@@ -1,0 +1,13 @@
+[package]
+name = "material_for_mc"
+version = "0.1.0"
+edition = "2021"
+description = "Material builder for Monte Carlo simulations"
+license = "MIT"
+
+[lib]
+name = "material_for_mc"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.19", features = ["extension-module"] }
