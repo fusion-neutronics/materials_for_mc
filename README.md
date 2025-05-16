@@ -6,7 +6,9 @@ A Rust package with Python bindings for making neutronics materials.
 
 
 
-# developer install
+# Developer install
+
+```
 python3.11 -m venv .materials_for_mc_env
 
 source .materials_for_mc_env/bin/activate
@@ -14,5 +16,16 @@ source .materials_for_mc_env/bin/activate
 pip install maturin
 
 maturin develop
+```
+
+# Example python usage
 
 python examples/use_in_python.py
+```
+
+# Testing
+
+```
+pytest
+cargo test
+```

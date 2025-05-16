@@ -22,3 +22,6 @@ Cargo.lock
 
 # python env
 .materials_for_mc_env/
+
+
+tests/__pycache__/
