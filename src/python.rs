@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::exceptions::PyValueError;
+// use pyo3::types::PyDict;
 use crate::material::Material;
+use pyo3::exceptions::PyValueError;
 
 #[pyclass(name = "Material")]
 pub struct PyMaterial {
@@ -18,13 +18,28 @@ impl PyMaterial {
     }
 
     fn add_nuclide(&mut self, nuclide: String, fraction: f64) -> PyResult<()> {
-        self.internal.add_nuclide(&nuclide, fraction)
+        self.internal
+            .add_nuclide(&nuclide, fraction)
             .map_err(|e| PyValueError::new_err(e))
     }
 
     fn set_density(&mut self, unit: String, value: f64) -> PyResult<()> {
-        self.internal.set_density(&unit, value)
+        self.internal
+            .set_density(&unit, value)
             .map_err(|e| PyValueError::new_err(e))
+    }
+
+    #[getter]
+    fn volume(&self) -> Option<f64> {
+        self.internal.volume
+    }
+
+    #[setter]
+    fn set_volume(&mut self, value: f64) -> PyResult<()> {
+        self.internal
+            .volume(Some(value))
+            .map_err(|e| PyValueError::new_err(e))?;
+        Ok(())
     }
 
     // fn get_nuclide_fraction(&self, nuclide: String) -> Option<f64> {
@@ -52,20 +67,30 @@ impl PyMaterial {
     /// String representation of the Material
     fn __str__(&self) -> PyResult<String> {
         let mut result = String::from("Material:\n");
-        
+
         // Add density information
         if let Some(density) = self.internal.density {
-            result.push_str(&format!("  Density: {} {}\n", density, self.internal.density_unit));
+            result.push_str(&format!(
+                "  Density: {} {}\n",
+                density, self.internal.density_unit
+            ));
         } else {
             result.push_str("  Density: not set\n");
         }
-        
+
+        // Add volume information
+        if let Some(volume) = self.internal.volume {
+            result.push_str(&format!("  Volume: {} cm³\n", volume));
+        } else {
+            result.push_str("  Volume: not set\n");
+        }
+
         // Add nuclide information
         result.push_str("  Composition:\n");
         for (nuclide, fraction) in &self.internal.nuclides {
             result.push_str(&format!("    {}: {}\n", nuclide, fraction));
         }
-        
+
         Ok(result)
     }
 
