@@ -1,5 +1,5 @@
 import pytest
-from material_for_mc import Material
+from materials_for_mc import Material
 
 def test_volume_set_and_get():
     material = Material()

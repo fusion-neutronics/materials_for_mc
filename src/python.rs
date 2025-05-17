@@ -109,3 +109,11 @@ impl PyMaterial {
         self.internal.density_unit.clone()
     }
 }
+
+
+// Add this module export function - this is what's missing
+#[pymodule]
+fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<PyMaterial>()?;
+    Ok(())
+}
