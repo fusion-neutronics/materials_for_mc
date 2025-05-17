@@ -17,3 +17,8 @@ pyo3 = { version = "0.19", features = ["extension-module"], optional = true  }
 # Optional: for building wheels
 [package.metadata.maturin]
 python-source = "python"
+
+[features]
+# Define the pyo3 feature
+default = []
+pyo3 = ["dep:pyo3"]

@@ -1,4 +1,9 @@
-use materials_for_mc::material::Material;
+// Change this:
+// use materials_for_mc::material::Material;
+
+// To this:
+use materials_for_mc::Material;
+
 
 fn main() {
     let mut mat = Material::new();

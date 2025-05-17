@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+
 #[derive(Debug, Clone)]
 pub struct Material {
     /// Composition of the material as a map of nuclide names to their atomic fractions

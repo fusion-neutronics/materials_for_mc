@@ -15,12 +15,13 @@ source .materials_for_mc_env/bin/activate
 
 pip install maturin
 
-maturin develop
+maturin develop --features pyo3
 ```
 
 # Example python usage
 
 ```
+
 python examples/use_in_python.py
 ```
 
@@ -28,9 +29,9 @@ python examples/use_in_python.py
 
 ```
 cargo build
-cd examples
+cd example_use
 cargo build
-cargo run examples/use_in_python.py
+cargo run
 ```
 
 # Testing
