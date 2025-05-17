@@ -7,12 +7,12 @@ license = "MIT"
 
 [lib]
 name = "materials_for_mc"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 # Keep the path the same
 path = "src/lib.rs"
 
 [dependencies]
-pyo3 = { version = "0.19", features = ["extension-module"] }
+pyo3 = { version = "0.19", features = ["extension-module"], optional = true  }
 
 # Optional: for building wheels
 [package.metadata.maturin]
