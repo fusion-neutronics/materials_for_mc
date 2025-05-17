@@ -1,4 +1,4 @@
-name: CI Rust testing
+name: Test usage with Rust
 
 on:
   push:
@@ -26,11 +26,10 @@ jobs:
       - name: Test
         run: cargo test --verbose
       - name: Test examples
-        run: cd example_use
-      - name: Build
-        run: cargo build --verbose
-      - name: Run
-        run: cargo run
+        run: |
+          cd example_use
+          cargo build --verbose
+          cargo run
 
   publish:
     name: Publish to crates.io
