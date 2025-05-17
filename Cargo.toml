@@ -1,13 +1,19 @@
 [package]
-name = "material_for_mc"
+name = "materials_for_mc"
 version = "0.1.0"
 edition = "2021"
 description = "Material builder for Monte Carlo simulations"
 license = "MIT"
 
 [lib]
-name = "material_for_mc"
+name = "materials_for_mc"
 crate-type = ["cdylib"]
+# Keep the path the same
+path = "src/lib.rs"
 
 [dependencies]
 pyo3 = { version = "0.19", features = ["extension-module"] }
+
+# Optional: for building wheels
+[package.metadata.maturin]
+python-source = "python"

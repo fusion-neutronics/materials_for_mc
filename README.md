@@ -20,7 +20,17 @@ maturin develop
 
 # Example python usage
 
+```
 python examples/use_in_python.py
+```
+
+# Example rust usage
+
+```
+cargo build
+cd examples
+cargo build
+cargo run examples/use_in_python.py
 ```
 
 # Testing
