@@ -8,7 +8,7 @@ pub struct Material {
     /// Density of the material in g/cm³
     pub density: Option<f64>,
     /// Density unit (default: g/cm³)
-    pub density_unit: String,
+    pub density_units: String,
     /// Volume of the material in cm³
     pub volume: Option<f64>,
 }
@@ -18,7 +18,7 @@ impl Material {
         Material {
             nuclides: HashMap::new(),
             density: None,
-            density_unit: String::from("g/cm3"),
+            density_units: String::from("g/cm3"),
             volume: None, // Initialize volume as None
         }
     }
@@ -38,7 +38,7 @@ impl Material {
         }
 
         self.density = Some(value);
-        self.density_unit = String::from(unit);
+        self.density_units = String::from(unit);
         Ok(())
     }
 
@@ -83,7 +83,7 @@ mod tests {
         let material = Material::new();
         assert!(material.nuclides.is_empty());
         assert_eq!(material.density, None);
-        assert_eq!(material.density_unit, "g/cm3");
+        assert_eq!(material.density_units, "g/cm3");
     }
 
     #[test]
@@ -126,13 +126,13 @@ mod tests {
         let result = material.set_density("g/cm3", 10.5);
         assert!(result.is_ok());
         assert_eq!(material.density, Some(10.5));
-        assert_eq!(material.density_unit, "g/cm3");
+        assert_eq!(material.density_units, "g/cm3");
 
         // Test setting a different unit
         let result = material.set_density("kg/m3", 10500.0);
         assert!(result.is_ok());
         assert_eq!(material.density, Some(10500.0));
-        assert_eq!(material.density_unit, "kg/m3");
+        assert_eq!(material.density_units, "kg/m3");
     }
 
     #[test]
@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(cloned.nuclides.get("U235"), Some(&0.05));
         assert_eq!(cloned.nuclides.get("U238"), Some(&0.95));
         assert_eq!(cloned.density, Some(19.1));
-        assert_eq!(cloned.density_unit, "g/cm3");
+        assert_eq!(cloned.density_units, "g/cm3");
     }
 
     #[test]
