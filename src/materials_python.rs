@@ -1,9 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyIndexError;
+use pyo3::types::PyList;
 use crate::materials::Materials;
 use crate::material_python::PyMaterial;
-// use pyo3::prelude::*;
-use crate::material::Material; 
 
 /// Python wrapper for the Rust Materials struct
 #[pyclass(name = "Materials")]
@@ -14,12 +13,23 @@ pub struct PyMaterials {
 
 #[pymethods]
 impl PyMaterials {
-    /// Create a new empty materials collection
+    /// Create a new materials collection, optionally with initial materials
     #[new]
-    fn new() -> Self {
-        PyMaterials {
+    fn py_new(materials: Option<&PyList>) -> PyResult<Self> {
+        let mut result = PyMaterials {
             internal: Materials::new(),
+        };
+        
+        // If materials were provided, add them to the collection
+        if let Some(mat_list) = materials {
+            for item in mat_list.iter() {
+                // Extract PyMaterial by value, not by reference
+                let material = item.extract::<PyRef<PyMaterial>>()?;
+                result.internal.append(material.get_internal().clone());
+            }
         }
+        
+        Ok(result)
     }
     
     /// Append a material to the collection
@@ -50,6 +60,12 @@ impl PyMaterials {
     fn len(&self) -> usize {
         self.internal.len()
     }
+
+    /// Special method for Python's len() function
+    fn __len__(&self) -> usize {
+        self.len()
+    }
+    
     
     /// Check if the collection is empty
     fn is_empty(&self) -> bool {
