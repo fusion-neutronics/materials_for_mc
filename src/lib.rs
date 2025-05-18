@@ -4,8 +4,8 @@ pub use material::Material;
 
 // Conditionally include the Python module
 #[cfg(feature = "pyo3")]
-mod python;
+mod material_python;
 
 // Re-export Python module for Maturin to find
 #[cfg(feature = "pyo3")]
-pub use python::*;
+pub use material_python::*;
