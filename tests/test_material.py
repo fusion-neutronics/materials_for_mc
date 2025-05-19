@@ -24,3 +24,16 @@ def test_initial_volume():
 
     # Test that the initial volume is None
     assert material.volume is None
+    
+def test_adding_nuclides():
+    material = Material()
+    material.add_nuclide("H", 1.0)
+    material.add_nuclide("Fe", 0.5)
+    assert material.nuclides == [("Fe", 0.5), ("H", 1.0)] # TODO change to named tuple using a custom type
+
+def test_density_settings():
+    material = Material()
+    material.add_nuclide("W", 0.5)
+    material.set_density('g/cm3', 19.3)
+    assert material.density == 19.3
+    assert material.density_units == 'g/cm3'

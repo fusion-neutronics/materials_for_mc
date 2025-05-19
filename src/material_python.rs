@@ -29,6 +29,21 @@ impl PyMaterial {
             .map_err(|e| PyValueError::new_err(e))
     }
 
+    /// Get the material nuclides as a tuple of (name, fraction) pairs
+    #[getter]
+    fn nuclides(&self) -> Vec<(String, f64)> {
+        // Convert HashMap to a Vec of tuples
+        let mut nuclide_vec: Vec<(String, f64)> = self.internal.nuclides
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        
+        // Sort by nuclide name for consistent order
+        nuclide_vec.sort_by(|a, b| a.0.cmp(&b.0));
+        
+        nuclide_vec
+    }
+
     #[getter]
     fn volume(&self) -> Option<f64> {
         self.internal.volume
@@ -72,7 +87,7 @@ impl PyMaterial {
         if let Some(density) = self.internal.density {
             result.push_str(&format!(
                 "  Density: {} {}\n",
-                density, self.internal.density_unit
+                density, self.internal.density_units
             ));
         } else {
             result.push_str("  Density: not set\n");
@@ -105,15 +120,21 @@ impl PyMaterial {
     }
 
     #[getter]
-    fn density_unit(&self) -> String {
-        self.internal.density_unit.clone()
+    fn density_units(&self) -> String {
+        self.internal.density_units.clone()
     }
 }
 
 
-// Add this module export function - this is what's missing
-#[pymodule]
-fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PyMaterial>()?;
-    Ok(())
+// Add these helper methods in a separate impl block
+impl PyMaterial {
+    // Helper method for other Python modules to access the internal Material
+    pub(crate) fn get_internal(&self) -> &Material {
+        &self.internal
+    }
+    
+    // Helper method to create a PyMaterial from a Material
+    pub(crate) fn from_material(material: Material) -> Self {
+        PyMaterial { internal: material }
+    }
 }
