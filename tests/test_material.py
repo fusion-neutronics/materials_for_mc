@@ -37,3 +37,25 @@ def test_density_settings():
     material.set_density('g/cm3', 19.3)
     assert material.density == 19.3
     assert material.density_units == 'g/cm3'
+
+def test_get_nuclide_names():
+    material = Material()
+    
+    # Test empty material has no nuclides
+    assert material.get_nuclide_names() == []
+    
+    # Add some nuclides
+    material.add_nuclide("U235", 0.05)
+    material.add_nuclide("U238", 0.95)
+    material.add_nuclide("O16", 2.0)
+    
+    # Check we get all nuclides in alphabetical order
+    assert material.get_nuclide_names() == ["O16", "U235", "U238"]
+    
+    # Test adding the same nuclide again replaces the previous value
+    material.add_nuclide("U235", 0.1)
+    assert "U235" in material.get_nuclide_names()
+    assert len(material.get_nuclide_names()) == 3  # Still 3 nuclides
+    
+    # Verify the order is still alphabetical
+    assert material.get_nuclide_names() == ["O16", "U235", "U238"]

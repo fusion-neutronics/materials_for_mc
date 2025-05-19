@@ -52,6 +52,13 @@ impl Material {
         Ok(self.volume)
     }
 
+    pub fn get_nuclides(&self) -> Vec<String> {
+        let mut nuclides: Vec<String> = self.nuclides.keys().cloned().collect();
+        nuclides.sort(); // Sort alphabetically for consistent output
+        nuclides
+    }
+
+
     // pub fn get_nuclide_fraction(&self, nuclide: &str) -> Option<f64> {
     //     self.nuclides.get(nuclide).cloned()
     // }
@@ -202,4 +209,22 @@ mod tests {
         assert_eq!(result.unwrap_err(), "Volume must be positive");
         assert_eq!(material.volume, Some(100.0)); // Ensure the volume wasn't changed
     }
+
+    #[test]
+    fn test_get_nuclides() {
+        let mut material = Material::new();
+        
+        // Empty material should return empty vector
+        assert!(material.get_nuclides().is_empty());
+        
+        // Add some nuclides
+        material.add_nuclide("U235", 0.05).unwrap();
+        material.add_nuclide("U238", 0.95).unwrap();
+        material.add_nuclide("O16", 2.0).unwrap();
+        
+        // Check the result is sorted
+        let nuclides = material.get_nuclides();
+        assert_eq!(nuclides, vec!["O16".to_string(), "U235".to_string(), "U238".to_string()]);
+    }
+
 }

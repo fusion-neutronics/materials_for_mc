@@ -65,8 +65,7 @@ impl PyMaterials {
     fn __len__(&self) -> usize {
         self.len()
     }
-    
-    
+
     /// Check if the collection is empty
     fn is_empty(&self) -> bool {
         self.internal.is_empty()
