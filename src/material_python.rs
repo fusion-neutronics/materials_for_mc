@@ -56,6 +56,15 @@ impl PyMaterial {
             .map_err(|e| PyValueError::new_err(e))?;
         Ok(())
     }
+    // Then try this:
+    fn get_nuclide_names(&self) -> Vec<String> {
+        self.internal.get_nuclides()
+    }
+
+    // // Add a regular method for get_nuclides
+    // fn get_nuclides(&self) -> Vec<String> {
+    //     self.internal.get_nuclides()
+    // }
 
     // fn get_nuclide_fraction(&self, nuclide: String) -> Option<f64> {
     //     self.internal.get_nuclide_fraction(&nuclide)
@@ -68,15 +77,6 @@ impl PyMaterial {
     // fn normalize(&mut self) -> PyResult<()> {
     //     self.internal.normalize()
     //         .map_err(|e| PyValueError::new_err(e))
-    // }
-
-    /// Get all nuclides and their fractions as a dictionary
-    // fn get_nuclides(&self, py: Python) -> PyResult<PyObject> {
-    //     let dict = PyDict::new(py);
-    //     for (nuclide, fraction) in &self.internal.nuclides {
-    //         dict.set_item(nuclide, *fraction)?;
-    //     }
-    //     Ok(dict.into())
     // }
 
     /// String representation of the Material
