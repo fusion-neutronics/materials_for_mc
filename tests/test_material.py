@@ -59,3 +59,9 @@ def test_get_nuclide_names():
     
     # Verify the order is still alphabetical
     assert material.get_nuclide_names() == ["O16", "U235", "U238"]
+
+def test_material_reading_data():
+    material = Material()
+    material.add_nuclide("Li6", 1.0)
+    
+    material.read_nuclides_from_json({"Li6":"tests/li6.json"})
