@@ -3,25 +3,17 @@ from materials_for_mc import Nuclide
 def test_read_li6_nuclide():
     nuc1 = Nuclide('Li6')
     nuc1.read_nuclide_from_json('tests/li6.json')
-    # assert nuc1.data is not None
-    # data = nuc1.data
-    # assert data.element.lower() == 'lithium'
-    # assert data.atomic_symbol == "Li"
-    # assert data.proton_number == 3
-    # assert data.mass_number == 6
-    # assert data.neutron_number == 3
-    # assert data.incident_particle == "neutron"
-    # assert isinstance(data.temperature, list)
-    # assert len(data.temperature) > 0
-    # # Check at least one temperature entry and one reaction
-    # temp_entry = data.temperature[0]
-    # assert isinstance(temp_entry.temps, dict)
-    # for t, reactions in temp_entry.temps.items():
-    #     assert isinstance(reactions, list)
-    #     if reactions:
-    #         reaction = reactions[0]
-    #         assert hasattr(reaction, "reaction_products")
-    #         assert hasattr(reaction, "mt_reaction_number")
-    #         assert isinstance(reaction.cross_section, list)
-    #         assert isinstance(reaction.energy, list)
-    #         break
+    assert nuc1.element.lower() == 'lithium'
+    assert nuc1.atomic_symbol == "Li"
+    assert nuc1.proton_number == 3
+    assert nuc1.mass_number == 6
+    assert nuc1.neutron_number == 3
+    assert list(nuc1.incident_particle.keys())[0] == "neutron"
+
+    cs = nuc1.incident_particle['neutron']['294']['2']['cross_section']
+    energy = nuc1.incident_particle['neutron']['294']['2']['energy']
+
+    for entry in cs:
+        assert isinstance(entry, float)
+    for entry in energy:
+        assert isinstance(entry, float)

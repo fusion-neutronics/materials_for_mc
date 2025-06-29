@@ -13,16 +13,9 @@ static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Nuclide>>> = Lazy::new(|
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
-    pub reaction_products: String,
-    pub mt_reaction_number: u32,
     pub cross_section: Vec<f64>,
     pub energy: Vec<f64>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TemperatureEntry {
-    #[serde(flatten)]
-    pub temps: HashMap<String, Vec<Reaction>>, // e.g., "294": [ ...reactions... ]
+    // ... add other fields as needed ...
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -33,9 +26,13 @@ pub struct Nuclide {
     pub proton_number: Option<u32>,
     pub neutron_number: Option<u32>,
     pub mass_number: Option<u32>,
-    pub incident_particle: Option<String>,
+    pub incident_particle: Option<HashMap<String, IncidentParticleData>>,
     pub library: Option<String>,
-    pub temperature: Option<Vec<TemperatureEntry>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IncidentParticleData {
+    pub temperature: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
 }
 
 // Read a single nuclide from a JSON file

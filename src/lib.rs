@@ -39,7 +39,6 @@ fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<materials_python::PyMaterials>()?;
     m.add_class::<nuclide_python::PyNuclide>()?;
     m.add_class::<nuclide_python::PyReaction>()?;
-    m.add_class::<nuclide_python::PyTemperatureEntry>()?;
     m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
     Ok(())
 }
