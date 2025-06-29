@@ -5,6 +5,11 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+// Global cache for nuclides to avoid reloading
+static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Nuclide>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
@@ -32,6 +37,7 @@ pub struct Nuclide {
     pub temperature: Vec<TemperatureEntry>,
 }
 
+// Read a single nuclide from a JSON file
 pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     path: P,
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
@@ -40,5 +46,33 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     let file = File::open(path_ref)?;
     let reader = BufReader::new(file);
     let nuclide = serde_json::from_reader(reader)?;
+    Ok(nuclide)
+}
+
+// Get a nuclide from the cache or load it from the specified JSON file
+pub fn get_or_load_nuclide(
+    nuclide_name: &str, 
+    json_path_map: &HashMap<String, String>
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Try to get from cache first
+    {
+        let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+        if let Some(nuclide) = cache.get(nuclide_name) {
+            return Ok(nuclide.clone());
+        }
+    }
+    
+    // Not in cache, load from JSON
+    let path = json_path_map.get(nuclide_name)
+        .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
+    
+    let nuclide = read_nuclide_from_json(path)?;
+    
+    // Store in cache
+    {
+        let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+        cache.insert(nuclide_name.to_string(), nuclide.clone());
+    }
+    
     Ok(nuclide)
 }

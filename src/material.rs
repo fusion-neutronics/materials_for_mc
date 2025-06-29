@@ -1,9 +1,5 @@
 use std::collections::HashMap;
-use crate::nuclide::{Nuclide, read_nuclide_from_json};
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-
-static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Nuclide>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+use crate::nuclide::{Nuclide, get_or_load_nuclide};
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -67,17 +63,15 @@ impl Material {
 
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
-        for nuclide in self.nuclides.keys() {
-            let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            if !cache.contains_key(nuclide) {
-                // Check if the JSON file is provided for this nuclide
-                let path = nuclide_json_map.get(nuclide)
-                    .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides in the material.", nuclide))?;
-                let data = read_nuclide_from_json(path)?;
-                cache.insert(nuclide.clone(), data);
-            }
-            // Optionally, you can store a reference or clone in the struct if needed
+        // Get all nuclide names that need to be loaded
+        let nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
+        
+        // Load nuclides using the centralized function in the nuclide module
+        for nuclide_name in nuclide_names {
+            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map)?;
+            self.nuclide_data.insert(nuclide_name, nuclide);
         }
+        
         Ok(())
     }
 

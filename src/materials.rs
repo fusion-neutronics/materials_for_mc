@@ -1,12 +1,6 @@
 use crate::material::Material;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::Mutex;
-use crate::nuclide::{Nuclide, read_nuclide_from_json};
-
-extern crate once_cell;
-
-static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Nuclide>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+use crate::nuclide::{Nuclide, get_or_load_nuclide};
 
 /// A collection of materials that behaves like a list/vector
 #[derive(Debug, Clone)]
@@ -82,6 +76,7 @@ impl Materials {
 
     /// Read nuclide data from JSON files for all materials, only once per nuclide
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
+        // Collect all unique nuclide names from all materials
         let mut needed: Vec<String> = Vec::new();
         for mat in &self.materials {
             for nuclide in mat.nuclides.keys() {
@@ -90,15 +85,13 @@ impl Materials {
                 }
             }
         }
-        let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        for nuclide in needed {
-            if !cache.contains_key(&nuclide) {
-                if let Some(path) = nuclide_json_map.get(&nuclide) {
-                    let data = read_nuclide_from_json(path)?;
-                    cache.insert(nuclide.clone(), data);
-                }
-            }
+        
+        // Load each nuclide directly using get_or_load_nuclide
+        for nuclide_name in needed {
+            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map)?;
+            self.nuclide_data.insert(nuclide_name, nuclide);
         }
+        
         Ok(())
     }
 }
@@ -148,7 +141,7 @@ mod tests {
         let material = Material::new();
         
         materials.append(material);
-        let removed = materials.remove(0);
+        let _removed = materials.remove(0);
         
         assert!(materials.is_empty());
     }
