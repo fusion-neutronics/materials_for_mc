@@ -76,19 +76,19 @@ impl Material {
         Ok(())
     }
 
-    /// Build a unified energy grid for all nuclides for a given particle, temperature, and MT
+    /// Build a unified energy grid for all nuclides for a given particle and temperature across all MT reactions
     pub fn unified_energy_grid(
         &self,
         particle: &str,
         temperature: &str,
-        mt: &str,
     ) -> Vec<f64> {
         let mut all_energies = Vec::new();
         for nuclide in self.nuclides.keys() {
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 if let Some(ip_data) = nuclide_data.incident_particle.as_ref().and_then(|ip| ip.get(particle)) {
                     if let Some(temp_data) = ip_data.temperature.get(temperature) {
-                        if let Some(reaction) = temp_data.get(mt) {
+                        // Iterate through all MT reactions for this nuclide
+                        for reaction in temp_data.values() {
                             all_energies.extend(&reaction.energy);
                         }
                     }

@@ -145,9 +145,9 @@ impl PyMaterial {
         })
     }
 
-    /// Return the unified energy grid for all nuclides for a given particle, temperature, and MT
-    fn unified_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Vec<f64> {
-        self.internal.unified_energy_grid(particle, temperature, mt)
+    /// Return the unified energy grid for all nuclides for a given particle and temperature across all MT reactions
+    fn unified_energy_grid(&self, particle: &str, temperature: &str) -> Vec<f64> {
+        self.internal.unified_energy_grid(particle, temperature)
     }
 }
 
