@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 
 #[derive(Debug, Clone)]
@@ -11,8 +12,8 @@ pub struct Material {
     pub density_units: String,
     /// Volume of the material in cm³
     pub volume: Option<f64>,
-    /// Loaded nuclide data (name -> Nuclide)
-    pub nuclide_data: HashMap<String, Nuclide>,
+    /// Loaded nuclide data (name -> Arc<Nuclide>)
+    pub nuclide_data: HashMap<String, Arc<Nuclide>>,
 }
 
 impl Material {
@@ -73,6 +74,31 @@ impl Material {
         }
         
         Ok(())
+    }
+
+    /// Build a unified energy grid for all nuclides for a given particle, temperature, and MT
+    pub fn unified_energy_grid(
+        &self,
+        particle: &str,
+        temperature: &str,
+        mt: &str,
+    ) -> Vec<f64> {
+        let mut all_energies = Vec::new();
+        for nuclide in self.nuclides.keys() {
+            if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
+                if let Some(ip_data) = nuclide_data.incident_particle.as_ref().and_then(|ip| ip.get(particle)) {
+                    if let Some(temp_data) = ip_data.temperature.get(temperature) {
+                        if let Some(reaction) = temp_data.get(mt) {
+                            all_energies.extend(&reaction.energy);
+                        }
+                    }
+                }
+            }
+        }
+        // Sort and deduplicate
+        all_energies.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
+        all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
+        all_energies
     }
 
 

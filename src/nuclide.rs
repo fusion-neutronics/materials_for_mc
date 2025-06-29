@@ -5,11 +5,11 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use once_cell::sync::Lazy;
 
 // Global cache for nuclides to avoid reloading
-static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Nuclide>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
@@ -100,12 +100,12 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
 pub fn get_or_load_nuclide(
     nuclide_name: &str, 
     json_path_map: &HashMap<String, String>
-) -> Result<Nuclide, Box<dyn std::error::Error>> {
+) -> Result<Arc<Nuclide>, Box<dyn std::error::Error>> {
     // Try to get from cache first
     {
         let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
         if let Some(nuclide) = cache.get(nuclide_name) {
-            return Ok(nuclide.clone());
+            return Ok(Arc::clone(nuclide));
         }
     }
     
@@ -114,12 +114,12 @@ pub fn get_or_load_nuclide(
         .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
     
     let nuclide = read_nuclide_from_json(path)?;
-    
+    let arc_nuclide = Arc::new(nuclide);
     // Store in cache
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        cache.insert(nuclide_name.to_string(), nuclide.clone());
+        cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
     }
     
-    Ok(nuclide)
+    Ok(arc_nuclide)
 }

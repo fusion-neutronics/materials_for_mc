@@ -1,14 +1,15 @@
 use crate::material::Material;
 use std::collections::HashMap;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
+use std::sync::Arc;
 
 /// A collection of materials that behaves like a list/vector
 #[derive(Debug, Clone)]
 pub struct Materials {
     /// Storage for materials in a vector
     materials: Vec<Material>,
-    /// Loaded nuclide data (name -> Nuclide)
-    pub nuclide_data: HashMap<String, Nuclide>,
+    /// Loaded nuclide data (name -> Arc<Nuclide>)
+    pub nuclide_data: HashMap<String, Arc<Nuclide>>,
 }
 
 impl Materials {
@@ -85,13 +86,20 @@ impl Materials {
                 }
             }
         }
-        
         // Load each nuclide directly using get_or_load_nuclide
-        for nuclide_name in needed {
-            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map)?;
-            self.nuclide_data.insert(nuclide_name, nuclide);
+        for nuclide_name in &needed {
+            let nuclide = get_or_load_nuclide(nuclide_name, nuclide_json_map)?;
+            self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&nuclide));
         }
-        
+        // Ensure all materials reference the shared Arc<Nuclide> from self.nuclide_data
+        for mat in &mut self.materials {
+            mat.nuclide_data.clear();
+            for nuclide_name in mat.nuclides.keys() {
+                if let Some(shared_arc) = self.nuclide_data.get(nuclide_name) {
+                    mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -159,5 +167,38 @@ mod tests {
         
         // Verify the modification was successful
         assert_eq!(materials.get(0).unwrap().density, Some(10.5));
+    }
+
+    #[test]
+    fn test_materials_nuclide_arc_sharing() {
+        use std::collections::HashMap;
+        use std::sync::Arc;
+        use crate::nuclide::Nuclide;
+
+        // Prepare nuclide JSON map (adjust path as needed)
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/li6.json".to_string());
+
+        // Create a Materials collection and add many materials referencing the same nuclide
+        let mut materials = super::Materials::new();
+        for _ in 0..100 {
+            let mut mat = crate::material::Material::new();
+            mat.add_nuclide("Li6", 1.0).unwrap();
+            materials.append(mat);
+        }
+        // Load nuclide data (should only load once and share Arc<Nuclide>)
+        materials.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Collect all Arc pointers for Li6 from each material
+        let mut arcs: Vec<Arc<Nuclide>> = Vec::new();
+        for mat in &materials.materials {
+            if let Some(arc) = mat.nuclide_data.get("Li6") {
+                arcs.push(Arc::clone(arc));
+            }
+        }
+        // All Arc pointers should point to the same allocation
+        for i in 1..arcs.len() {
+            assert!(Arc::ptr_eq(&arcs[0], &arcs[i]), "Nuclide Arc is not shared!");
+        }
     }
 }

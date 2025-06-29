@@ -136,6 +136,19 @@ impl PyMaterial {
         self.internal.read_nuclides_from_json(&rust_map)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
+
+    /// Return the pointer address of the Arc<Nuclide> for a given nuclide name (for debugging/sharing checks)
+    fn nuclide_ptr_addr(&self, nuclide: &str) -> Option<usize> {
+        self.internal.nuclide_data.get(nuclide).map(|arc| {
+            let ptr: *const crate::nuclide::Nuclide = std::sync::Arc::as_ptr(arc);
+            ptr as usize
+        })
+    }
+
+    /// Return the unified energy grid for all nuclides for a given particle, temperature, and MT
+    fn unified_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Vec<f64> {
+        self.internal.unified_energy_grid(particle, temperature, mt)
+    }
 }
 
 
