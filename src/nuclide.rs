@@ -27,6 +27,7 @@ pub struct TemperatureEntry {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
+    pub name: Option<String>,
     pub element: Option<String>,
     pub atomic_symbol: Option<String>,
     pub proton_number: Option<u32>,

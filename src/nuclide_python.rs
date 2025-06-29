@@ -9,7 +9,7 @@ use crate::nuclide::{Nuclide, Reaction, TemperatureEntry};
 #[derive(Clone, Default)]
 pub struct PyNuclide {
     #[pyo3(get)]
-    pub name: String,
+    pub name: Option<String>,
     #[pyo3(get)]
     pub element: Option<String>,
     #[pyo3(get)]
@@ -31,7 +31,7 @@ pub struct PyNuclide {
 #[pymethods]
 impl PyNuclide {
     #[new]
-    pub fn new(name: String) -> Self {
+    pub fn new(name: Option<String>) -> Self {
         PyNuclide {
             name,
             element: None,
@@ -48,6 +48,7 @@ impl PyNuclide {
     pub fn read_nuclide_from_json(&mut self, path: &str) -> PyResult<()> {
         let nuclide = crate::nuclide::read_nuclide_from_json(path)
             .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+        self.name = nuclide.name;
         self.element = nuclide.element;
         self.atomic_symbol = nuclide.atomic_symbol;
         self.proton_number = nuclide.proton_number;
@@ -69,7 +70,7 @@ impl PyNuclide {
 impl From<Nuclide> for PyNuclide {
     fn from(n: Nuclide) -> Self {
         PyNuclide {
-            name: n.element.clone().unwrap_or_default(),
+            name: n.name,
             element: n.element,
             atomic_symbol: n.atomic_symbol,
             proton_number: n.proton_number,
