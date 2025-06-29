@@ -27,14 +27,14 @@ pub struct TemperatureEntry {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
-    pub element: String,
-    pub atomic_symbol: String,
-    pub proton_number: u32,
-    pub neutron_number: u32,
-    pub mass_number: u32,
-    pub incident_particle: String,
-    pub library: String,
-    pub temperature: Vec<TemperatureEntry>,
+    pub element: Option<String>,
+    pub atomic_symbol: Option<String>,
+    pub proton_number: Option<u32>,
+    pub neutron_number: Option<u32>,
+    pub mass_number: Option<u32>,
+    pub incident_particle: Option<String>,
+    pub library: Option<String>,
+    pub temperature: Option<Vec<TemperatureEntry>>,
 }
 
 // Read a single nuclide from a JSON file
