@@ -1,6 +1,7 @@
 // First, import any modules and re-export the types for Rust usage
 mod material;
 mod materials;
+mod nuclide;
 pub use material::Material;
 pub use materials::Materials;
 

@@ -2,6 +2,8 @@ use pyo3::prelude::*;
 // use pyo3::types::PyDict;
 use crate::material::Material;
 use pyo3::exceptions::PyValueError;
+use pyo3::types::PyDict;
+use std::collections::HashMap;
 
 #[pyclass(name = "Material")]
 pub struct PyMaterial {
@@ -122,6 +124,17 @@ impl PyMaterial {
     #[getter]
     fn density_units(&self) -> String {
         self.internal.density_units.clone()
+    }
+
+    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: &PyDict) -> PyResult<()> {
+        let mut rust_map = HashMap::new();
+        for (k, v) in nuclide_json_map.iter() {
+            let key: String = k.extract()?;
+            let val: String = v.extract()?;
+            rust_map.insert(key, val);
+        }
+        self.internal.read_nuclides_from_json(&rust_map)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
