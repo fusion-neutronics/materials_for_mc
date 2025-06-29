@@ -81,6 +81,21 @@ impl PyNuclide {
             Ok(None)
         }
     }
+
+    #[getter]
+    pub fn incident_particles(&self) -> Option<Vec<String>> {
+        Nuclide::from(self.clone()).incident_particles()
+    }
+
+    #[getter]
+    pub fn temperatures(&self) -> Option<Vec<String>> {
+        Nuclide::from(self.clone()).temperatures()
+    }
+
+    #[getter]
+    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+        Nuclide::from(self.clone()).reaction_mts()
+    }
 }
 
 #[cfg(feature = "pyo3")]
@@ -95,6 +110,21 @@ impl From<Nuclide> for PyNuclide {
             mass_number: n.mass_number,
             library: n.library,
             incident_particle: n.incident_particle,
+        }
+    }
+}
+
+impl From<PyNuclide> for Nuclide {
+    fn from(py: PyNuclide) -> Self {
+        Nuclide {
+            name: py.name,
+            element: py.element,
+            atomic_symbol: py.atomic_symbol,
+            proton_number: py.proton_number,
+            neutron_number: py.neutron_number,
+            mass_number: py.mass_number,
+            library: py.library,
+            incident_particle: py.incident_particle,
         }
     }
 }

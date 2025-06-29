@@ -9,6 +9,9 @@ def test_read_li6_nuclide():
     assert nuc1.mass_number == 6
     assert nuc1.neutron_number == 3
     assert list(nuc1.incident_particle.keys())[0] == "neutron"
+    assert nuc1.incident_particles == ['neutron']
+    assert nuc1.temperatures == ['294']
+    assert nuc1.reaction_mts[0] == 1
 
     cs = nuc1.incident_particle['neutron']['294']['2']['cross_section']
     energy = nuc1.incident_particle['neutron']['294']['2']['energy']

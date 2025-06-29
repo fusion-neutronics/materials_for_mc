@@ -35,6 +35,55 @@ pub struct IncidentParticleData {
     pub temperature: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
 }
 
+impl Nuclide {
+    /// Get a list of available incident particle strings (e.g., ["neutron", ...])
+    pub fn incident_particles(&self) -> Option<Vec<String>> {
+        self.incident_particle.as_ref().map(|ip_map| {
+            let mut v: Vec<String> = ip_map.keys().cloned().collect();
+            v.sort();
+            v
+        })
+    }
+
+    pub fn temperatures(&self) -> Option<Vec<String>> {
+        let mut temps = std::collections::HashSet::new();
+        if let Some(ip_map) = &self.incident_particle {
+            for ip_data in ip_map.values() {
+                for temp in ip_data.temperature.keys() {
+                    temps.insert(temp.clone());
+                }
+            }
+        }
+        if temps.is_empty() {
+            None
+        } else {
+            let mut temps_vec: Vec<String> = temps.into_iter().collect();
+            temps_vec.sort();
+            Some(temps_vec)
+        }
+    }
+
+    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+        let mut mts = std::collections::HashSet::new();
+        if let Some(ip_map) = &self.incident_particle {
+            for ip_data in ip_map.values() {
+                for mt_map in ip_data.temperature.values() {
+                    for mt in mt_map.keys() {
+                        mts.insert(mt.clone());
+                    }
+                }
+            }
+        }
+        if mts.is_empty() {
+            None
+        } else {
+            let mut mts_vec: Vec<String> = mts.into_iter().collect();
+            mts_vec.sort();
+            Some(mts_vec)
+        }
+    }
+}
+
 // Read a single nuclide from a JSON file
 pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     path: P,
