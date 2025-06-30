@@ -23,8 +23,7 @@ grid = mat1.unified_energy_grid_neutron()
 micro_xs = mat1.calculate_microscopic_xs_neutron(grid)
 import numpy as np
 
-micro_xs_at_14 = float(np.interp(14e6, grid, micro_xs))
-
+micro_xs_at_14 = float(np.interp(14e6, grid, micro_xs['total']))
 
 
 mean_free_path = 1/micro_xs_at_14

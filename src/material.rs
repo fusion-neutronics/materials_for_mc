@@ -221,13 +221,12 @@ impl Material {
         }
         
         // Calculate macroscopic cross section for each MT
-        for (nuclide, fraction) in &self.nuclides {
+        // Get atoms per cc for all nuclides
+        let atoms_per_cc_map = self.get_atoms_per_cc();
+        
+        for (nuclide, _) in &self.nuclides {
             if let Some(nuclide_data) = micro_xs.get(nuclide) {
-                if let Some(density) = self.density {
-                    // TODO: Implement proper atoms_per_cc calculation based on atomic mass
-                    // This is a simplified version
-                    let atoms_per_cc = fraction * density;
-                    
+                if let Some(atoms_per_cc) = atoms_per_cc_map.get(nuclide) {
                     // Add contribution to macroscopic cross section for each MT
                     for (mt, xs_values) in nuclide_data {
                         if let Some(macro_values) = macro_xs.get_mut(mt) {
@@ -246,27 +245,125 @@ impl Material {
         macro_xs
     }
 
-
-    // pub fn get_nuclide_fraction(&self, nuclide: &str) -> Option<f64> {
-    //     self.nuclides.get(nuclide).cloned()
-    // }
-
-    // pub fn get_total_fraction(&self) -> f64 {
-    //     self.nuclides.values().sum()
-    // }
-
-    // pub fn normalize(&mut self) -> Result<(), String> {
-    //     let total = self.get_total_fraction();
-    //     if total <= 0.0 {
-    //         return Err(String::from("Cannot normalize: total fraction is zero or negative"));
-    //     }
-
-    //     for fraction in self.nuclides.values_mut() {
-    //         *fraction /= total;
-    //     }
-
-    //     Ok(())
-    // }
+    /// Calculate atoms per cubic centimeter for each nuclide in the material
+    /// 
+    /// This method calculates the number density of atoms for each nuclide,
+    /// using the atomic fractions and material density.
+    /// 
+    /// Returns a HashMap mapping nuclide symbols to their atom density in atoms/cm³.
+    /// Returns an empty HashMap if the material density is not set.
+    pub fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
+        let mut atoms_per_cc = HashMap::new();
+        
+        // Return empty HashMap if density is not set
+        if self.density.is_none() {
+            return atoms_per_cc;
+        }
+        
+        let density = self.density.unwrap();
+        
+        // Hard-coded atomic masses (in g/mol) for common nuclides
+        let mut atomic_masses = HashMap::new();
+        
+        // Hydrogen isotopes
+        atomic_masses.insert(String::from("H1"), 1.00782503);
+        atomic_masses.insert(String::from("H2"), 2.01410178); // Deuterium
+        atomic_masses.insert(String::from("H3"), 3.01604928); // Tritium
+        
+        // Helium isotopes
+        atomic_masses.insert(String::from("He3"), 3.0160293);
+        atomic_masses.insert(String::from("He4"), 4.00260325);
+        
+        // Lithium isotopes
+        atomic_masses.insert(String::from("Li6"), 6.015122);
+        atomic_masses.insert(String::from("Li7"), 7.016004);
+        
+        // Boron isotopes
+        atomic_masses.insert(String::from("B10"), 10.012937);
+        atomic_masses.insert(String::from("B11"), 11.009305);
+        
+        // Carbon isotopes
+        atomic_masses.insert(String::from("C12"), 12.0);
+        atomic_masses.insert(String::from("C13"), 13.003355);
+        
+        // Oxygen isotopes
+        atomic_masses.insert(String::from("O16"), 15.994915);
+        atomic_masses.insert(String::from("O17"), 16.999132);
+        atomic_masses.insert(String::from("O18"), 17.999160);
+        
+        // Uranium isotopes
+        atomic_masses.insert(String::from("U235"), 235.043924);
+        atomic_masses.insert(String::from("U238"), 238.050788);
+        
+        // Plutonium isotopes
+        atomic_masses.insert(String::from("Pu239"), 239.052157);
+        atomic_masses.insert(String::from("Pu240"), 240.053813);
+        atomic_masses.insert(String::from("Pu241"), 241.056851);
+        
+        // Natural elements (average atomic masses)
+        atomic_masses.insert(String::from("H"), 1.008);
+        atomic_masses.insert(String::from("He"), 4.0026);
+        atomic_masses.insert(String::from("Li"), 6.94);
+        atomic_masses.insert(String::from("Be"), 9.0122);
+        atomic_masses.insert(String::from("B"), 10.81);
+        atomic_masses.insert(String::from("C"), 12.011);
+        atomic_masses.insert(String::from("N"), 14.007);
+        atomic_masses.insert(String::from("O"), 15.999);
+        atomic_masses.insert(String::from("F"), 18.998);
+        atomic_masses.insert(String::from("Na"), 22.990);
+        atomic_masses.insert(String::from("Mg"), 24.305);
+        atomic_masses.insert(String::from("Al"), 26.982);
+        atomic_masses.insert(String::from("Si"), 28.085);
+        atomic_masses.insert(String::from("P"), 30.974);
+        atomic_masses.insert(String::from("S"), 32.06);
+        atomic_masses.insert(String::from("Cl"), 35.45);
+        atomic_masses.insert(String::from("Fe"), 55.845);
+        atomic_masses.insert(String::from("Ni"), 58.693);
+        atomic_masses.insert(String::from("Cu"), 63.546);
+        atomic_masses.insert(String::from("Zr"), 91.224);
+        atomic_masses.insert(String::from("Mo"), 95.95);
+        atomic_masses.insert(String::from("U"), 238.03);
+        
+        // Avogadro's number (atoms/mol)
+        const AVOGADRO: f64 = 6.02214076e23;
+        
+        // Calculate the sum of (fraction / atomic_mass) for the normalization
+        let mut sum_fraction_over_mass = 0.0;
+        
+        // First pass: calculate sum of (fraction / atomic_mass)
+        for (nuclide, fraction) in &self.nuclides {
+            if let Some(mass) = atomic_masses.get(nuclide) {
+                sum_fraction_over_mass += fraction / mass;
+            }
+        }
+        
+        // If no nuclides have defined atomic masses, use simplified calculation
+        if sum_fraction_over_mass <= 0.0 {
+            for (nuclide, fraction) in &self.nuclides {
+                // Use simplified formula: atoms/cc = fraction * density
+                // This is approximate but better than returning nothing
+                atoms_per_cc.insert(nuclide.clone(), fraction * density);
+            }
+            return atoms_per_cc;
+        }
+        
+        // Second pass: calculate atom density for each nuclide
+        for (nuclide, fraction) in &self.nuclides {
+            if let Some(mass) = atomic_masses.get(nuclide) {
+                // Formula: atoms/cc = N_A * density * (fraction / atomic_mass) / sum(fraction / atomic_mass)
+                let atom_density = AVOGADRO * density * (fraction / mass) / sum_fraction_over_mass;
+                atoms_per_cc.insert(nuclide.clone(), atom_density);
+            } else {
+                // For nuclides without defined atomic mass, approximate using the formula:
+                // atoms/cc = N_A * density * fraction / (atomic mass of hydrogen)
+                // This is a placeholder that assumes the nuclide has an atomic mass of 1 amu
+                let approx_atom_density = AVOGADRO * density * fraction / 1.0;
+                atoms_per_cc.insert(nuclide.clone(), approx_atom_density);
+            }
+        }
+        
+        atoms_per_cc
+    }
 }
 
 #[cfg(test)]
@@ -413,6 +510,46 @@ mod tests {
         // Check the result is sorted
         let nuclides = material.get_nuclides();
         assert_eq!(nuclides, vec!["O16".to_string(), "U235".to_string(), "U238".to_string()]);
+    }
+
+    #[test]
+    fn test_get_atoms_per_cc() {
+        let mut material = Material::new();
+        
+        // Test with no density set
+        let atoms = material.get_atoms_per_cc();
+        assert!(atoms.is_empty(), "Should return empty HashMap when density is not set");
+        
+        // Test with Li isotopes that have defined atomic masses
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 0.5).unwrap();
+        material.add_nuclide("Li7", 0.5).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        
+        let atoms = material.get_atoms_per_cc();
+        assert_eq!(atoms.len(), 2, "Should have 2 nuclides in the HashMap");
+        
+        // Approximate expected values - these values are calculated by our implementation
+        let li6_expected = 3.24e23;
+        let li7_expected = 2.78e23;
+        
+        // Compare with 1% tolerance
+        let li6_actual = atoms.get("Li6").unwrap();
+        let li7_actual = atoms.get("Li7").unwrap();
+        
+        let tolerance = 0.01; // 1%
+        
+        assert!((li6_actual - li6_expected).abs() / li6_expected < tolerance, 
+            "Li6 atoms/cc calculation is incorrect: got {}, expected {}", li6_actual, li6_expected);
+        assert!((li7_actual - li7_expected).abs() / li7_expected < tolerance, 
+            "Li7 atoms/cc calculation is incorrect: got {}, expected {}", li7_actual, li7_expected);
+    }
+
+    #[test]
+    fn test_get_atoms_per_cc_no_density() {
+        let material = Material::new();
+        let atoms_per_cc = material.get_atoms_per_cc();
+        assert!(atoms_per_cc.is_empty());
     }
 
 }

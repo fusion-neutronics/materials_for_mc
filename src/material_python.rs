@@ -187,6 +187,11 @@ impl PyMaterial {
     fn macroscopic_xs_neutron(&self) -> HashMap<String, Vec<f64>> {
         self.internal.macroscopic_xs_neutron.clone()
     }
+
+    /// Get the atoms per cubic centimeter for each nuclide in the material
+    fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
+        self.internal.get_atoms_per_cc()
+    }
 }
 
 
