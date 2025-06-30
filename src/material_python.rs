@@ -155,40 +155,31 @@ impl PyMaterial {
         self.internal.set_temperature(temperature);
     }
 
-    /// Return the unified energy grid for all nuclides for a given particle across all MT reactions
-    /// This method also caches the result in the material for future use
-    fn unified_energy_grid(&mut self, particle: &str) -> Vec<f64> {
-        self.internal.unified_energy_grid(particle)
-    }
-    
-    /// Get the cached unified energy grid if available, or build it if not
-    fn get_unified_energy_grid(&mut self, particle: &str) -> Vec<f64> {
-        self.internal.get_unified_energy_grid(particle)
+    /// Return the unified energy grid for neutrons across all MT reactions
+    fn unified_energy_grid_neutron(&mut self) -> Vec<f64> {
+        self.internal.unified_energy_grid_neutron()
     }
 
-    /// Calculate microscopic cross sections on the unified energy grid for all available MT reactions
+    /// Calculate microscopic cross sections for neutrons on the unified energy grid
     /// If unified_energy_grid is None or not provided, it will use the cached grid or build a new one
-    #[pyo3(signature = (particle, unified_energy_grid=None))]
-    fn calculate_microscopic_xs(
+    #[pyo3(signature = (unified_energy_grid=None))]
+    fn calculate_microscopic_xs_neutron(
         &mut self,
-        particle: &str,
         unified_energy_grid: Option<Vec<f64>>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         let grid_ref = unified_energy_grid.as_ref().map(|g| g.as_slice());
-        self.internal.calculate_microscopic_xs(particle, grid_ref)
+        self.internal.calculate_microscopic_xs_neutron(grid_ref)
     }
 
-    /// Calculate macroscopic cross sections on the unified energy grid for all available MT reactions
+    /// Calculate macroscopic cross sections for neutrons on the unified energy grid
     /// If unified_energy_grid is None or not provided, it will use the cached grid or build a new one
-    /// Currently only supports neutron particles.
-    #[pyo3(signature = (particle, unified_energy_grid=None))]
-    fn calculate_macroscopic_xs(
+    #[pyo3(signature = (unified_energy_grid=None))]
+    fn calculate_macroscopic_xs_neutron(
         &mut self,
-        particle: &str,
         unified_energy_grid: Option<Vec<f64>>,
     ) -> HashMap<String, Vec<f64>> {
         let grid_ref = unified_energy_grid.as_ref().map(|g| g.as_slice());
-        self.internal.calculate_macroscopic_xs(particle, grid_ref)
+        self.internal.calculate_macroscopic_xs_neutron(grid_ref)
     }
 
     /// Get the macroscopic cross sections for neutrons

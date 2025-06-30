@@ -20,9 +20,8 @@ pub struct Material {
     /// Macroscopic cross sections for different MT numbers (neutron only for now)
     /// Map of MT number -> cross sections
     pub macroscopic_xs_neutron: HashMap<String, Vec<f64>>,
-    /// Unified energy grid for different particle types
-    /// Map of particle type -> energy grid
-    pub unified_energy_grid: HashMap<String, Vec<f64>>,
+    /// Unified energy grid for neutrons
+    pub unified_energy_grid_neutron: Vec<f64>,
 }
 
 impl Material {
@@ -35,7 +34,7 @@ impl Material {
             temperature: String::from("294"), // Default temperature in K (room temperature)
             nuclide_data: HashMap::new(),
             macroscopic_xs_neutron: HashMap::new(),
-            unified_energy_grid: HashMap::new(),
+            unified_energy_grid_neutron: Vec::new(),
         }
     }
 
@@ -71,7 +70,7 @@ impl Material {
     pub fn set_temperature(&mut self, temperature: &str) {
         self.temperature = String::from(temperature);
         // Clear cached data that depends on temperature
-        self.unified_energy_grid.clear();
+        self.unified_energy_grid_neutron.clear();
         self.macroscopic_xs_neutron.clear();
     }
 
@@ -95,20 +94,20 @@ impl Material {
         Ok(())
     }
 
-    /// Build a unified energy grid for all nuclides for a given particle across all MT reactions
-    /// This method also stores the result in the material's unified_energy_grid property
-    pub fn unified_energy_grid(
+    /// Build a unified energy grid for all nuclides for neutrons across all MT reactions
+    /// This method also stores the result in the material's unified_energy_grid_neutron property
+    pub fn unified_energy_grid_neutron(
         &mut self,
-        particle: &str,
     ) -> Vec<f64> {
         // Check if we already have this grid in the cache
-        if let Some(grid) = self.unified_energy_grid.get(particle) {
-            return grid.clone();
+        if !self.unified_energy_grid_neutron.is_empty() {
+            return self.unified_energy_grid_neutron.clone();
         }
         
         // If not cached, build the grid
         let mut all_energies = Vec::new();
         let temperature = &self.temperature;
+        let particle = "neutron"; // This is now specifically for neutrons
         
         for nuclide in self.nuclides.keys() {
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
@@ -127,38 +126,30 @@ impl Material {
         all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
         
         // Cache the result
-        self.unified_energy_grid.insert(particle.to_string(), all_energies.clone());
+        self.unified_energy_grid_neutron = all_energies.clone();
         
         all_energies
     }
-    
-    /// Get the cached unified energy grid if available, or build it if not
-    pub fn get_unified_energy_grid(
-        &mut self,
-        particle: &str,
-    ) -> Vec<f64> {
-        self.unified_energy_grid(particle)
-    }
 
-    /// Calculate microscopic cross sections on the unified energy grid
+    /// Calculate microscopic cross sections for neutrons on the unified energy grid
     /// 
     /// This method interpolates the microscopic cross sections for each nuclide
     /// onto the unified energy grid for all available MT reactions.
     /// If unified_energy_grid is None, it will use the cached grid or build a new one.
     /// Returns a nested HashMap: nuclide -> mt -> cross_section values
-    pub fn calculate_microscopic_xs(
+    pub fn calculate_microscopic_xs_neutron(
         &mut self,
-        particle: &str,
         unified_energy_grid: Option<&[f64]>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         // Get the grid (either from parameter or from cache/build)
         let grid = match unified_energy_grid {
             Some(grid) => grid.to_vec(),
-            None => self.unified_energy_grid(particle),
+            None => self.unified_energy_grid_neutron(),
         };
         
         let mut micro_xs: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
+        let particle = "neutron"; // Explicitly set particle type
         
         for nuclide in self.nuclides.keys() {
             let mut nuclide_xs = HashMap::new();
@@ -192,28 +183,20 @@ impl Material {
         micro_xs
     }
 
-    /// Calculate macroscopic cross sections on the unified energy grid
+    /// Calculate macroscopic cross sections for neutrons on the unified energy grid
     /// 
     /// This method calculates the total macroscopic cross section by:
     /// 1. Interpolating the microscopic cross sections onto the unified grid
     /// 2. Multiplying by atom density for each nuclide
     /// 3. Summing over all nuclides
-    /// 
-    /// Currently only supports neutron particles.
-    pub fn calculate_macroscopic_xs(
+    pub fn calculate_macroscopic_xs_neutron(
         &mut self,
-        particle: &str,
         unified_grid: Option<&[f64]>,
     ) -> HashMap<String, Vec<f64>> {
-        if particle != "neutron" {
-            // For now, we only support neutron cross sections
-            return HashMap::new();
-        }
-        
         const BARN_TO_CM2: f64 = 1.0e-24; // conversion from barns to cm²
         
         // First get microscopic cross sections on the unified grid
-        let micro_xs = self.calculate_microscopic_xs(particle, unified_grid);
+        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid);
         
         // Create a map to hold macroscopic cross sections for each MT
         let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
@@ -258,9 +241,7 @@ impl Material {
         }
         
         // Cache the results in the material
-        if particle == "neutron" {
-            self.macroscopic_xs_neutron = macro_xs.clone();
-        }
+        self.macroscopic_xs_neutron = macro_xs.clone();
         
         macro_xs
     }

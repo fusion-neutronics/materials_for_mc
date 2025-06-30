@@ -8,7 +8,7 @@ def test_unified_energy_grid():
     material.temperature = "294"  # Set temperature using the property
     material.read_nuclides_from_json({"Li6": "tests/li6.json", "Li7": "tests/li7.json"})
     # Get the unified energy grid across all MT reactions
-    grid = material.unified_energy_grid("neutron")
+    grid = material.unified_energy_grid_neutron()
     # The grid should be sorted and unique
     assert all(grid[i] < grid[i+1] for i in range(len(grid)-1)), "Grid is not sorted and unique!"
     assert len(grid) > 0, "Grid should not be empty!"

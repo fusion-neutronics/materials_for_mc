@@ -12,17 +12,17 @@ def test_macroscopic_xs():
     material.read_nuclides_from_json({"Li6": "tests/li6.json", "Li7": "tests/li7.json"})
     
     # Get the unified energy grid - this will cache it
-    grid = material.unified_energy_grid("neutron")
+    grid = material.unified_energy_grid_neutron()
     
     # Calculate microscopic cross sections for all MT numbers using the cached grid
-    micro_xs = material.calculate_microscopic_xs("neutron")
+    micro_xs = material.calculate_microscopic_xs_neutron()
     
     # Verify that we have cross sections for both nuclides
     assert "Li6" in micro_xs, "No microscopic cross sections for Li6"
     assert "Li7" in micro_xs, "No microscopic cross sections for Li7"
     
     # Calculate macroscopic cross sections - will use the cached grid
-    macro_xs = material.calculate_macroscopic_xs("neutron")
+    macro_xs = material.calculate_macroscopic_xs_neutron()
     
     # Verify the macroscopic cross sections contain MT=2
     assert "2" in macro_xs, "No MT=2 in macroscopic cross sections"
@@ -55,5 +55,5 @@ def test_macroscopic_xs():
     
     # # Test explicit grid parameter - calculate again with explicit grid
     # explicit_grid = grid[::2]  # Use every other point from the original grid
-    # micro_xs_explicit = material.calculate_microscopic_xs("neutron")
+    # micro_xs_explicit = material.calculate_microscopic_xs_neutron()
     # assert len(micro_xs_explicit["Li6"]["2"]) == len(explicit_grid), "Explicit grid not used correctly"
