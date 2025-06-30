@@ -182,6 +182,11 @@ impl PyMaterial {
         self.internal.calculate_macroscopic_xs_neutron(grid_ref)
     }
 
+    /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
+    fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+        self.internal.calculate_total_xs_neutron()
+    }
+
     /// Get the macroscopic cross sections for neutrons
     #[getter]
     fn macroscopic_xs_neutron(&self) -> HashMap<String, Vec<f64>> {

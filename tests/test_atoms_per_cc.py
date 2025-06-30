@@ -17,10 +17,12 @@ def test_get_atoms_per_cc():
     atoms = material.get_atoms_per_cc()
     assert len(atoms) == 2, "Should have 2 nuclides in the dict"
     
-    # Calculate expected values - these are the actual values we get from our implementation
-    # Using the formula: N_A * density * (fraction / atomic_mass) / sum(fraction / atomic_mass)
-    li6_expected = 3.24e23  # Actual value (atoms/cm³)
-    li7_expected = 2.78e23  # Actual value (atoms/cm³)
+    # Calculate expected values using OpenMC's formula: N_A * density * fraction / atomic_mass
+    avogadro = 6.02214076e23  # Atoms per mol
+    li6_mass = 6.015122  # g/mol
+    li7_mass = 7.016004  # g/mol
+    li6_expected = avogadro * 1.0 * 0.5 / li6_mass  # Should be about 5.0e22 atoms/cm³
+    li7_expected = avogadro * 1.0 * 0.5 / li7_mass  # Should be about 4.3e22 atoms/cm³
     
     # Test with relative tolerance of 1%
     assert atoms["Li6"] == pytest.approx(li6_expected, rel=0.01), "Li6 atoms/cc calculation is incorrect"
@@ -36,3 +38,21 @@ def test_get_atoms_per_cc():
     # For nuclides without defined masses, the Avogadro's number calculation is used
     # with an approximation of atomic mass = 1.0
     assert atoms["CustomNuclide"] > 0, "Should calculate some value for undefined nuclide"
+
+ 
+    # Test with different density units (kg/m³)
+    material = Material()
+    material.add_nuclide("Li6", 1.0)
+    material.set_density("kg/m3", 1000.0)  # 1000 kg/m³ = 1 g/cm³
+    
+    atoms_kg_m3 = material.get_atoms_per_cc()
+    
+    # Compare with same material using g/cm³
+    material_g_cm3 = Material()
+    material_g_cm3.add_nuclide("Li6", 1.0)
+    material_g_cm3.set_density("g/cm3", 1.0)
+    
+    atoms_g_cm3 = material_g_cm3.get_atoms_per_cc()
+    
+    # Both should give the same result since the densities are equivalent
+    assert atoms_kg_m3["Li6"] == pytest.approx(atoms_g_cm3["Li6"], rel=0.01), "Different density units should give consistent results"

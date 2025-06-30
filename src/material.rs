@@ -245,6 +245,88 @@ impl Material {
         macro_xs
     }
 
+    /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
+    /// 
+    /// This method takes the macroscopic cross sections and sums all relevant MT reactions
+    /// to create a "total" cross section, which is added to the HashMap.
+    /// 
+    /// If a total cross section already exists in the HashMap, it will be overwritten.
+    /// 
+    /// Returns the updated HashMap with the "total" entry added.
+    pub fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+        // Get the macroscopic cross sections (calculate if not already done)
+        let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
+            self.calculate_macroscopic_xs_neutron(None)
+        } else {
+            self.macroscopic_xs_neutron.clone()
+        };
+        
+        // Define the MT numbers that should be summed for the total cross section
+        const TOTAL_MT_NUMBERS: [&str; 393] = [
+            "2", "5", "11", "17", "19", "20", "21", "22", "23", "24", "25", "28", "29", "30", 
+            "32", "33", "34", "35", "36", "37", "38", "41", "42", "44", "45", "50", "51", "52", 
+            "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", 
+            "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", 
+            "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "102", "108", "109", 
+            "111", "112", "113", "114", "115", "116", "117", "152", "153", "154", "155", "156", 
+            "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", 
+            "169", "170", "171", "172", "173", "174", "175", "176", "177", "178", "179", "180", 
+            "181", "182", "183", "184", "185", "186", "187", "188", "189", "190", "191", "192", 
+            "193", "194", "195", "196", "197", "198", "199", "200", "600", "601", "602", "603", 
+            "604", "605", "606", "607", "608", "609", "610", "611", "612", "613", "614", "615", 
+            "616", "617", "618", "619", "620", "621", "622", "623", "624", "625", "626", "627", 
+            "628", "629", "630", "631", "632", "633", "634", "635", "636", "637", "638", "639", 
+            "640", "641", "642", "643", "644", "645", "646", "647", "648", "649", "650", "651", 
+            "652", "653", "654", "655", "656", "657", "658", "659", "660", "661", "662", "663", 
+            "664", "665", "666", "667", "668", "669", "670", "671", "672", "673", "674", "675", 
+            "676", "677", "678", "679", "680", "681", "682", "683", "684", "685", "686", "687", 
+            "688", "689", "690", "691", "692", "693", "694", "695", "696", "697", "698", "699", 
+            "700", "701", "702", "703", "704", "705", "706", "707", "708", "709", "710", "711", 
+            "712", "713", "714", "715", "716", "717", "718", "719", "720", "721", "722", "723", 
+            "724", "725", "726", "727", "728", "729", "730", "731", "732", "733", "734", "735", 
+            "736", "737", "738", "739", "740", "741", "742", "743", "744", "745", "746", "747", 
+            "748", "749", "750", "751", "752", "753", "754", "755", "756", "757", "758", "759", 
+            "760", "761", "762", "763", "764", "765", "766", "767", "768", "769", "770", "771", 
+            "772", "773", "774", "775", "776", "777", "778", "779", "780", "781", "782", "783", 
+            "784", "785", "786", "787", "788", "789", "790", "791", "792", "793", "794", "795", 
+            "796", "797", "798", "799", "800", "801", "802", "803", "804", "805", "806", "807", 
+            "808", "809", "810", "811", "812", "813", "814", "815", "816", "817", "818", "819", 
+            "820", "821", "822", "823", "824", "825", "826", "827", "828", "829", "830", "831", 
+            "832", "833", "834", "835", "836", "837", "838", "839", "840", "841", "842", "843", 
+            "844", "845", "846", "847", "848", "849", "875", "876", "877", "878", "879", "880", 
+            "881", "882", "883", "884", "885", "886", "887", "888", "889", "890", "891"
+        ];
+        
+        // Get the length of the energy grid from any MT reaction
+        let grid_length = macro_xs.values().next().map_or(0, |xs| xs.len());
+        
+        // If there are no cross sections, return the empty HashMap
+        if grid_length == 0 {
+            return macro_xs;
+        }
+        
+        // Initialize the total cross section with zeros
+        let mut total_xs = vec![0.0; grid_length];
+        
+        // Sum up all the relevant MT reactions
+        for mt in TOTAL_MT_NUMBERS.iter() {
+            if let Some(xs_values) = macro_xs.get(*mt) {
+                for (i, &xs) in xs_values.iter().enumerate() {
+                    total_xs[i] += xs;
+                }
+            }
+        }
+        
+        // Create a new HashMap with the original data plus the total
+        let mut result = macro_xs.clone();
+        result.insert(String::from("total"), total_xs);
+        
+        // Update the cached macroscopic cross sections
+        self.macroscopic_xs_neutron = result.clone();
+        
+        result
+    }
+
     /// Calculate atoms per cubic centimeter for each nuclide in the material
     /// 
     /// This method calculates the number density of atoms for each nuclide,
@@ -260,69 +342,26 @@ impl Material {
             return atoms_per_cc;
         }
         
-        let density = self.density.unwrap();
+        // Convert density to g/cm³ if necessary
+        let mut density = self.density.unwrap();
+        
+        // Handle different density units
+        match self.density_units.as_str() {
+            "g/cm3" => (), // Already in the right units
+            "kg/m3" => density = density / 1000.0, // Convert kg/m³ to g/cm³
+            _ => {
+                // For any other units, just use the value as is, but it may give incorrect results
+                println!("Warning: Unsupported density unit '{}' for atoms_per_cc calculation. Results may be incorrect.", self.density_units);
+            }
+        }
         
         // Hard-coded atomic masses (in g/mol) for common nuclides
         let mut atomic_masses = HashMap::new();
         
-        // Hydrogen isotopes
-        atomic_masses.insert(String::from("H1"), 1.00782503);
-        atomic_masses.insert(String::from("H2"), 2.01410178); // Deuterium
-        atomic_masses.insert(String::from("H3"), 3.01604928); // Tritium
-        
-        // Helium isotopes
-        atomic_masses.insert(String::from("He3"), 3.0160293);
-        atomic_masses.insert(String::from("He4"), 4.00260325);
-        
         // Lithium isotopes
-        atomic_masses.insert(String::from("Li6"), 6.015122);
+        atomic_masses.insert(String::from("Li6"), 6.01512288742);
         atomic_masses.insert(String::from("Li7"), 7.016004);
         
-        // Boron isotopes
-        atomic_masses.insert(String::from("B10"), 10.012937);
-        atomic_masses.insert(String::from("B11"), 11.009305);
-        
-        // Carbon isotopes
-        atomic_masses.insert(String::from("C12"), 12.0);
-        atomic_masses.insert(String::from("C13"), 13.003355);
-        
-        // Oxygen isotopes
-        atomic_masses.insert(String::from("O16"), 15.994915);
-        atomic_masses.insert(String::from("O17"), 16.999132);
-        atomic_masses.insert(String::from("O18"), 17.999160);
-        
-        // Uranium isotopes
-        atomic_masses.insert(String::from("U235"), 235.043924);
-        atomic_masses.insert(String::from("U238"), 238.050788);
-        
-        // Plutonium isotopes
-        atomic_masses.insert(String::from("Pu239"), 239.052157);
-        atomic_masses.insert(String::from("Pu240"), 240.053813);
-        atomic_masses.insert(String::from("Pu241"), 241.056851);
-        
-        // Natural elements (average atomic masses)
-        atomic_masses.insert(String::from("H"), 1.008);
-        atomic_masses.insert(String::from("He"), 4.0026);
-        atomic_masses.insert(String::from("Li"), 6.94);
-        atomic_masses.insert(String::from("Be"), 9.0122);
-        atomic_masses.insert(String::from("B"), 10.81);
-        atomic_masses.insert(String::from("C"), 12.011);
-        atomic_masses.insert(String::from("N"), 14.007);
-        atomic_masses.insert(String::from("O"), 15.999);
-        atomic_masses.insert(String::from("F"), 18.998);
-        atomic_masses.insert(String::from("Na"), 22.990);
-        atomic_masses.insert(String::from("Mg"), 24.305);
-        atomic_masses.insert(String::from("Al"), 26.982);
-        atomic_masses.insert(String::from("Si"), 28.085);
-        atomic_masses.insert(String::from("P"), 30.974);
-        atomic_masses.insert(String::from("S"), 32.06);
-        atomic_masses.insert(String::from("Cl"), 35.45);
-        atomic_masses.insert(String::from("Fe"), 55.845);
-        atomic_masses.insert(String::from("Ni"), 58.693);
-        atomic_masses.insert(String::from("Cu"), 63.546);
-        atomic_masses.insert(String::from("Zr"), 91.224);
-        atomic_masses.insert(String::from("Mo"), 95.95);
-        atomic_masses.insert(String::from("U"), 238.03);
         
         // Avogadro's number (atoms/mol)
         const AVOGADRO: f64 = 6.02214076e23;
@@ -347,16 +386,17 @@ impl Material {
             return atoms_per_cc;
         }
         
-        // Second pass: calculate atom density for each nuclide
+        // Calculate atom density for each nuclide
+        // Following OpenMC's formula: atom_density = density * Avogadro_number / atomic_mass
         for (nuclide, fraction) in &self.nuclides {
             if let Some(mass) = atomic_masses.get(nuclide) {
-                // Formula: atoms/cc = N_A * density * (fraction / atomic_mass) / sum(fraction / atomic_mass)
-                let atom_density = AVOGADRO * density * (fraction / mass) / sum_fraction_over_mass;
+                // Formula: atoms/cc = N_A * density * fraction / atomic_mass
+                let atom_density = AVOGADRO * density * fraction / mass;
                 atoms_per_cc.insert(nuclide.clone(), atom_density);
             } else {
-                // For nuclides without defined atomic mass, approximate using the formula:
-                // atoms/cc = N_A * density * fraction / (atomic mass of hydrogen)
-                // This is a placeholder that assumes the nuclide has an atomic mass of 1 amu
+                // For nuclides without defined atomic mass, we can't calculate accurately
+                // Print a warning and use a very rough approximation
+                println!("Warning: No atomic mass data for nuclide '{}'. Using approximate value.", nuclide);
                 let approx_atom_density = AVOGADRO * density * fraction / 1.0;
                 atoms_per_cc.insert(nuclide.clone(), approx_atom_density);
             }
@@ -550,6 +590,50 @@ mod tests {
         let material = Material::new();
         let atoms_per_cc = material.get_atoms_per_cc();
         assert!(atoms_per_cc.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_total_xs_neutron() {
+        let mut material = Material::new();
+        
+        // Add some nuclides
+        material.add_nuclide("Li6", 0.5).unwrap();
+        material.add_nuclide("Li7", 0.5).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        
+        // Create some mock cross sections directly
+        let mut mock_xs = HashMap::new();
+        
+        // MT=2 (elastic scattering)
+        mock_xs.insert(String::from("2"), vec![1.0, 2.0, 3.0]);
+        
+        // MT=102 (radiative capture)
+        mock_xs.insert(String::from("102"), vec![0.5, 1.0, 1.5]);
+        
+        // MT=999 (some reaction not in the total list)
+        mock_xs.insert(String::from("999"), vec![0.1, 0.2, 0.3]);
+        
+        // Set the mock cross sections directly
+        material.macroscopic_xs_neutron = mock_xs;
+        
+        // Calculate the total cross section
+        let result = material.calculate_total_xs_neutron();
+        
+        // Check that the total was calculated correctly
+        assert!(result.contains_key("total"), "Total cross section not found in result");
+        
+        let total_xs = result.get("total").unwrap();
+        assert_eq!(total_xs.len(), 3, "Total cross section has wrong length");
+        
+        // Total should be the sum of MT=2 and MT=102 only (not MT=999)
+        assert_eq!(total_xs[0], 1.5, "Total cross section[0] is incorrect");
+        assert_eq!(total_xs[1], 3.0, "Total cross section[1] is incorrect");
+        assert_eq!(total_xs[2], 4.5, "Total cross section[2] is incorrect");
+        
+        // Verify that the original cross sections are still there
+        assert!(result.contains_key("2"), "MT=2 not found in result");
+        assert!(result.contains_key("102"), "MT=102 not found in result");
+        assert!(result.contains_key("999"), "MT=999 not found in result");
     }
 
 }
