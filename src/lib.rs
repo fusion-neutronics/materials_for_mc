@@ -2,8 +2,10 @@
 mod material;
 mod materials;
 mod nuclide;
+mod utilities;
 pub use material::Material;
 pub use materials::Materials;
+pub use utilities::{interpolate_linear, interpolate_log_log};
 
 // Import PyO3 items conditionally
 #[cfg(feature = "pyo3")]

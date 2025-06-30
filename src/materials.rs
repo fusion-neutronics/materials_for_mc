@@ -95,7 +95,7 @@ impl Materials {
         for mat in &mut self.materials {
             mat.nuclide_data.clear();
             for nuclide_name in mat.nuclides.keys() {
-                if let Some(shared_arc) = self.nuclide_data.get(nuclide_name) {
+                if let Some(shared_arc) = self.nuclide_data.get::<str>(nuclide_name) {
                     mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
                 }
             }
