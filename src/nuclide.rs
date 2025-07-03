@@ -1,12 +1,15 @@
 // Struct representing a nuclide, matching the JSON file structure
 // Update the fields as needed to match all JSON entries
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde_json;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use once_cell::sync::Lazy;
 
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -34,7 +37,8 @@ pub struct Nuclide {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncidentParticleData {
     #[serde(rename = "reactions")]
-    pub reactions_by_temp: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
+    #[serde(deserialize_with = "deserialize_reactions_with_int_mt")]
+    pub reactions_by_temp: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt -> Reaction
 }
 
 impl Nuclide {
@@ -65,13 +69,13 @@ impl Nuclide {
         }
     }
 
-    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+    pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         let mut mts = std::collections::HashSet::new();
         if let Some(ip_map) = &self.incident_particle {
             for ip_data in ip_map.values() {
                 for mt_map in ip_data.reactions_by_temp.values() {
                     for mt in mt_map.keys() {
-                        mts.insert(mt.clone());
+                        mts.insert(*mt);
                     }
                 }
             }
@@ -79,7 +83,7 @@ impl Nuclide {
         if mts.is_empty() {
             None
         } else {
-            let mut mts_vec: Vec<String> = mts.into_iter().collect();
+            let mut mts_vec: Vec<i32> = mts.into_iter().collect();
             mts_vec.sort();
             Some(mts_vec)
         }
@@ -92,7 +96,7 @@ impl Nuclide {
 
     /// Get the full reaction energy grid for a specific reaction, 
     /// taking into account the threshold_idx for the new format
-    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: i32) -> Option<Vec<f64>> {
         // Check if we have a top-level energy grid
         if let Some(energy_map) = &self.energy {
             if let Some(energy_grid) = energy_map.get(temperature) {
@@ -100,7 +104,7 @@ impl Nuclide {
                 if let Some(ip_map) = &self.incident_particle {
                     if let Some(ip_data) = ip_map.get(particle) {
                         if let Some(temp_reactions) = ip_data.reactions_by_temp.get(temperature) {
-                            if let Some(reaction) = temp_reactions.get(mt) {
+                            if let Some(reaction) = temp_reactions.get(&mt) {
                                 // Use the threshold_idx to determine where this reaction starts in the energy grid
                                 let threshold_idx = reaction.threshold_idx;
                                 if threshold_idx < energy_grid.len() {
@@ -115,6 +119,50 @@ impl Nuclide {
         
         None
     }
+}
+
+/// Custom deserializer function to convert string MT numbers to integers
+fn deserialize_reactions_with_int_mt<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<String, HashMap<i32, Reaction>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct ReactionsMapVisitor;
+
+    impl<'de> Visitor<'de> for ReactionsMapVisitor {
+        type Value = HashMap<String, HashMap<i32, Reaction>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a map of temperatures to MT reactions")
+        }
+
+        fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+        where
+            M: MapAccess<'de>,
+        {
+            let mut map = HashMap::new();
+            
+            while let Some((temperature, mt_reactions_str)) = access.next_entry::<String, HashMap<String, Reaction>>()? {
+                let mut mt_reactions_int = HashMap::new();
+                
+                for (mt_str, reaction) in mt_reactions_str {
+                    // Convert MT string to integer
+                    let mt_int = mt_str.parse::<i32>().map_err(|_| {
+                        de::Error::custom(format!("Failed to parse MT number '{}' as integer", mt_str))
+                    })?;
+                    
+                    mt_reactions_int.insert(mt_int, reaction);
+                }
+                
+                map.insert(temperature, mt_reactions_int);
+            }
+            
+            Ok(map)
+        }
+    }
+
+    deserializer.deserialize_map(ReactionsMapVisitor)
 }
 
 // Read a single nuclide from a JSON file
@@ -178,6 +226,7 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
                                     new_reaction.insert("cross_section".to_string(), xs.clone());
                                 }
                                 
+                                // Use the original string MT as the key (will be converted to int during deserialization)
                                 reactions_map.insert(mt.clone(), serde_json::Value::Object(new_reaction));
                             }
                             

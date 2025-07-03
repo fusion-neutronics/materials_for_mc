@@ -77,7 +77,8 @@ impl PyNuclide {
                         reaction_dict.set_item("cross_section", &reaction.cross_section)?;
                         reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
                         reaction_dict.set_item("interpolation", &reaction.interpolation)?;
-                        mt_dict.set_item(mt_key, reaction_dict)?;
+                        // Use integer MT directly as a key in Python
+                        mt_dict.set_item(*mt_key, reaction_dict)?;
                     }
                     
                     temp_dict.set_item(temp_key, mt_dict)?;
@@ -102,7 +103,7 @@ impl PyNuclide {
     }
 
     #[getter]
-    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+    pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         Nuclide::from(self.clone()).reaction_mts()
     }
 
@@ -126,7 +127,7 @@ impl PyNuclide {
     }
     
     // Get the full reaction energy grid for a specific reaction
-    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: i32) -> Option<Vec<f64>> {
         let nuclide = Nuclide::from(self.clone());
         nuclide.get_reaction_energy_grid(particle, temperature, mt)
     }
