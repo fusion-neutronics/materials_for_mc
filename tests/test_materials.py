@@ -1,7 +1,7 @@
 import pytest
 import gc
 import sys
-from materials_for_mc import Material, Materials
+from materials_for_mc import Material, Materials, Config
 
 def test_building_up_materials():
     mat1 = Material()
@@ -33,13 +33,20 @@ def test_building_up_materials():
     assert mats[1].nuclides == [("Fe", 0.5)]
 
 def test_materials_data_reading():
+    from materials_for_mc import Config
+    
+    # Set the cross-section paths in the global Config
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    
     material1 = Material()
     material1.add_nuclide("Li6", 1.0)
 
     material2 = Material()
     material2.add_nuclide("Li7", 1.0)
     
-    # Assuming the JSON file is structured correctly
+    # Create a Materials collection
     materials = Materials([material1, material2])
-    materials.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    
+    # Accessing data will automatically load nuclides from the global Config
+    assert len(materials) == 2
 

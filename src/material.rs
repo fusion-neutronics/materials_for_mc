@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
-use crate::utilities::{interpolate_linear, interpolate_log_log};
+use crate::config::CONFIG;
+use crate::utilities::{interpolate_linear};
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -94,11 +95,39 @@ impl Material {
         Ok(())
     }
 
+    /// Ensure all nuclides are loaded, using the global configuration if needed
+    fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let nuclide_names: Vec<String> = self.nuclides.keys()
+            .filter(|name| !self.nuclide_data.contains_key(*name))
+            .cloned()
+            .collect();
+        
+        if nuclide_names.is_empty() {
+            return Ok(());
+        }
+        
+        // Get the global configuration
+        let config = CONFIG.lock().unwrap();
+        
+        // Load any missing nuclides
+        for nuclide_name in nuclide_names {
+            let nuclide = get_or_load_nuclide(&nuclide_name, &config.cross_sections)?;
+            self.nuclide_data.insert(nuclide_name.clone(), nuclide);
+        }
+        
+        Ok(())
+    }
+
     /// Build a unified energy grid for all nuclides for neutrons across all MT reactions
     /// This method also stores the result in the material's unified_energy_grid_neutron property
     pub fn unified_energy_grid_neutron(
         &mut self,
     ) -> Vec<f64> {
+        // Ensure nuclides are loaded before proceeding
+        if let Err(e) = self.ensure_nuclides_loaded() {
+            eprintln!("Error loading nuclides: {}", e);
+        }
+        
         // Check if we already have this grid in the cache
         if !self.unified_energy_grid_neutron.is_empty() {
             return self.unified_energy_grid_neutron.clone();
@@ -107,22 +136,42 @@ impl Material {
         // If not cached, build the grid
         let mut all_energies = Vec::new();
         let temperature = &self.temperature;
-        let particle = "neutron"; // This is now specifically for neutrons
+        let _particle = "neutron"; // This is now specifically for neutrons
+        
+        println!("Building unified energy grid for temperature: {}", temperature);
         
         for nuclide in self.nuclides.keys() {
+            println!("Processing nuclide: {}", nuclide);
+            
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 // Check if there's a top-level energy grid
                 if let Some(energy_map) = &nuclide_data.energy {
+                    println!("Nuclide has top-level energy grid");
+                    
                     if let Some(energy_grid) = energy_map.get(temperature) {
+                        println!("Found energy grid for temperature: {}", temperature);
                         all_energies.extend(energy_grid);
+                    } else {
+                        println!("No energy grid found for temperature {}", temperature);
+                        
+                        // Print available temperatures
+                        println!("Available temperatures in energy map: {:?}", energy_map.keys().collect::<Vec<_>>());
                     }
+                } else {
+                    println!("Nuclide does not have top-level energy grid");
                 }
+            } else {
+                println!("No data found for nuclide: {}", nuclide);
             }
         }
+        
+        println!("Total number of energy points collected: {}", all_energies.len());
         
         // Sort and deduplicate
         all_energies.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
         all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
+        
+        println!("Number of unique energy points after deduplication: {}", all_energies.len());
         
         // Cache the result
         self.unified_energy_grid_neutron = all_energies.clone();
@@ -140,6 +189,11 @@ impl Material {
         &mut self,
         unified_energy_grid: Option<&[f64]>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
+        // Ensure nuclides are loaded before proceeding
+        if let Err(e) = self.ensure_nuclides_loaded() {
+            eprintln!("Error loading nuclides: {}", e);
+        }
+        
         // Get the grid (either from parameter or from cache/build)
         let grid = match unified_energy_grid {
             Some(grid) => grid.to_vec(),
@@ -148,19 +202,39 @@ impl Material {
         
         let mut micro_xs: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
+        let temp_with_k = format!("{}K", temperature);
         let particle = "neutron"; // Explicitly set particle type
+        
+        println!("Calculating microscopic cross sections for temperature: {} (or {})", temperature, temp_with_k);
         
         for nuclide in self.nuclides.keys() {
             let mut nuclide_xs = HashMap::new();
             
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
+                println!("Processing nuclide: {}", nuclide);
+                
                 if let Some(ip_data) = nuclide_data.incident_particle.as_ref().and_then(|ip| ip.get(particle)) {
-                    // Get the energy grid for this nuclide and temperature
-                    if let Some(energy_map) = &nuclide_data.energy {
-                        if let Some(energy_grid) = energy_map.get(temperature) {
-                            // Process all MT reactions using the shared energy grid
-                            if let Some(temp_data) = ip_data.reactions_by_temp.get(temperature) {
+                    println!("Found incident particle data for: {}", particle);
+                    
+                    // Try both temperature formats
+                    let temp_data = ip_data.reactions_by_temp.get(temperature)
+                        .or_else(|| ip_data.reactions_by_temp.get(&temp_with_k));
+                    
+                    if let Some(temp_data) = temp_data {
+                        println!("Found reactions for temperature");
+                        
+                        // Get the energy grid for this nuclide and temperature
+                        if let Some(energy_map) = &nuclide_data.energy {
+                            let energy_grid = energy_map.get(temperature)
+                                .or_else(|| energy_map.get(&temp_with_k));
+                            
+                            if let Some(energy_grid) = energy_grid {
+                                println!("Found energy grid for temperature");
+                                
+                                // Process all MT reactions using the shared energy grid
                                 for (mt, reaction) in temp_data {
+                                    println!("Processing MT: {}", mt);
+                                    
                                     // Create a vector to store interpolated cross sections
                                     let mut xs_values = Vec::with_capacity(grid.len());
                                     
@@ -170,6 +244,7 @@ impl Material {
                                         &energy_grid[threshold_idx..]
                                     } else {
                                         // If threshold is past the end of the grid, this reaction doesn't exist
+                                        println!("Warning: threshold_idx {} is beyond energy grid length {}", threshold_idx, energy_grid.len());
                                         continue;
                                     };
                                     
@@ -194,18 +269,38 @@ impl Material {
                                     
                                     nuclide_xs.insert(mt.clone(), xs_values);
                                 }
+                            } else {
+                                println!("No energy grid found for temperature {} or {}", temperature, temp_with_k);
+                                
+                                // Print available temperatures
+                                println!("Available temperatures in energy map: {:?}", energy_map.keys().collect::<Vec<_>>());
                             }
+                        } else {
+                            println!("No energy grid found for nuclide");
                         }
+                    } else {
+                        println!("No reactions found for temperature {} or {}", temperature, temp_with_k);
+                        
+                        // Print available temperatures
+                        println!("Available temperatures in reactions: {:?}", ip_data.reactions_by_temp.keys().collect::<Vec<_>>());
                     }
+                } else {
+                    println!("No incident particle data found for particle: {}", particle);
                 }
+            } else {
+                println!("No nuclide data found for: {}", nuclide);
             }
             
             // Only add the nuclide if we found cross section data
             if !nuclide_xs.is_empty() {
+                println!("Adding microscopic cross sections for nuclide: {} with {} MT values", nuclide, nuclide_xs.len());
                 micro_xs.insert(nuclide.clone(), nuclide_xs);
+            } else {
+                println!("No cross sections found for nuclide: {}", nuclide);
             }
         }
         
+        println!("Finished calculating microscopic cross sections: found data for {} nuclides", micro_xs.len());
         micro_xs
     }
 
@@ -219,6 +314,11 @@ impl Material {
         &mut self,
         unified_grid: Option<&[f64]>,
     ) -> HashMap<String, Vec<f64>> {
+        // Ensure nuclides are loaded before proceeding
+        if let Err(e) = self.ensure_nuclides_loaded() {
+            eprintln!("Error loading nuclides: {}", e);
+        }
+        
         const BARN_TO_CM2: f64 = 1.0e-24; // conversion from barns to cm²
         
         // First get microscopic cross sections on the unified grid
@@ -280,6 +380,11 @@ impl Material {
     /// 
     /// Returns the updated HashMap with the "total" entry added.
     pub fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+        // Ensure nuclides are loaded before proceeding
+        if let Err(e) = self.ensure_nuclides_loaded() {
+            eprintln!("Error loading nuclides: {}", e);
+        }
+        
         // Get the macroscopic cross sections (calculate if not already done)
         let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
             self.calculate_macroscopic_xs_neutron(None)

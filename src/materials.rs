@@ -1,6 +1,7 @@
 use crate::material::Material;
 use std::collections::HashMap;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
+use crate::config::CONFIG;
 use std::sync::Arc;
 
 /// A collection of materials that behaves like a list/vector
@@ -100,6 +101,45 @@ impl Materials {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
+    pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Collect all unique nuclide names from all materials that aren't already loaded
+        let mut needed: Vec<String> = Vec::new();
+        for mat in &self.materials {
+            for nuclide_name in mat.nuclides.keys() {
+                if !self.nuclide_data.contains_key(nuclide_name) && !needed.contains(nuclide_name) {
+                    needed.push(nuclide_name.clone());
+                }
+            }
+        }
+        
+        if needed.is_empty() {
+            return Ok(());
+        }
+        
+        // Get the global configuration
+        let config = CONFIG.lock().unwrap();
+        
+        // Load each missing nuclide
+        for nuclide_name in &needed {
+            let nuclide = get_or_load_nuclide(nuclide_name, &config.cross_sections)?;
+            self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&nuclide));
+        }
+        
+        // Ensure all materials reference the shared Arc<Nuclide> from self.nuclide_data
+        for mat in &mut self.materials {
+            for nuclide_name in mat.nuclides.keys() {
+                if !mat.nuclide_data.contains_key(nuclide_name) {
+                    if let Some(shared_arc) = self.nuclide_data.get::<str>(nuclide_name) {
+                        mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
+                    }
+                }
+            }
+        }
+        
         Ok(())
     }
 }

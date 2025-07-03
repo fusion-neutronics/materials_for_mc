@@ -125,7 +125,110 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     println!("reading {}", path_ref.display());
     let file = File::open(path_ref)?;
     let reader = BufReader::new(file);
-    let nuclide = serde_json::from_reader(reader)?;
+    
+    // First read the JSON into a Value to check its structure
+    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
+    
+    // Check if we have a "reactions" field with temperature keys
+    // This is the old format that needs to be converted
+    if let Some(reactions) = json_value.get("reactions") {
+        if reactions.is_object() {
+            // This is the old format
+            // Create a new JSON structure for the new format
+            let mut new_json = json_value.clone();
+            
+            // Extract temperature keys
+            let temperatures: Vec<String> = reactions.as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+            
+            // Create energy map for each temperature
+            let mut energy_map = serde_json::Map::new();
+            let mut incident_particle_map = serde_json::Map::new();
+            let mut particle_data = serde_json::Map::new();
+            
+            for temp in &temperatures {
+                if let Some(temp_reactions) = reactions.get(temp) {
+                    // Create reactions map for this temperature
+                    let mut reactions_map = serde_json::Map::new();
+                    
+                    // Get energy grid from first reaction (MT=2 is elastic)
+                    if let Some(mt2) = temp_reactions.get("2") {
+                        if let Some(xs) = mt2.get("xs") {
+                            // Store the energy grid
+                            energy_map.insert(temp.clone(), xs.clone());
+                            
+                            // Process all reactions
+                            for (mt, reaction_data) in temp_reactions.as_object().unwrap() {
+                                let mut new_reaction = serde_json::Map::new();
+                                
+                                // Copy the threshold_idx and interpolation
+                                if let Some(threshold_idx) = reaction_data.get("threshold_idx") {
+                                    new_reaction.insert("threshold_idx".to_string(), threshold_idx.clone());
+                                }
+                                
+                                if let Some(interpolation) = reaction_data.get("interpolation") {
+                                    new_reaction.insert("interpolation".to_string(), interpolation.clone());
+                                }
+                                
+                                // Rename xs to cross_section
+                                if let Some(xs) = reaction_data.get("xs") {
+                                    new_reaction.insert("cross_section".to_string(), xs.clone());
+                                }
+                                
+                                reactions_map.insert(mt.clone(), serde_json::Value::Object(new_reaction));
+                            }
+                            
+                            // Add the reactions for this temperature
+                            particle_data.insert(temp.clone(), serde_json::Value::Object(reactions_map));
+                        }
+                    }
+                }
+            }
+            
+            // Create the incident_particle map with "neutron" data
+            incident_particle_map.insert("neutron".to_string(), 
+                serde_json::Value::Object({
+                    let mut map = serde_json::Map::new();
+                    map.insert("reactions".to_string(), serde_json::Value::Object(particle_data));
+                    map
+                })
+            );
+            
+            // Update the JSON structure
+            new_json["incident_particle"] = serde_json::Value::Object(incident_particle_map);
+            new_json["energy"] = serde_json::Value::Object(energy_map);
+            
+            // For backward compatibility, set element to "lithium" if atomic_symbol is "Li"
+            if let Some(symbol) = new_json.get("atomic_symbol") {
+                if symbol.as_str() == Some("Li") {
+                    new_json["element"] = serde_json::Value::String("lithium".to_string());
+                }
+            }
+            
+            // Calculate neutron_number = mass_number - atomic_number
+            if let (Some(mass), Some(atomic)) = (new_json.get("mass_number"), new_json.get("atomic_number")) {
+                if let (Some(mass_num), Some(atomic_num)) = (mass.as_u64(), atomic.as_u64()) {
+                    let neutron_num = mass_num - atomic_num;
+                    new_json["neutron_number"] = serde_json::Value::Number(serde_json::Number::from(neutron_num));
+                }
+            }
+            
+            // Remove the old format fields
+            new_json.as_object_mut().unwrap().remove("reactions");
+            
+            // Parse the updated JSON
+            let nuclide: Nuclide = serde_json::from_value(new_json)?;
+            return Ok(nuclide);
+        }
+    }
+    
+    // If we don't need conversion, just parse normally
+    let file = File::open(path_ref)?; // Re-open the file
+    let reader = BufReader::new(file);
+    let nuclide: Nuclide = serde_json::from_reader(reader)?;
     Ok(nuclide)
 }
 

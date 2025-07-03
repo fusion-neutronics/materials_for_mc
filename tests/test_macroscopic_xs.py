@@ -1,22 +1,23 @@
 import pytest
 import numpy as np
-from materials_for_mc import Material
+from materials_for_mc import Material, Config
 
 def test_macroscopic_xs_neutron():
+
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     # Create a material with Li6 and Li7
     material = Material()
     material.add_nuclide("Li6", 0.5)
     material.add_nuclide("Li7", 0.5)
     material.set_density("g/cm3", 1.0)  # Setting a simple density
     material.temperature = "294"  # Set temperature using the property
-    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     
     # Get the unified energy grid - this will cache it
     grid = material.unified_energy_grid_neutron()
     
     # Calculate microscopic cross sections for all MT numbers using the cached grid
     micro_xs = material.calculate_microscopic_xs_neutron()
-    
+    print(micro_xs)
     # Verify that we have cross sections for both nuclides
     assert "Li6" in micro_xs, "No microscopic cross sections for Li6"
     assert "Li7" in micro_xs, "No microscopic cross sections for Li7"
@@ -39,12 +40,12 @@ def test_macroscopic_xs_neutron():
 
 def test_macroscopic_xs_with_atoms_per_cc():
     # Create a material with Li isotopes that have defined atomic masses
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     material = Material()
     material.add_nuclide("Li6", 0.5)
     material.add_nuclide("Li7", 0.5)
     material.set_density("g/cm3", 1.0)
     material.temperature = "294"
-    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     
     # Get the atoms per cc
     atoms_per_cc = material.get_atoms_per_cc()
@@ -75,11 +76,11 @@ def test_macroscopic_xs_with_atoms_per_cc():
 
 def test_macroscopic_xs_calculation_formula():
     # Create a test material with nuclides that have defined atomic masses
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     material = Material()
     material.add_nuclide("Li6", 1.0)  # Using a single nuclide for simplicity
     material.set_density("g/cm3", 1.0)
     material.temperature = "294"
-    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json"})
     
     # Get microscopic cross sections
     micro_xs = material.calculate_microscopic_xs_neutron()

@@ -1,14 +1,16 @@
 import pytest
-from materials_for_mc import Material
+from materials_for_mc import Material, Config
 
 def test_calculate_total_xs_neutron():
+    # Set up global Config
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    
     # Create a material
     material = Material()
     material.add_nuclide("Li6", 1.0)
     material.add_nuclide("Li7", 1.0)
     material.set_density("g/cm3", 1.0)
     material.temperature = "294"
-    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     
     # Calculate macroscopic cross sections
     macro_xs = material.calculate_macroscopic_xs_neutron()
