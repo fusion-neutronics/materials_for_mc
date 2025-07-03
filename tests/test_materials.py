@@ -41,5 +41,5 @@ def test_materials_data_reading():
     
     # Assuming the JSON file is structured correctly
     materials = Materials([material1, material2])
-    materials.read_nuclides_from_json({"Li6": "tests/li6.json", "Li7": "tests/li7.json"})
+    materials.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
 

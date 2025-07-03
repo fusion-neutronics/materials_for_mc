@@ -14,8 +14,8 @@ static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
     pub cross_section: Vec<f64>,
-    pub energy: Vec<f64>,
-    // ... add other fields as needed ...
+    pub threshold_idx: usize,
+    pub interpolation: Vec<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,16 +23,18 @@ pub struct Nuclide {
     pub name: Option<String>,
     pub element: Option<String>,
     pub atomic_symbol: Option<String>,
-    pub proton_number: Option<u32>,
+    pub atomic_number: Option<u32>,
     pub neutron_number: Option<u32>,
     pub mass_number: Option<u32>,
     pub incident_particle: Option<HashMap<String, IncidentParticleData>>,
     pub library: Option<String>,
+    pub energy: Option<HashMap<String, Vec<f64>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncidentParticleData {
-    pub temperature: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
+    #[serde(rename = "reactions")]
+    pub reactions_by_temp: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
 }
 
 impl Nuclide {
@@ -49,7 +51,7 @@ impl Nuclide {
         let mut temps = std::collections::HashSet::new();
         if let Some(ip_map) = &self.incident_particle {
             for ip_data in ip_map.values() {
-                for temp in ip_data.temperature.keys() {
+                for temp in ip_data.reactions_by_temp.keys() {
                     temps.insert(temp.clone());
                 }
             }
@@ -67,7 +69,7 @@ impl Nuclide {
         let mut mts = std::collections::HashSet::new();
         if let Some(ip_map) = &self.incident_particle {
             for ip_data in ip_map.values() {
-                for mt_map in ip_data.temperature.values() {
+                for mt_map in ip_data.reactions_by_temp.values() {
                     for mt in mt_map.keys() {
                         mts.insert(mt.clone());
                     }
@@ -81,6 +83,37 @@ impl Nuclide {
             mts_vec.sort();
             Some(mts_vec)
         }
+    }
+
+    /// Get the energy grid for a specific temperature
+    pub fn energy_grid(&self, temperature: &str) -> Option<&Vec<f64>> {
+        self.energy.as_ref().and_then(|energy_map| energy_map.get(temperature))
+    }
+
+    /// Get the full reaction energy grid for a specific reaction, 
+    /// taking into account the threshold_idx for the new format
+    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+        // Check if we have a top-level energy grid
+        if let Some(energy_map) = &self.energy {
+            if let Some(energy_grid) = energy_map.get(temperature) {
+                // We have a top-level energy grid, now get the reaction
+                if let Some(ip_map) = &self.incident_particle {
+                    if let Some(ip_data) = ip_map.get(particle) {
+                        if let Some(temp_reactions) = ip_data.reactions_by_temp.get(temperature) {
+                            if let Some(reaction) = temp_reactions.get(mt) {
+                                // Use the threshold_idx to determine where this reaction starts in the energy grid
+                                let threshold_idx = reaction.threshold_idx;
+                                if threshold_idx < energy_grid.len() {
+                                    return Some(energy_grid[threshold_idx..].to_vec());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        None
     }
 }
 

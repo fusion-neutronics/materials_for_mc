@@ -8,7 +8,7 @@ def test_calculate_total_xs_neutron():
     material.add_nuclide("Li7", 1.0)
     material.set_density("g/cm3", 1.0)
     material.temperature = "294"
-    material.read_nuclides_from_json({"Li6": "tests/li6.json", "Li7": "tests/li7.json"})
+    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
     
     # Calculate macroscopic cross sections
     macro_xs = material.calculate_macroscopic_xs_neutron()

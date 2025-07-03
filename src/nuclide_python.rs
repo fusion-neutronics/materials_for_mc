@@ -16,7 +16,7 @@ pub struct PyNuclide {
     #[pyo3(get)]
     pub atomic_symbol: Option<String>,
     #[pyo3(get)]
-    pub proton_number: Option<u32>,
+    pub atomic_number: Option<u32>,
     #[pyo3(get)]
     pub neutron_number: Option<u32>,
     #[pyo3(get)]
@@ -24,6 +24,7 @@ pub struct PyNuclide {
     #[pyo3(get)]
     pub library: Option<String>,
     pub incident_particle: Option<HashMap<String, crate::nuclide::IncidentParticleData>>,
+    pub energy: Option<HashMap<String, Vec<f64>>>,
 }
 
 #[cfg(feature = "pyo3")]
@@ -35,11 +36,12 @@ impl PyNuclide {
             name,
             element: None,
             atomic_symbol: None,
-            proton_number: None,
+            atomic_number: None,
             neutron_number: None,
             mass_number: None,
             library: None,
             incident_particle: None,
+            energy: None,
         }
     }
 
@@ -49,11 +51,12 @@ impl PyNuclide {
         self.name = nuclide.name;
         self.element = nuclide.element;
         self.atomic_symbol = nuclide.atomic_symbol;
-        self.proton_number = nuclide.proton_number;
+        self.atomic_number = nuclide.atomic_number;
         self.neutron_number = nuclide.neutron_number;
         self.mass_number = nuclide.mass_number;
         self.library = nuclide.library;
         self.incident_particle = nuclide.incident_particle;
+        self.energy = nuclide.energy;
         Ok(())
     }
 
@@ -64,16 +67,22 @@ impl PyNuclide {
             for (ip_key, ip_data) in ip_map.iter() {
                 // temperature: HashMap<String, HashMap<String, Reaction>>
                 let temp_dict = PyDict::new(py);
-                for (temp_key, mt_map) in ip_data.temperature.iter() {
+                
+                // Handle reactions by temperature
+                for (temp_key, mt_map) in ip_data.reactions_by_temp.iter() {
                     let mt_dict = PyDict::new(py);
+                    
                     for (mt_key, reaction) in mt_map.iter() {
                         let reaction_dict = PyDict::new(py);
                         reaction_dict.set_item("cross_section", &reaction.cross_section)?;
-                        reaction_dict.set_item("energy", &reaction.energy)?;
+                        reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
+                        reaction_dict.set_item("interpolation", &reaction.interpolation)?;
                         mt_dict.set_item(mt_key, reaction_dict)?;
                     }
+                    
                     temp_dict.set_item(temp_key, mt_dict)?;
                 }
+                
                 py_dict.set_item(ip_key, temp_dict)?;
             }
             Ok(Some(py_dict.into()))
@@ -96,6 +105,31 @@ impl PyNuclide {
     pub fn reaction_mts(&self) -> Option<Vec<String>> {
         Nuclide::from(self.clone()).reaction_mts()
     }
+
+    #[getter]
+    pub fn energy(&self, py: Python) -> PyResult<Option<PyObject>> {
+        if let Some(energy_map) = &self.energy {
+            let py_dict = PyDict::new(py);
+            for (temp_key, energy_grid) in energy_map.iter() {
+                py_dict.set_item(temp_key, energy_grid)?;
+            }
+            Ok(Some(py_dict.into()))
+        } else {
+            Ok(None)
+        }
+    }
+    
+    // Get the energy grid for a specific temperature
+    pub fn energy_grid(&self, temperature: &str) -> Option<Vec<f64>> {
+        let nuclide = Nuclide::from(self.clone());
+        nuclide.energy_grid(temperature).cloned()
+    }
+    
+    // Get the full reaction energy grid for a specific reaction
+    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+        let nuclide = Nuclide::from(self.clone());
+        nuclide.get_reaction_energy_grid(particle, temperature, mt)
+    }
 }
 
 #[cfg(feature = "pyo3")]
@@ -105,11 +139,12 @@ impl From<Nuclide> for PyNuclide {
             name: n.name,
             element: n.element,
             atomic_symbol: n.atomic_symbol,
-            proton_number: n.proton_number,
+            atomic_number: n.atomic_number,
             neutron_number: n.neutron_number,
             mass_number: n.mass_number,
             library: n.library,
             incident_particle: n.incident_particle,
+            energy: n.energy,
         }
     }
 }
@@ -120,11 +155,12 @@ impl From<PyNuclide> for Nuclide {
             name: py.name,
             element: py.element,
             atomic_symbol: py.atomic_symbol,
-            proton_number: py.proton_number,
+            atomic_number: py.atomic_number,
             neutron_number: py.neutron_number,
             mass_number: py.mass_number,
             library: py.library,
             incident_particle: py.incident_particle,
+            energy: py.energy,
         }
     }
 }

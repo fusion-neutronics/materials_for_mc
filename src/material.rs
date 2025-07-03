@@ -111,16 +111,15 @@ impl Material {
         
         for nuclide in self.nuclides.keys() {
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
-                if let Some(ip_data) = nuclide_data.incident_particle.as_ref().and_then(|ip| ip.get(particle)) {
-                    if let Some(temp_data) = ip_data.temperature.get(temperature) {
-                        // Iterate through all MT reactions for this nuclide
-                        for reaction in temp_data.values() {
-                            all_energies.extend(&reaction.energy);
-                        }
+                // Check if there's a top-level energy grid
+                if let Some(energy_map) = &nuclide_data.energy {
+                    if let Some(energy_grid) = energy_map.get(temperature) {
+                        all_energies.extend(energy_grid);
                     }
                 }
             }
         }
+        
         // Sort and deduplicate
         all_energies.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
         all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
@@ -156,19 +155,46 @@ impl Material {
             
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 if let Some(ip_data) = nuclide_data.incident_particle.as_ref().and_then(|ip| ip.get(particle)) {
-                    if let Some(temp_data) = ip_data.temperature.get(temperature) {
-                        // Process all MT reactions for this nuclide
-                        for (mt, reaction) in temp_data {
-                            // Create a vector to store interpolated cross sections
-                            let mut xs_values = Vec::with_capacity(grid.len());
-                            
-                            // Interpolate cross sections onto unified grid
-                            for &energy in &grid {
-                                let xs = interpolate_linear(&reaction.energy, &reaction.cross_section, energy);
-                                xs_values.push(xs);
+                    // Get the energy grid for this nuclide and temperature
+                    if let Some(energy_map) = &nuclide_data.energy {
+                        if let Some(energy_grid) = energy_map.get(temperature) {
+                            // Process all MT reactions using the shared energy grid
+                            if let Some(temp_data) = ip_data.reactions_by_temp.get(temperature) {
+                                for (mt, reaction) in temp_data {
+                                    // Create a vector to store interpolated cross sections
+                                    let mut xs_values = Vec::with_capacity(grid.len());
+                                    
+                                    // Create a subslice of the energy grid starting at threshold_idx
+                                    let threshold_idx = reaction.threshold_idx;
+                                    let reaction_energy = if threshold_idx < energy_grid.len() {
+                                        &energy_grid[threshold_idx..]
+                                    } else {
+                                        // If threshold is past the end of the grid, this reaction doesn't exist
+                                        continue;
+                                    };
+                                    
+                                    // Make sure the reaction xs has the right length
+                                    if reaction.cross_section.len() != reaction_energy.len() {
+                                        // Mismatch between energy grid and cross section array lengths
+                                        println!("Warning: cross section length {} doesn't match energy grid length {} for nuclide {} MT {}", 
+                                                reaction.cross_section.len(), reaction_energy.len(), nuclide, mt);
+                                        continue;
+                                    }
+                                    
+                                    // Interpolate cross sections onto unified grid
+                                    for &grid_energy in &grid {
+                                        // If the energy is below threshold, xs is 0
+                                        if grid_energy < reaction_energy[0] {
+                                            xs_values.push(0.0);
+                                        } else {
+                                            let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
+                                            xs_values.push(xs);
+                                        }
+                                    }
+                                    
+                                    nuclide_xs.insert(mt.clone(), xs_values);
+                                }
                             }
-                            
-                            nuclide_xs.insert(mt.clone(), xs_values);
                         }
                     }
                 }
@@ -569,9 +595,12 @@ mod tests {
         let atoms = material.get_atoms_per_cc();
         assert_eq!(atoms.len(), 2, "Should have 2 nuclides in the HashMap");
         
-        // Approximate expected values - these values are calculated by our implementation
-        let li6_expected = 3.24e23;
-        let li7_expected = 2.78e23;
+        // Approximate expected values - these values are calculated using the formula:
+        // Li6: number_density = (0.5 * N_A) / (6.0 u)
+        // Li7: number_density = (0.5 * N_A) / (7.0 u)
+        let avogadro = 6.02214076e23;
+        let li6_expected = 0.5 * avogadro / 6.0;
+        let li7_expected = 0.5 * avogadro / 7.0;
         
         // Compare with 1% tolerance
         let li6_actual = atoms.get("Li6").unwrap();

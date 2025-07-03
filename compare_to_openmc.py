@@ -16,7 +16,7 @@ mat1.add_nuclide('Li6',1)
 mat1.set_density('g/cm3',1.)
 
 mat1.temperature = "294"  # Set temperature directly on the material
-mat1.read_nuclides_from_json({'Li6':'tests/li6.json'})
+mat1.read_nuclides_from_json({'Li6':'tests/li6_neutron.json'})
 
 
 # Get the unified energy grid

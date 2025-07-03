@@ -65,6 +65,6 @@ def test_material_data_xs_reading():
     material.add_nuclide("Li6", 1.0)
     
     # Assuming the JSON file is structured correctly
-    material.read_nuclides_from_json({"Li6": "tests/li6.json"})
+    material.read_nuclides_from_json({"Li6": "tests/li6_neutron.json"})
     
     assert len(material.nuclides) == 1
