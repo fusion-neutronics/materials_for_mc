@@ -20,3 +20,16 @@ for openmc_x, my_x in zip(openmc_xs, xs):
 for openmc_energy, energy in zip(openmc_energies, energies):
     print(f'OpenMC: {openmc_energy}, My code: {energy}')
     assert math.isclose(openmc_energy , energy, rel_tol=1e-6, abs_tol=1e-6)
+
+
+import matplotlib.pyplot as plt
+plt.plot(openmc_energies, openmc_xs, label='OpenMC', linestyle='--')
+plt.plot(energies, xs, label='My code', linestyle='-.')  
+plt.xlabel('Energy (eV)')
+plt.ylabel('Cross Section (barns)')
+plt.title('Li6 Neutron Cross Section Comparison')
+plt.legend()
+plt.xscale('log')
+plt.yscale('log')
+plt.grid(True)
+plt.show()
