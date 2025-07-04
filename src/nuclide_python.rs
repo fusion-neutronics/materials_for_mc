@@ -23,8 +23,8 @@ pub struct PyNuclide {
     pub mass_number: Option<u32>,
     #[pyo3(get)]
     pub library: Option<String>,
-    pub incident_particle: Option<HashMap<String, crate::nuclide::IncidentParticleData>>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
+    pub reactions: HashMap<String, HashMap<String, Reaction>>,
 }
 
 #[cfg(feature = "pyo3")]
@@ -40,8 +40,8 @@ impl PyNuclide {
             neutron_number: None,
             mass_number: None,
             library: None,
-            incident_particle: None,
             energy: None,
+            reactions: HashMap::new(),
         }
     }
 
@@ -55,46 +55,39 @@ impl PyNuclide {
         self.neutron_number = nuclide.neutron_number;
         self.mass_number = nuclide.mass_number;
         self.library = nuclide.library;
-        self.incident_particle = nuclide.incident_particle;
         self.energy = nuclide.energy;
+        self.reactions = nuclide.reactions;
         Ok(())
     }
 
     #[getter]
-    pub fn incident_particle(&self, py: Python) -> PyResult<Option<PyObject>> {
-        if let Some(ip_map) = &self.incident_particle {
-            let py_dict = PyDict::new(py);
-            for (ip_key, ip_data) in ip_map.iter() {
-                // temperature: HashMap<String, HashMap<String, Reaction>>
-                let temp_dict = PyDict::new(py);
+    pub fn reactions(&self, py: Python) -> PyResult<PyObject> {
+        let py_dict = PyDict::new(py);
+        
+        // Create a dictionary of temperature -> mt -> reaction
+        for (temp, mt_map) in &self.reactions {
+            let mt_dict = PyDict::new(py);
+            
+            for (mt, reaction) in mt_map {
+                let reaction_dict = PyDict::new(py);
+                reaction_dict.set_item("cross_section", &reaction.cross_section)?;
+                reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
+                reaction_dict.set_item("interpolation", &reaction.interpolation)?;
                 
-                // Handle reactions by temperature
-                for (temp_key, mt_map) in ip_data.reactions_by_temp.iter() {
-                    let mt_dict = PyDict::new(py);
-                    
-                    for (mt_key, reaction) in mt_map.iter() {
-                        let reaction_dict = PyDict::new(py);
-                        reaction_dict.set_item("cross_section", &reaction.cross_section)?;
-                        reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
-                        reaction_dict.set_item("interpolation", &reaction.interpolation)?;
-                        // Convert integer MT to string for Python
-                        mt_dict.set_item(mt_key.to_string(), reaction_dict)?;
-                    }
-                    
-                    temp_dict.set_item(temp_key, mt_dict)?;
+                // Add energy if available
+                if !reaction.energy.is_empty() {
+                    reaction_dict.set_item("energy", &reaction.energy)?;
                 }
                 
-                py_dict.set_item(ip_key, temp_dict)?;
+                // Add to MT map
+                mt_dict.set_item(mt, reaction_dict)?;
             }
-            Ok(Some(py_dict.into()))
-        } else {
-            Ok(None)
+            
+            // Add to temperature map
+            py_dict.set_item(temp, mt_dict)?;
         }
-    }
-
-    #[getter]
-    pub fn incident_particles(&self) -> Option<Vec<String>> {
-        Nuclide::from(self.clone()).incident_particles()
+        
+        Ok(py_dict.into())
     }
 
     #[getter]
@@ -103,7 +96,7 @@ impl PyNuclide {
     }
 
     #[getter]
-    pub fn reaction_mts(&self) -> Option<Vec<i32>> {
+    pub fn reaction_mts(&self) -> Option<Vec<String>> {
         Nuclide::from(self.clone()).reaction_mts()
     }
 
@@ -126,10 +119,16 @@ impl PyNuclide {
         nuclide.energy_grid(temperature).cloned()
     }
     
-    // Get the full reaction energy grid for a specific reaction
-    pub fn get_reaction_energy_grid(&self, particle: &str, temperature: &str, mt: i32) -> Option<Vec<f64>> {
-        let nuclide = Nuclide::from(self.clone());
-        nuclide.get_reaction_energy_grid(particle, temperature, mt)
+    // Get the reaction energy grid for a specific reaction
+    pub fn get_reaction_energy_grid(&self, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+        if let Some(temp_reactions) = self.reactions.get(temperature) {
+            if let Some(reaction) = temp_reactions.get(mt) {
+                if !reaction.energy.is_empty() {
+                    return Some(reaction.energy.clone());
+                }
+            }
+        }
+        None
     }
 }
 
@@ -144,8 +143,8 @@ impl From<Nuclide> for PyNuclide {
             neutron_number: n.neutron_number,
             mass_number: n.mass_number,
             library: n.library,
-            incident_particle: n.incident_particle,
             energy: n.energy,
+            reactions: n.reactions,
         }
     }
 }
@@ -160,8 +159,8 @@ impl From<PyNuclide> for Nuclide {
             neutron_number: py.neutron_number,
             mass_number: py.mass_number,
             library: py.library,
-            incident_particle: py.incident_particle,
             energy: py.energy,
+            reactions: py.reactions,
         }
     }
 }
