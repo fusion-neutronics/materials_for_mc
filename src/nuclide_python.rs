@@ -77,8 +77,8 @@ impl PyNuclide {
                         reaction_dict.set_item("cross_section", &reaction.cross_section)?;
                         reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
                         reaction_dict.set_item("interpolation", &reaction.interpolation)?;
-                        // Use integer MT directly as a key in Python
-                        mt_dict.set_item(*mt_key, reaction_dict)?;
+                        // Convert integer MT to string for Python
+                        mt_dict.set_item(mt_key.to_string(), reaction_dict)?;
                     }
                     
                     temp_dict.set_item(temp_key, mt_dict)?;

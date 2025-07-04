@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
-use crate::utilities::{interpolate_linear};
+use crate::utilities::interpolate_linear;
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -441,7 +441,8 @@ impl Material {
         
         // Sum up all the relevant MT reactions
         for mt in TOTAL_MT_NUMBERS.iter() {
-            if let Some(xs_values) = macro_xs.get(&mt.to_string()) {
+            let mt_str = mt.to_string();
+            if let Some(xs_values) = macro_xs.get(&mt_str) {
                 for (i, &xs) in xs_values.iter().enumerate() {
                     total_xs[i] += xs;
                 }
@@ -456,6 +457,61 @@ impl Material {
         self.macroscopic_xs_neutron = result.clone();
         
         result
+    }
+
+    /// Calculate the neutron mean free path at a given energy
+    /// 
+    /// This method calculates the mean free path of a neutron at a specific energy
+    /// by interpolating the total macroscopic cross section and then taking 1/Σ.
+    /// 
+    /// If the total macroscopic cross section hasn't been calculated yet, it will
+    /// automatically call calculate_total_xs_neutron() first.
+    /// 
+    /// # Arguments
+    /// * `energy` - The energy of the neutron in eV
+    /// 
+    /// # Returns
+    /// * The mean free path in cm, or None if there's no cross section data
+    pub fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
+        // Ensure we have a total cross section
+        if !self.macroscopic_xs_neutron.contains_key("total") {
+            self.calculate_total_xs_neutron();
+        }
+        
+        // If we still don't have a total cross section, return None
+        if !self.macroscopic_xs_neutron.contains_key("total") {
+            return None;
+        }
+        
+        // Get the total cross section and energy grid
+        let total_xs = &self.macroscopic_xs_neutron["total"];
+        
+        // If we have an empty cross section array, return None
+        if total_xs.is_empty() || self.unified_energy_grid_neutron.is_empty() {
+            return None;
+        }
+        
+        // Make sure the energy grid and cross section have the same length
+        if total_xs.len() != self.unified_energy_grid_neutron.len() {
+            eprintln!("Error: Energy grid and cross section lengths don't match");
+            return None;
+        }
+        
+        // Interpolate to get the cross section at the requested energy
+        // Using linear-linear interpolation
+        let cross_section = interpolate_linear(
+            &self.unified_energy_grid_neutron, 
+            total_xs, 
+            energy
+        );
+        
+        // Mean free path = 1/Σ
+        // Check for zero to avoid division by zero
+        if cross_section <= 0.0 {
+            None
+        } else {
+            Some(1.0 / cross_section)
+        }
     }
 
     /// Calculate atoms per cubic centimeter for each nuclide in the material
@@ -492,7 +548,6 @@ impl Material {
         // Lithium isotopes
         atomic_masses.insert(String::from("Li6"), 6.01512288742);
         atomic_masses.insert(String::from("Li7"), 7.016004);
-        
         
         // Avogadro's number (atoms/mol)
         const AVOGADRO: f64 = 6.02214076e23;
@@ -768,6 +823,43 @@ mod tests {
         assert!(result.contains_key("2"), "MT=2 not found in result");
         assert!(result.contains_key("102"), "MT=102 not found in result");
         assert!(result.contains_key("999"), "MT=999 not found in result");
+    }
+
+    #[test]
+    fn test_mean_free_path_neutron() {
+        let mut material = Material::new();
+        
+        // Test with empty material should return None
+        assert_eq!(material.mean_free_path_neutron(1.0), None);
+        
+        // Add a nuclide and set density
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        
+        // Create mock cross sections directly
+        let energy_grid = vec![1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0, 100000000.0];
+        material.unified_energy_grid_neutron = energy_grid.clone();
+        
+        // Set total cross section (in barns * atoms/cm³, which gives cm⁻¹)
+        // Intentionally using a simple pattern that's easy to verify
+        let total_xs = vec![1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625];
+        material.macroscopic_xs_neutron.insert(String::from("total"), total_xs.clone());
+        
+        // Test exact values from our mock data
+        assert_eq!(material.mean_free_path_neutron(1.0), Some(1.0));
+        assert_eq!(material.mean_free_path_neutron(10.0), Some(2.0));
+        assert_eq!(material.mean_free_path_neutron(100.0), Some(4.0));
+        
+        // Test interpolated value
+        // At energy = 3.0, we're using linear interpolation between 1.0 and 10.0
+        // Cross section should be about 0.889 (linearly interpolated between 1.0 and 0.5)
+        // Mean free path should be about 1.125
+        let mfp_3ev = material.mean_free_path_neutron(3.0).unwrap();
+        assert!((mfp_3ev - 1.125).abs() < 0.01, "Expected ~1.125, got {}", mfp_3ev);
+        
+        // Test outside of range (should use endpoint value)
+        assert_eq!(material.mean_free_path_neutron(0.1), Some(1.0)); // Below range
+        assert_eq!(material.mean_free_path_neutron(1e9), Some(256.0)); // Above range
     }
 
 }

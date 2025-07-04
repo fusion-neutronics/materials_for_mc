@@ -63,24 +63,6 @@ impl PyMaterial {
         self.internal.get_nuclides()
     }
 
-    // // Add a regular method for get_nuclides
-    // fn get_nuclides(&self) -> Vec<String> {
-    //     self.internal.get_nuclides()
-    // }
-
-    // fn get_nuclide_fraction(&self, nuclide: String) -> Option<f64> {
-    //     self.internal.get_nuclide_fraction(&nuclide)
-    // }
-
-    // fn get_total_fraction(&self) -> f64 {
-    //     self.internal.get_total_fraction()
-    // }
-
-    // fn normalize(&mut self) -> PyResult<()> {
-    //     self.internal.normalize()
-    //         .map_err(|e| PyValueError::new_err(e))
-    // }
-
     /// String representation of the Material
     fn __str__(&self) -> PyResult<String> {
         let mut result = String::from("Material:\n");
@@ -196,6 +178,23 @@ impl PyMaterial {
     /// Get the atoms per cubic centimeter for each nuclide in the material
     fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
         self.internal.get_atoms_per_cc()
+    }
+
+    /// Calculate the neutron mean free path at a given energy
+    /// 
+    /// This method calculates the mean free path of a neutron at a specific energy
+    /// by interpolating the total macroscopic cross section and then taking 1/Σ.
+    /// 
+    /// If the total macroscopic cross section hasn't been calculated yet, it will
+    /// automatically call calculate_total_xs_neutron() first.
+    /// 
+    /// # Arguments
+    /// * `energy` - The energy of the neutron in eV
+    /// 
+    /// # Returns
+    /// * The mean free path in cm, or None if there's no cross section data
+    fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
+        self.internal.mean_free_path_neutron(energy)
     }
 }
 

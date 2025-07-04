@@ -14,7 +14,7 @@ def test_read_li6_nuclide():
     # We don't expect any specific order of MT numbers, just check they're all strings
     assert all(isinstance(mt, int) for mt in nuc1.reaction_mts)
 
-    cs = nuc1.incident_particle['neutron']['294'][2]['cross_section']
+    cs = nuc1.incident_particle['neutron']['294']['2']['cross_section']
     
     for entry in cs:
         assert isinstance(entry, float)
