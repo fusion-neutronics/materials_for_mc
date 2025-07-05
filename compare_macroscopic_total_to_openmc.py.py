@@ -8,9 +8,8 @@ mat.add_nuclide('Li6',1)
 mat.set_density('g/cm3', 20.)
 
 
-openmc_energies, openmc_xs = openmc.calculate_cexs(mat, [2], temperature=294)
+openmc_energies, openmc_xs = openmc.calculate_cexs(mat, ['total'], temperature=294)
 openmc_xs=openmc_xs[0]
-
 
 
 mat1 = m4mc.Material()
@@ -20,12 +19,14 @@ mat1.set_density('g/cm3',20.)
 mat1.temperature = "294"  # Set temperature directly on the material
 mat1.read_nuclides_from_json({'Li6':'tests/li6_neutron.json'})
 mat1.calculate_macroscopic_xs_neutron()
-my_macro = mat1.macroscopic_xs_neutron['2']
-# Get the unified energy grid}')
+mat1.calculate_total_xs_neutron()
+my_macro = mat1.macroscopic_xs_neutron['total']
+my_energies = mat1.unified_energy_grid_neutron()
+
 
 import matplotlib.pyplot as plt
 plt.plot(openmc_energies, openmc_xs, label='OpenMC', linestyle='--')
-plt.plot(mat1.unified_energy_grid_neutron(),my_macro, label='My code', linestyle='-.')
+plt.plot(my_energies,my_macro, label='My code', linestyle='-.')
 plt.xlabel('Energy (eV)')
 plt.ylabel('Cross Section (barns)')
 plt.title('Li6 Neutron Macroscopic Cross Section Comparison')
