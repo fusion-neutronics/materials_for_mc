@@ -364,10 +364,91 @@ impl Material {
         macro_xs
     }
 
-    /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
+    /// Calculate hierarchical MT numbers when they are missing from the original data
     /// 
-    /// This method takes the macroscopic cross sections and sums all relevant MT reactions
-    /// to create a "total" cross section, which is added to the HashMap.
+    /// This ensures that higher-level MT numbers (e.g., MT=3, MT=4) are available
+    /// by summing their constituent reactions according to OpenMC's sum rules.
+    /// 
+    /// If a hierarchical MT number is already present in the cross section data,
+    /// it will not be recalculated or overwritten.
+    pub fn ensure_hierarchical_mt_numbers(&mut self) {
+        // Get a mutable reference to the macroscopic cross sections
+        let xs_map = &mut self.macroscopic_xs_neutron;
+        
+        // Skip if there are no cross sections
+        if xs_map.is_empty() {
+            return;
+        }
+        
+        // Define the OpenMC sum rules for hierarchical MT numbers
+        let sum_rules: std::collections::HashMap<i32, Vec<i32>> = [
+            (3, vec![4, 5, 11, 16, 17, 22, 23, 24, 25, 27, 28, 29, 30, 32, 33, 34, 35,
+                   36, 37, 41, 42, 44, 45, 152, 153, 154, 156, 157, 158, 159, 160,
+                   161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
+                   173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 185,
+                   186, 187, 188, 189, 190, 194, 195, 196, 198, 199, 200]),
+            (4, (50..92).collect()),
+            (16, (875..892).collect()),
+            (18, vec![19, 20, 21, 38]),
+            (27, vec![18, 101]),
+            (101, vec![102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 113, 114,
+                     115, 116, 117, 155, 182, 191, 192, 193, 197]),
+            (103, (600..650).collect()),
+            (104, (650..700).collect()),
+            (105, (700..750).collect()),
+            (106, (750..800).collect()),
+            (107, (800..850).collect())
+        ].iter().cloned().collect();
+        
+        // Get the length of the energy grid from any MT reaction
+        let grid_length = xs_map.values().next().map_or(0, |xs| xs.len());
+        if grid_length == 0 {
+            return;
+        }
+        
+        // Process each hierarchical MT number
+        for (&mt, constituents) in &sum_rules {
+            let mt_str = mt.to_string();
+            
+            // Skip if this MT already exists
+            if xs_map.contains_key(&mt_str) {
+                println!("MT={} already exists in the cross section data, not recalculating", mt);
+                continue;
+            }
+            
+            // Initialize a vector for this MT with zeros
+            let mut mt_xs = vec![0.0; grid_length];
+            let mut has_constituents = false;
+            
+            // Sum the constituent MT numbers
+            println!("Calculating MT={} from its constituents", mt);
+            for &constituent_mt in constituents {
+                let constituent_mt_str = constituent_mt.to_string();
+                if let Some(xs_values) = xs_map.get(&constituent_mt_str) {
+                    for (i, &xs) in xs_values.iter().enumerate() {
+                        mt_xs[i] += xs;
+                    }
+                    has_constituents = true;
+                    println!("  Added MT={} to the sum", constituent_mt);
+                }
+            }
+            
+            // Only add this MT if at least one constituent was found
+            if has_constituents {
+                println!("Adding calculated MT={} to the cross section data", mt);
+                xs_map.insert(mt_str, mt_xs);
+            } else {
+                println!("No constituents found for MT={}, not adding to cross section data", mt);
+            }
+        }
+    }
+    
+    /// Calculate the total cross section for neutrons using MT=2 + MT=3
+    /// 
+    /// This method follows OpenMC's approach of calculating the total cross section
+    /// as the sum of elastic (MT=2) and non-elastic (MT=3) cross sections.
+    /// 
+    /// First ensures that MT=3 is calculated from its constituents if not already present.
     /// 
     /// If a total cross section already exists in the HashMap, it will be overwritten.
     /// 
@@ -385,41 +466,8 @@ impl Material {
             self.macroscopic_xs_neutron.clone()
         };
         
-        // Define the MT numbers that should be summed for the total cross section
-        const TOTAL_MT_NUMBERS: [i32; 393] = [
-            2, 5, 11, 17, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 
-            32, 33, 34, 35, 36, 37, 38, 41, 42, 44, 45, 50, 51, 52, 
-            53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 
-            67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 
-            81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 102, 108, 109, 
-            111, 112, 113, 114, 115, 116, 117, 152, 153, 154, 155, 156, 
-            157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 
-            169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 
-            181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 
-            193, 194, 195, 196, 197, 198, 199, 200, 600, 601, 602, 603, 
-            604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 
-            616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 
-            628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 
-            640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 
-            652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 
-            664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 
-            676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 
-            688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 
-            700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 
-            712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 
-            724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 
-            736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 
-            748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 
-            760, 761, 762, 763, 764, 765, 766, 767, 768, 769, 770, 771, 
-            772, 773, 774, 775, 776, 777, 778, 779, 780, 781, 782, 783, 
-            784, 785, 786, 787, 788, 789, 790, 791, 792, 793, 794, 795, 
-            796, 797, 798, 799, 800, 801, 802, 803, 804, 805, 806, 807, 
-            808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 
-            820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 
-            832, 833, 834, 835, 836, 837, 838, 839, 840, 841, 842, 843, 
-            844, 845, 846, 847, 848, 849, 875, 876, 877, 878, 879, 880, 
-            881, 882, 883, 884, 885, 886, 887, 888, 889, 890, 891
-        ];
+        // Ensure hierarchical MT numbers are calculated (especially MT=3)
+        self.ensure_hierarchical_mt_numbers();
         
         // Get the length of the energy grid from any MT reaction
         let grid_length = macro_xs.values().next().map_or(0, |xs| xs.len());
@@ -432,19 +480,42 @@ impl Material {
         // Initialize the total cross section with zeros
         let mut total_xs = vec![0.0; grid_length];
         
-        // Sum up all the relevant MT reactions
-        for mt in TOTAL_MT_NUMBERS.iter() {
-            let mt_str = mt.to_string();
-            if let Some(xs_values) = macro_xs.get(&mt_str) {
-                for (i, &xs) in xs_values.iter().enumerate() {
-                    total_xs[i] += xs;
-                }
+        // According to OpenMC, total (MT=1) = elastic (MT=2) + non-elastic (MT=3)
+        
+        // Add MT=2 (elastic scattering)
+        let mut has_mt2 = false;
+        if let Some(mt2_xs) = self.macroscopic_xs_neutron.get("2") {
+            for (i, &xs) in mt2_xs.iter().enumerate() {
+                total_xs[i] += xs;
             }
+            has_mt2 = true;
+            println!("Added MT=2 (elastic) to total cross section");
+        } else {
+            println!("Warning: MT=2 (elastic) not found in cross section data");
+        }
+        
+        // Add MT=3 (non-elastic)
+        let mut has_mt3 = false;
+        if let Some(mt3_xs) = self.macroscopic_xs_neutron.get("3") {
+            for (i, &xs) in mt3_xs.iter().enumerate() {
+                total_xs[i] += xs;
+            }
+            has_mt3 = true;
+            println!("Added MT=3 (non-elastic) to total cross section");
+        } else {
+            println!("Warning: MT=3 (non-elastic) not found in cross section data");
         }
         
         // Create a new HashMap with the original data plus the total
         let mut result = macro_xs.clone();
-        result.insert(String::from("total"), total_xs);
+        
+        // Only add the total if we found at least one of MT=2 or MT=3
+        if has_mt2 || has_mt3 {
+            println!("Adding calculated total cross section to the data");
+            result.insert(String::from("total"), total_xs);
+        } else {
+            println!("Warning: Could not calculate total cross section, neither MT=2 nor MT=3 were found");
+        }
         
         // Update the cached macroscopic cross sections
         self.macroscopic_xs_neutron = result.clone();
@@ -831,10 +902,8 @@ mod tests {
     fn test_calculate_total_xs_neutron() {
         let mut material = Material::new();
         
-        // Add some nuclides
-        material.add_nuclide("Li6", 0.5).unwrap();
-        material.add_nuclide("Li7", 0.5).unwrap();
-        material.set_density("g/cm3", 1.0).unwrap();
+        // We don't need to actually load nuclides from JSON for this test,
+        // we'll just use mock data
         
         // Create some mock cross sections directly
         let mut mock_xs = HashMap::new();
@@ -842,32 +911,48 @@ mod tests {
         // MT=2 (elastic scattering)
         mock_xs.insert(String::from("2"), vec![1.0, 2.0, 3.0]);
         
-        // MT=102 (radiative capture)
-        mock_xs.insert(String::from("102"), vec![0.5, 1.0, 1.5]);
+        // MT=4 (inelastic scattering - a component of MT=3)
+        mock_xs.insert(String::from("4"), vec![0.2, 0.4, 0.6]);
         
-        // MT=999 (some reaction not in the total list)
+        // MT=16 (n,2n - another component of MT=3)
+        mock_xs.insert(String::from("16"), vec![0.3, 0.6, 0.9]);
+        
+        // MT=999 (some reaction not in the sum rules)
         mock_xs.insert(String::from("999"), vec![0.1, 0.2, 0.3]);
         
         // Set the mock cross sections directly
-        material.macroscopic_xs_neutron = mock_xs;
+        material.macroscopic_xs_neutron = mock_xs.clone();
+        material.unified_energy_grid_neutron = vec![1.0, 2.0, 3.0]; // Add a grid
         
-        // Calculate the total cross section
+        // Calculate hierarchical MT numbers first (MT=3 from components)
+        material.ensure_hierarchical_mt_numbers();
+        
+        // Verify MT=3 was created correctly
+        assert!(material.macroscopic_xs_neutron.contains_key("3"), "MT=3 not created");
+        let mt3_xs = material.macroscopic_xs_neutron.get("3").unwrap();
+        assert_eq!(mt3_xs.len(), 3, "MT=3 cross section has wrong length");
+        assert_eq!(mt3_xs[0], 0.5, "MT=3[0] is incorrect"); // 0.2 + 0.3
+        assert_eq!(mt3_xs[1], 1.0, "MT=3[1] is incorrect"); // 0.4 + 0.6
+        assert_eq!(mt3_xs[2], 1.5, "MT=3[2] is incorrect"); // 0.6 + 0.9
+        
+        // Now calculate the total cross section
         let result = material.calculate_total_xs_neutron();
         
         // Check that the total was calculated correctly
         assert!(result.contains_key("total"), "Total cross section not found in result");
         
+        // Total should be the sum of MT=2 and MT=3
         let total_xs = result.get("total").unwrap();
         assert_eq!(total_xs.len(), 3, "Total cross section has wrong length");
+        assert_eq!(total_xs[0], 1.5, "Total cross section[0] is incorrect"); // 1.0 + 0.5
+        assert_eq!(total_xs[1], 3.0, "Total cross section[1] is incorrect"); // 2.0 + 1.0
+        assert_eq!(total_xs[2], 4.5, "Total cross section[2] is incorrect"); // 3.0 + 1.5
         
-        // Total should be the sum of MT=2 and MT=102 only (not MT=999)
-        assert_eq!(total_xs[0], 1.5, "Total cross section[0] is incorrect");
-        assert_eq!(total_xs[1], 3.0, "Total cross section[1] is incorrect");
-        assert_eq!(total_xs[2], 4.5, "Total cross section[2] is incorrect");
-        
-        // Verify that the original cross sections are still there
+        // Verify that all cross sections are in the result
         assert!(result.contains_key("2"), "MT=2 not found in result");
-        assert!(result.contains_key("102"), "MT=102 not found in result");
+        assert!(result.contains_key("3"), "MT=3 not found in result");
+        assert!(result.contains_key("4"), "MT=4 not found in result");
+        assert!(result.contains_key("16"), "MT=16 not found in result");
         assert!(result.contains_key("999"), "MT=999 not found in result");
     }
 
