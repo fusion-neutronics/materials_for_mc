@@ -5,7 +5,7 @@ import materials_for_mc as m4mc
 openmc.config['cross_sections'] = '/home/jon/nuclear_data/cross_sections.xml'
 mat = openmc.Material()
 mat.add_nuclide('Li6',1)
-# mat.add_nuclide('Li7',1)
+mat.add_nuclide('Li7',12)
 mat.set_density('g/cm3', 20.)
 
 
@@ -13,10 +13,10 @@ openmc_energies, openmc_xs = openmc.calculate_cexs(mat, [2], temperature=294)
 openmc_xs=openmc_xs[0]
 
 
-m4mc.Config.set_cross_sections({'Li6':'tests/li6_neutron.json'})
+m4mc.Config.set_cross_sections({'Li6':'tests/li6_neutron.json', 'Li7':'tests/li7_neutron.json'})
 mat1 = m4mc.Material()
 mat1.add_nuclide('Li6',1)
-# mat1.add_nuclide('Li7',1)
+mat1.add_nuclide('Li7',12)
 mat1.set_density('g/cm3',20.)
 
 mat1.temperature = "294"  # Set temperature directly on the material

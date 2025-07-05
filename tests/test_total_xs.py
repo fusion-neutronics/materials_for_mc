@@ -29,7 +29,7 @@ def test_calculate_total_xs_neutron():
     grid = material.unified_energy_grid_neutron()
     
     # Sum up all the relevant MT reactions for a few energy points
-    relevant_mts = ["2", "102"]  # Simplified list for testing
+    relevant_mts = ["2", "3"]  # MT=2 (elastic) and MT=3 (non-elastic) according to OpenMC
     for mt in relevant_mts:
         if mt in macro_xs:
             # Check that values were added to the total (simplified test)

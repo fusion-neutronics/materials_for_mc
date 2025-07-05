@@ -125,7 +125,7 @@ impl Material {
     ) -> Vec<f64> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
-            eprintln!("Error loading nuclides: {}", e);
+            panic!("Error loading nuclides: {}", e);
         }
         
         // Check if we already have this grid in the cache
@@ -191,7 +191,7 @@ impl Material {
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
-            eprintln!("Error loading nuclides: {}", e);
+            panic!("Error loading nuclides: {}", e);
         }
         
         // Get the grid (either from parameter or from cache/build)
@@ -308,7 +308,7 @@ impl Material {
     ) -> HashMap<String, Vec<f64>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
-            eprintln!("Error loading nuclides: {}", e);
+            panic!("Error loading nuclides: {}", e);
         }
         
         // First get microscopic cross sections on the unified grid
@@ -456,7 +456,7 @@ impl Material {
     pub fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
-            eprintln!("Error loading nuclides: {}", e);
+            panic!("Error loading nuclides: {}", e);
         }
         
         // Get the macroscopic cross sections (calculate if not already done)
