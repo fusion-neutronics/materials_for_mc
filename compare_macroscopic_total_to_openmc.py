@@ -35,3 +35,7 @@ plt.xscale('log')
 plt.yscale('log')
 plt.grid(True)
 plt.show()
+
+for openmc_energy, my_energy in zip(openmc_energies, my_energies):
+    print(f'OpenMC: {openmc_energy}, My code: {my_energy}')
+    assert np.isclose(openmc_energy , my_energy, rtol=1e-6, atol=1e-6)
