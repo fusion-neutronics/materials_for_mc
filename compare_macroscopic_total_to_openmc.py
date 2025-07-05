@@ -24,17 +24,67 @@ my_macro = mat1.macroscopic_xs_neutron['total']
 my_energies = mat1.unified_energy_grid_neutron()
 
 
-import matplotlib.pyplot as plt
-plt.plot(openmc_energies, openmc_xs, label='OpenMC', linestyle='--')
-plt.plot(my_energies,my_macro, label='My code', linestyle='-.')
-plt.xlabel('Energy (eV)')
-plt.ylabel('Cross Section (barns)')
-plt.title('Li6 Neutron Macroscopic Cross Section Comparison')
-plt.legend()
-plt.xscale('log')
-plt.yscale('log')
-plt.grid(True)
-plt.show()
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# Create a figure with secondary y-axis
+fig = go.Figure()
+
+# Add trace for my code's total cross-section
+fig.add_trace(
+    go.Scatter(
+        x=my_energies,
+        y=my_macro,
+        name='mycode (total)',
+        line=dict(dash='dashdot', width=2)
+    )
+)
+
+# Add traces for individual MT reaction cross-sections from my code
+for mt in list(mat1.macroscopic_xs_neutron.keys()):
+    my_macro = mat1.macroscopic_xs_neutron[mt]
+    if my_macro[0] != 0 and mt != 'total':  # Skip empty reactions and avoid duplicating total
+        fig.add_trace(
+            go.Scatter(
+                x=my_energies,
+                y=my_macro,
+                name=f'MT={mt}',
+                line=dict(dash='dashdot', width=1),
+                visible='legendonly'  # Hide by default to reduce clutter
+            )
+        )
+
+# Add trace for OpenMC total cross-section
+fig.add_trace(
+    go.Scatter(
+        x=openmc_energies,
+        y=openmc_xs,
+        name='OpenMC (total)',
+        line=dict(dash='dash', width=2)
+    )
+)
+
+# Update layout with logarithmic scales and labels
+fig.update_layout(
+    title='Li6 Neutron Macroscopic Cross Section Comparison',
+    xaxis_title='Energy (eV)',
+    yaxis_title='Cross Section (barns)',
+    xaxis_type='log',
+    yaxis_type='log',
+    legend=dict(
+        yanchor="top",
+        y=0.99,
+        xanchor="left",
+        x=0.01
+    ),
+    hovermode='closest'
+)
+
+fig.update_xaxes(gridcolor='lightgray')
+fig.update_yaxes(gridcolor='lightgray')
+
+# Show the figure
+fig.write_html('macroscopic_total_comparison.html')
 
 for openmc_energy, my_energy in zip(openmc_energies, my_energies):
     print(f'OpenMC: {openmc_energy}, My code: {my_energy}')
