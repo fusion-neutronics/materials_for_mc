@@ -24,6 +24,14 @@ my_macro = mat1.macroscopic_xs_neutron['total']
 my_energies = mat1.unified_energy_grid_neutron()
 
 
+for openmc_energy, my_energy in zip(openmc_energies, my_energies):
+    print(f'OpenMC: {openmc_energy}, My code: {my_energy}')
+    assert np.isclose(openmc_energy , my_energy, rtol=1e-6, atol=1e-6)
+
+for openmc_x, my_x in zip(openmc_xs, my_macro):
+    print(f'OpenMC: {openmc_x}, My code: {my_x}')
+    # assert np.isclose(openmc_x, my_x, rtol=1e-6, atol=1e-6)
+
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -85,7 +93,3 @@ fig.update_yaxes(gridcolor='lightgray')
 
 # Show the figure
 fig.write_html('macroscopic_total_comparison.html')
-
-for openmc_energy, my_energy in zip(openmc_energies, my_energies):
-    print(f'OpenMC: {openmc_energy}, My code: {my_energy}')
-    assert np.isclose(openmc_energy , my_energy, rtol=1e-6, atol=1e-6)

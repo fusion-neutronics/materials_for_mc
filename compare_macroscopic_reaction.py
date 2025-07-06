@@ -8,7 +8,7 @@ mat.add_nuclide('Li6',1)
 mat.set_density('g/cm3', 20.)
 
 
-openmc_energies, openmc_xs = openmc.calculate_cexs(mat, ['2'], temperature=294)
+openmc_energies, openmc_xs = openmc.calculate_cexs(mat, [2], temperature=294)
 openmc_xs=openmc_xs[0]
 
 
