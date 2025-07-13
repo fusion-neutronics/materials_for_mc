@@ -25,3 +25,4 @@ Cargo.lock
 
 
 tests/__pycache__/
+*.html
