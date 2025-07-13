@@ -371,6 +371,9 @@ impl Material {
     /// 
     /// If a hierarchical MT number is already present in the cross section data,
     /// it will not be recalculated or overwritten.
+    /// 
+    /// This implementation processes MT numbers in dependency order (bottom-up),
+    /// ensuring that all constituents are calculated before their parents.
     pub fn ensure_hierarchical_mt_numbers(&mut self) {
         // Get a mutable reference to the macroscopic cross sections
         let xs_map = &mut self.macroscopic_xs_neutron;
@@ -406,13 +409,65 @@ impl Material {
             return;
         }
         
-        // Process each hierarchical MT number
-        for (&mt, constituents) in &sum_rules {
+        println!("Starting hierarchical MT calculation");
+        println!("Available MT numbers before: {:?}", xs_map.keys().collect::<Vec<_>>());
+        
+        // Create a dependency graph and processing order
+        // We need to process MT numbers in dependency order (leaf nodes first)
+        let mut processing_order = Vec::new();
+        let mut processed_set = std::collections::HashSet::new();
+        
+        // First add all leaf MT numbers (those that don't appear as parents in sum_rules)
+        // and those that already exist in xs_map
+        for mt_str in xs_map.keys() {
+            if let Ok(mt) = mt_str.parse::<i32>() {
+                processed_set.insert(mt);
+            }
+        }
+        
+        // Helper function to add an MT and its dependencies to the processing order
+        fn add_to_processing_order(
+            mt: i32, 
+            sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
+            processed: &mut std::collections::HashSet<i32>,
+            order: &mut Vec<i32>
+        ) {
+            // Skip if already processed
+            if processed.contains(&mt) {
+                return;
+            }
+            
+            // Process dependencies first (if this MT is in the sum rules)
+            if let Some(constituents) = sum_rules.get(&mt) {
+                for &constituent in constituents {
+                    add_to_processing_order(constituent, sum_rules, processed, order);
+                }
+            }
+            
+            // Now add this MT
+            processed.insert(mt);
+            order.push(mt);
+        }
+        
+        // Add MTs to processing order in bottom-up dependency order
+        for &mt in sum_rules.keys() {
+            add_to_processing_order(mt, &sum_rules, &mut processed_set, &mut processing_order);
+        }
+        
+        println!("Processing order: {:?}", processing_order);
+        
+        // Now process in the determined order
+        for mt in processing_order {
             let mt_str = mt.to_string();
             
             // Skip if this MT already exists
             if xs_map.contains_key(&mt_str) {
                 println!("MT={} already exists in the cross section data, not recalculating", mt);
+                continue;
+            }
+            
+            // Skip if this MT is not in the sum rules
+            if !sum_rules.contains_key(&mt) {
                 continue;
             }
             
@@ -422,7 +477,7 @@ impl Material {
             
             // Sum the constituent MT numbers
             println!("Calculating MT={} from its constituents", mt);
-            for &constituent_mt in constituents {
+            for &constituent_mt in &sum_rules[&mt] {
                 let constituent_mt_str = constituent_mt.to_string();
                 if let Some(xs_values) = xs_map.get(&constituent_mt_str) {
                     for (i, &xs) in xs_values.iter().enumerate() {
@@ -441,6 +496,9 @@ impl Material {
                 println!("No constituents found for MT={}, not adding to cross section data", mt);
             }
         }
+        
+        println!("Finished hierarchical MT calculation");
+        println!("Final MT numbers: {:?}", xs_map.keys().collect::<Vec<_>>());
     }
     
     /// Calculate the total cross section for neutrons using MT=2 + MT=3
