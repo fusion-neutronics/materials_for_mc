@@ -30,7 +30,7 @@ jobs:
           python -m pip install virtualenv
           python -m virtualenv venv
           source venv/bin/activate
-          pip install pytest maturin
+          pip install pytest maturin numpy
           maturin develop --features pyo3
           pytest
           cd example_use
