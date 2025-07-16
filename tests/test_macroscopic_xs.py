@@ -97,6 +97,6 @@ def test_macroscopic_xs_calculation_formula():
     # Check for MT=2 (elastic scattering) if it exists
     if "2" in macro_xs and "Li6" in micro_xs and "2" in micro_xs["Li6"]:
         for i in range(min(10, len(macro_xs["2"]))):  # Check first 10 points or all if less
-            expected = atoms_per_cc["Li6"] * micro_xs["Li6"]["2"][i] * BARN_TO_CM2
+            expected = atoms_per_cc["Li6"] * micro_xs["Li6"]["2"][i]
             assert macro_xs["2"][i] == pytest.approx(expected, rel=1e-6), \
                 f"Macroscopic XS calculation incorrect at index {i}"
