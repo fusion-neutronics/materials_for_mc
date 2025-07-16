@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyIndexError;
 use pyo3::types::PyList;
+use pyo3::types::PyDict;
+use std::collections::HashMap;
 use crate::materials::Materials;
 use crate::material_python::PyMaterial;
 
@@ -79,5 +81,17 @@ impl PyMaterials {
     /// Make the Materials object behave like a sequence in Python
     fn __getitem__(&self, index: usize) -> PyResult<PyMaterial> {
         self.get(index)
+    }
+
+    /// Read nuclides from a JSON-like Python dictionary
+    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: &PyDict) -> PyResult<()> {
+        let mut rust_map = HashMap::new();
+        for (k, v) in nuclide_json_map.iter() {
+            let key: String = k.extract()?;
+            let val: String = v.extract()?;
+            rust_map.insert(key, val);
+        }
+        self.internal.read_nuclides_from_json(&rust_map)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 }

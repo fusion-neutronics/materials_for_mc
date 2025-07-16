@@ -1,5 +1,5 @@
 import pytest
-from materials_for_mc import Material
+from materials_for_mc import Material, Config
 
 def test_volume_set_and_get():
     material = Material()
@@ -59,3 +59,28 @@ def test_get_nuclide_names():
     
     # Verify the order is still alphabetical
     assert material.get_nuclide_names() == ["O16", "U235", "U238"]
+
+def test_material_data_xs_reading():
+    # Import Config locally to avoid module-level import issues
+    from materials_for_mc import Config
+    import os
+    
+    material = Material()
+    material.add_nuclide("Li6", 1.0)
+    
+    # Print the current working directory and check if the file exists
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"File exists: {os.path.exists('tests/li6_neutron.json')}")
+    
+    # Set the cross-section path in the global Config
+    Config.set_cross_sections({"Li6": "tests/li6_neutron.json"})
+    
+    # Print the cross-sections to verify they're set correctly
+    print(f"Cross-sections: {Config.get_cross_sections()}")
+    
+    # Accessing methods that need nuclide data will automatically load them
+    # Let's call a method that triggers the loading
+    grid = material.unified_energy_grid_neutron()
+    
+    assert len(material.nuclides) == 1
+    assert len(grid) > 0, "Energy grid should not be empty"
