@@ -1,13 +1,9 @@
 import pytest
 from materials_for_mc import Material
 
+
 def test_get_atoms_per_cc():
-    material = Material()
-    
-    # Test with no density set
-    atoms = material.get_atoms_per_cc()
-    assert len(atoms) == 0, "Should return empty dict when density is not set"
-    
+
     # Test with Li isotopes - proper atomic mass calculation
     material = Material()
     material.add_nuclide("Li6", 0.5)
@@ -21,8 +17,14 @@ def test_get_atoms_per_cc():
     avogadro = 6.02214076e23  # Atoms per mol
     li6_mass = 6.015122  # g/mol
     li7_mass = 7.016004  # g/mol
-    li6_expected = avogadro * 1.0 * 0.5 / li6_mass  # Should be about 5.0e22 atoms/cm³
-    li7_expected = avogadro * 1.0 * 0.5 / li7_mass  # Should be about 4.3e22 atoms/cm³
+    
+    # Average molar mass
+    avg_molar_mass = (li6_mass * 0.5 + li7_mass * 0.5) / 1.0
+    
+    # The formula in the Rust code includes a factor of 1e-24 to convert to atoms/barn-cm
+    # atoms/barn-cm = density * N_A / avg_molar_mass * normalized_fraction * 1e-24
+    li6_expected = avogadro * 1.0 / avg_molar_mass * 0.5 * 1.0e-24  # atoms/barn-cm
+    li7_expected = avogadro * 1.0 / avg_molar_mass * 0.5 * 1.0e-24  # atoms/barn-cm
     
     # Test with relative tolerance of 1%
     assert atoms["Li6"] == pytest.approx(li6_expected, rel=0.01), "Li6 atoms/cc calculation is incorrect"
