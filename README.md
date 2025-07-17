@@ -2,7 +2,7 @@
 
 # Materials for MC
 
-A Rust package with Python bindings for making neutronics materials.
+A Rust package with Python bindings and WebAssembly support for making neutronics materials.
 
 
 
@@ -21,7 +21,6 @@ maturin develop --features pyo3
 # Example python usage
 
 ```
-
 python examples/use_in_python.py
 ```
 
@@ -33,6 +32,27 @@ cd example_use
 cargo build
 cargo run
 ```
+
+# WebAssembly Support
+
+The package can be compiled to WebAssembly for use in web browsers:
+
+```bash
+# Build the WASM package
+./build_wasm.sh
+
+# Serve the demo page locally
+./serve.sh
+
+# Open the demo page in your browser
+# http://localhost:8000/macroscopic_xs_plotter.html
+```
+
+The WebAssembly demo includes:
+- Material creation and manipulation
+- Cross section calculation and visualization
+- Predefined materials (Natural Lithium and Enriched Lithium)
+- Interactive plotting with Plotly
 
 # Testing
 

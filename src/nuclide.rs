@@ -312,7 +312,148 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     Ok(nuclide)
 }
 
+// Read a nuclide from a JSON string
+pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Parse the JSON string
+    let json_value: serde_json::Value = serde_json::from_str(json_content)?;
+    
+    // Use the same parsing logic as read_nuclide_from_json but skip file reading
+    parse_nuclide_from_json_value(json_value)
+}
+
+// Parse a nuclide from a JSON value (refactored from read_nuclide_from_json)
+fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    let mut nuclide = Nuclide {
+        name: None,
+        element: None,
+        atomic_symbol: None,
+        atomic_number: None,
+        neutron_number: None,
+        mass_number: None,
+        library: None,
+        energy: None,
+        reactions: HashMap::new(),
+    };
+
+    // Parse the nuclide name if present
+    if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
+        nuclide.name = Some(name.to_string());
+    }
+    
+    // Handle energy grids for each temperature
+    let mut energy_map = HashMap::new();
+    
+    // Check if we have the modern format with "energy" field
+    if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
+        for (temp, energy_arr) in energy_obj {
+            if let Some(energy_values) = energy_arr.as_array() {
+                let energy_vec: Vec<f64> = energy_values
+                    .iter()
+                    .filter_map(|v| v.as_f64())
+                    .collect();
+                energy_map.insert(temp.clone(), energy_vec);
+            }
+        }
+        nuclide.energy = Some(energy_map);
+    }
+    
+    // Process reactions - check multiple formats
+    
+    // Check if we have the old format with "reactions" field
+    if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
+        for (temp, mt_reactions) in reactions_obj {
+            let mut temp_reactions = HashMap::new();
+            
+            // Process all MT reactions for this temperature
+            if let Some(mt_obj) = mt_reactions.as_object() {
+                for (mt, reaction_data) in mt_obj {
+                    if let Some(reaction_obj) = reaction_data.as_object() {
+                        let mut reaction = Reaction {
+                            cross_section: Vec::new(),
+                            threshold_idx: 0,
+                            interpolation: Vec::new(),
+                            energy: Vec::new(),
+                        };
+                        
+                        // Get cross section (might be named "xs" in old format)
+                        if let Some(xs) = reaction_obj.get("cross_section").or_else(|| reaction_obj.get("xs")) {
+                            if let Some(xs_arr) = xs.as_array() {
+                                reaction.cross_section = xs_arr
+                                    .iter()
+                                    .filter_map(|v| v.as_f64())
+                                    .collect();
+                            }
+                        }
+                        
+                        // Get threshold_idx
+                        if let Some(idx) = reaction_obj.get("threshold_idx").and_then(|v| v.as_u64()) {
+                            reaction.threshold_idx = idx as usize;
+                        }
+                        
+                        // Get interpolation
+                        if let Some(interp) = reaction_obj.get("interpolation") {
+                            if let Some(interp_arr) = interp.as_array() {
+                                reaction.interpolation = interp_arr
+                                    .iter()
+                                    .filter_map(|v| v.as_i64())
+                                    .map(|v| v as i32)
+                                    .collect();
+                            }
+                        }
+                        
+                        // Get energy (some reactions may have their own energy grid)
+                        if let Some(energy) = reaction_obj.get("energy") {
+                            if let Some(energy_arr) = energy.as_array() {
+                                reaction.energy = energy_arr
+                                    .iter()
+                                    .filter_map(|v| v.as_f64())
+                                    .collect();
+                            }
+                        }
+                        
+                        // Insert the reaction into the temperature's map
+                        temp_reactions.insert(mt.clone(), reaction);
+                    }
+                }
+            }
+            
+            // Only insert if we found reactions
+            if !temp_reactions.is_empty() {
+                nuclide.reactions.insert(temp.clone(), temp_reactions);
+            }
+        }
+    }
+    
+    // Check if we need to add the particle type field (future-proofing)
+    // This is a placeholder for future implementation
+    
+    println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
+    println!("Found {} temperature(s) with reaction data", nuclide.reactions.len());
+    
+    Ok(nuclide)
+}
+
 // Get a nuclide from the cache or load it from the specified JSON file
+// Global flag to indicate if we're in a WASM environment
+// This will be set to true when compiling for WASM
+#[cfg(target_arch = "wasm32")]
+static WASM_ENVIRONMENT: bool = true;
+
+#[cfg(not(target_arch = "wasm32"))]
+static WASM_ENVIRONMENT: bool = false;
+
+// Store the string content of nuclide data for WASM environment
+static mut NUCLIDE_JSON_CONTENT: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+// Set the JSON content for a nuclide - this is used in WASM environment
+pub fn set_nuclide_json_content(name: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+    unsafe {
+        let mut json_content = NUCLIDE_JSON_CONTENT.lock().unwrap();
+        json_content.insert(name.to_string(), content.to_string());
+    }
+    Ok(())
+}
+
 pub fn get_or_load_nuclide(
     nuclide_name: &str, 
     json_path_map: &HashMap<String, String>
@@ -325,17 +466,48 @@ pub fn get_or_load_nuclide(
         }
     }
     
-    // Not in cache, load from JSON
-    let path = json_path_map.get(nuclide_name)
-        .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
+    // Check if we're in a WASM environment
+    #[cfg(target_arch = "wasm32")]
+    {
+        // In WASM, try to get the JSON content from memory
+        let content = unsafe {
+            let json_content = NUCLIDE_JSON_CONTENT.lock().unwrap();
+            json_content.get(nuclide_name).cloned()
+        };
+        
+        if let Some(content) = content {
+            // If we have content, parse it
+            let nuclide = read_nuclide_from_json_str(&content)?;
+            let arc_nuclide = Arc::new(nuclide);
+            
+            // Store in cache
+            {
+                let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+                cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
+            }
+            
+            return Ok(arc_nuclide);
+        } else {
+            return Err(format!("No JSON content provided for nuclide '{}' in WASM environment", nuclide_name).into());
+        }
+    }
     
-    let nuclide = read_nuclide_from_json(path)?;
-    let arc_nuclide = Arc::new(nuclide);
-    // Store in cache
+    // Non-WASM environment: load from file
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Not in cache, load from JSON file
+        let path = json_path_map.get(nuclide_name)
+            .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
+        
+        let nuclide = read_nuclide_from_json(path)?;
+        let arc_nuclide = Arc::new(nuclide);
+        // Store in cache
+    
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
         cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
     }
     
     Ok(arc_nuclide)
+}
 }
