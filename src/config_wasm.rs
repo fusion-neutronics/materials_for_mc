@@ -51,7 +51,7 @@ impl WasmConfig {
 
     #[wasm_bindgen]
     pub fn set_nuclide_data(nuclide_name: &str, json_content: &str) -> Result<(), JsValue> {
-        match crate::nuclide::set_nuclide_json_content(nuclide_name, json_content) {
+        match crate::nuclide_wasm::set_nuclide_json_content(nuclide_name, json_content) {
             Ok(_) => Ok(()),
             Err(e) => Err(JsValue::from_str(&format!("Failed to set nuclide data: {:?}", e))),
         }

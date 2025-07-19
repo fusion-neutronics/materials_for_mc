@@ -111,25 +111,14 @@ impl Material {
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
-            #[cfg(target_arch = "wasm32")]
-            {
-                // In WASM, try to get the nuclide but handle errors more specifically
-                match get_or_load_nuclide(&nuclide_name, &config.cross_sections) {
-                    Ok(nuclide) => {
-                        self.nuclide_data.insert(nuclide_name.clone(), nuclide);
-                    },
-                    Err(_) => {
-                        // In WASM, we convert the error to a more specific message
-                        return Err(format!("Failed to load nuclide '{}' in WASM environment. Make sure you've loaded the nuclide data first using WasmConfig.set_nuclide_data() or WasmMaterial.load_nuclide_data()", nuclide_name).into());
-                    }
+            // Load from the provided JSON path map
+            match get_or_load_nuclide(&nuclide_name, &config.cross_sections) {
+                Ok(nuclide) => {
+                    self.nuclide_data.insert(nuclide_name.clone(), nuclide);
+                },
+                Err(e) => {
+                    return Err(format!("Failed to load nuclide '{}': {}", nuclide_name, e).into());
                 }
-            }
-            
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                // In non-WASM, load from file
-                let nuclide = get_or_load_nuclide(&nuclide_name, &config.cross_sections)?;
-                self.nuclide_data.insert(nuclide_name.clone(), nuclide);
             }
         }
         

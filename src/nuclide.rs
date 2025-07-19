@@ -434,26 +434,6 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
 }
 
 // Get a nuclide from the cache or load it from the specified JSON file
-// Global flag to indicate if we're in a WASM environment
-// This will be set to true when compiling for WASM
-#[cfg(target_arch = "wasm32")]
-static WASM_ENVIRONMENT: bool = true;
-
-#[cfg(not(target_arch = "wasm32"))]
-static WASM_ENVIRONMENT: bool = false;
-
-// Store the string content of nuclide data for WASM environment
-static mut NUCLIDE_JSON_CONTENT: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-// Set the JSON content for a nuclide - this is used in WASM environment
-pub fn set_nuclide_json_content(name: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
-    unsafe {
-        let mut json_content = NUCLIDE_JSON_CONTENT.lock().unwrap();
-        json_content.insert(name.to_string(), content.to_string());
-    }
-    Ok(())
-}
-
 pub fn get_or_load_nuclide(
     nuclide_name: &str, 
     json_path_map: &HashMap<String, String>
@@ -466,48 +446,18 @@ pub fn get_or_load_nuclide(
         }
     }
     
-    // Check if we're in a WASM environment
-    #[cfg(target_arch = "wasm32")]
-    {
-        // In WASM, try to get the JSON content from memory
-        let content = unsafe {
-            let json_content = NUCLIDE_JSON_CONTENT.lock().unwrap();
-            json_content.get(nuclide_name).cloned()
-        };
-        
-        if let Some(content) = content {
-            // If we have content, parse it
-            let nuclide = read_nuclide_from_json_str(&content)?;
-            let arc_nuclide = Arc::new(nuclide);
-            
-            // Store in cache
-            {
-                let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-                cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
-            }
-            
-            return Ok(arc_nuclide);
-        } else {
-            return Err(format!("No JSON content provided for nuclide '{}' in WASM environment", nuclide_name).into());
-        }
-    }
+    // Not in cache, load from JSON file
+    let path = json_path_map.get(nuclide_name)
+        .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
     
-    // Non-WASM environment: load from file
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        // Not in cache, load from JSON file
-        let path = json_path_map.get(nuclide_name)
-            .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
-        
-        let nuclide = read_nuclide_from_json(path)?;
-        let arc_nuclide = Arc::new(nuclide);
-        // Store in cache
+    let nuclide = read_nuclide_from_json(path)?;
+    let arc_nuclide = Arc::new(nuclide);
     
+    // Store in cache
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
         cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
     }
     
     Ok(arc_nuclide)
-}
 }
