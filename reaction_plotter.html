@@ -33,10 +33,23 @@
             padding: 15px;
             background-color: #f9f9f9;
             border-radius: 8px;
+            max-height: 500px;
+            overflow-y: auto;
         }
         .control-group {
             flex: 1;
             min-width: 250px;
+        }
+        .filter-container {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         label {
             display: block;
@@ -45,10 +58,11 @@
         }
         select {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
+            font-size: 14px;
         }
         .plot-container {
             width: 100%;
@@ -67,19 +81,29 @@
             font-size: 0.9em;
             margin-top: 5px;
         }
+        .reactions-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: white;
+        }
         .reaction-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 10px;
             align-items: center;
-            margin-bottom: 10px;
-            padding: 10px;
+            margin-bottom: 6px;
+            padding: 8px;
             background-color: #f0f0f0;
             border-radius: 4px;
         }
         .reaction-delete {
-            margin-left: 10px;
             color: red;
             cursor: pointer;
             font-weight: bold;
+            font-size: 16px;
         }
         .add-reaction-btn {
             background-color: #4CAF50;
@@ -93,6 +117,11 @@
         .add-reaction-btn:hover {
             background-color: #45a049;
         }
+        .reaction-label {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
     </style>
 </head>
 <body>
@@ -101,8 +130,7 @@
         
         <div class="control-panel">
             <div class="control-group">
-                <label>Add Reactions to Plot:</label>
-                <div id="reactions-container"></div>
+                <div id="reactions-container" class="reactions-container"></div>
                 <button id="add-reaction-btn" class="add-reaction-btn">Add Reaction</button>
             </div>
         </div>
@@ -118,6 +146,13 @@
 
         // Material definitions
         const materialDefinitions = {
+            pure_li6: {
+                name: "Pure Li-6",
+                nuclides: [
+                    { name: "Li6", fraction: 1.0 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            },
             natural_lithium: {
                 name: "Natural Lithium",
                 nuclides: [
@@ -139,70 +174,51 @@
         // Cross section data storage
         const materialData = {};
         
-        // Color palette for plotting
-        const colors = [
-            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-        ];
-
-        // MT reaction definitions with friendly names
-        const mtReactions = {
-            "total": { id: "total", name: "Total" },
-            "2": { id: "2", name: "Elastic Scattering (MT 2)" },
-            "3": { id: "3", name: "Non-elastic (MT 3)" },
-            "4": { id: "4", name: "Inelastic (MT 4)" },
-            "16": { id: "16", name: "n,2n (MT 16)" },
-            "102": { id: "102", name: "n,γ (MT 102)" },
-            "103": { id: "103", name: "n,p (MT 103)" },
-            "104": { id: "104", name: "n,d (MT 104)" },
-            "105": { id: "105", name: "n,t (MT 105)" },
-            "106": { id: "106", name: "n,He-3 (MT 106)" },
-            "107": { id: "107", name: "n,α (MT 107)" }
-        };
-
         // Initialize the application
         async function init_app() {
             // Initialize the WASM module
             await init();
             
-            // Load the nuclide data from JSON files
-            await loadNuclideData();
-            
-            // Load all materials upfront
-            await loadAllMaterials();
-            
             // Set up event listeners
             document.getElementById('add-reaction-btn').addEventListener('click', addReactionRow);
             
-            // Add initial reaction row (natural lithium total)
+            // Add initial reaction row (pure Li6 total)
             addReactionRow();
         }
 
-        // Load nuclide data from JSON files
-        async function loadNuclideData() {
-            const nuclideFiles = {
-                "Li6": "tests/li6_neutron.json",
-                "Li7": "tests/li7_neutron.json"
-            };
+        // Load nuclide data from JSON file
+        async function loadNuclideData(nuclide) {
+            // If we've already loaded this nuclide, don't load it again
+            if (window.loadedNuclides && window.loadedNuclides.has(nuclide)) {
+                return;
+            }
             
-            for (const [nuclide, filePath] of Object.entries(nuclideFiles)) {
-                try {
-                    // Fetch the JSON file
-                    const response = await fetch(filePath);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
-                    }
-                    
-                    // Get the JSON content as text
-                    const jsonContent = await response.text();
-                    
-                    // Set the nuclide data in the WASM module
-                    WasmConfig.set_nuclide_data(nuclide, jsonContent);
-                    
-                    console.log(`Loaded nuclide data for ${nuclide}`);
-                } catch (error) {
-                    console.error(`Error loading nuclide data for ${nuclide}:`, error);
+            // Initialize loaded nuclides tracking set if it doesn't exist
+            if (!window.loadedNuclides) {
+                window.loadedNuclides = new Set();
+            }
+            
+            const filePath = `tests/${nuclide.toLowerCase()}_neutron.json`;
+            
+            try {
+                // Fetch the JSON file
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
                 }
+                
+                // Get the JSON content as text
+                const jsonContent = await response.text();
+                
+                // Set the nuclide data in the WASM module
+                WasmConfig.set_nuclide_data(nuclide, jsonContent);
+                
+                // Mark this nuclide as loaded
+                window.loadedNuclides.add(nuclide);
+                
+                console.log(`Loaded nuclide data for ${nuclide}`);
+            } catch (error) {
+                console.error(`Error loading nuclide data for ${nuclide}:`, error);
             }
         }
 
@@ -216,8 +232,12 @@
                     // Create the material in WASM
                     const material = new WasmMaterial();
                     
-                    // Add nuclides
+                    // Load and add nuclides
                     for (const nuclide of materialDef.nuclides) {
+                        // First load the nuclide data if needed
+                        await loadNuclideData(nuclide.name);
+                        
+                        // Then add to material
                         material.add_nuclide(nuclide.name, nuclide.fraction);
                     }
                     
@@ -252,7 +272,11 @@
                     crossSections: {
                         ...macroXS.cross_sections,
                         ...totalXS.cross_sections
-                    }
+                    },
+                    // Store the available reactions for this material
+                    availableReactions: new Set(
+                        ['total', ...Object.keys(macroXS.cross_sections)]
+                    )
                 };
                 
                 return true;
@@ -271,7 +295,11 @@
             row.className = 'reaction-row';
             row.id = `reaction-row-${rowId}`;
             
-            // Create material select
+            // Create material select with labels
+            const materialLabel = document.createElement('div');
+            materialLabel.className = 'reaction-label';
+            materialLabel.textContent = 'Material:';
+            
             const materialSelect = document.createElement('select');
             materialSelect.className = 'material-select';
             materialSelect.dataset.rowId = rowId;
@@ -279,13 +307,14 @@
                 .map(([id, def]) => `<option value="${id}">${def.name}</option>`)
                 .join('');
             
-            // Create reaction select (MT number)
+            // Create reaction select with labels
+            const reactionLabel = document.createElement('div');
+            reactionLabel.className = 'reaction-label';
+            reactionLabel.textContent = 'Reaction:';
+            
             const reactionSelect = document.createElement('select');
             reactionSelect.className = 'reaction-select';
             reactionSelect.dataset.rowId = rowId;
-            reactionSelect.innerHTML = Object.values(mtReactions)
-                .map(rx => `<option value="${rx.id}">${rx.name}</option>`)
-                .join('');
             
             // Create delete button
             const deleteBtn = document.createElement('span');
@@ -297,57 +326,158 @@
                 updatePlot();
             });
             
+            // Create material container
+            const materialContainer = document.createElement('div');
+            materialContainer.appendChild(materialLabel);
+            materialContainer.appendChild(materialSelect);
+            
+            // Create reaction container
+            const reactionContainer = document.createElement('div');
+            reactionContainer.appendChild(reactionLabel);
+            reactionContainer.appendChild(reactionSelect);
+            
             // Combine elements
-            row.appendChild(document.createTextNode('Material: '));
-            row.appendChild(materialSelect);
-            row.appendChild(document.createTextNode(' Reaction: '));
-            row.appendChild(reactionSelect);
+            row.appendChild(materialContainer);
+            row.appendChild(reactionContainer);
             row.appendChild(deleteBtn);
             
             reactionsContainer.appendChild(row);
             
+            // Update the available reactions for the selected material
+            async function updateAvailableReactions() {
+                const materialId = materialSelect.value;
+                let material = materialData[materialId];
+                
+                // If the material data isn't loaded yet, load it now
+                if (!material || !material.availableReactions) {
+                    console.log(`Loading material data for ${materialId}...`);
+                    
+                    // Show loading indicator
+                    document.getElementById('loading').style.display = 'block';
+                    
+                    // Get the material definition
+                    const materialDef = materialDefinitions[materialId];
+                    
+                    // Create the material in WASM
+                    const wasmMaterial = new WasmMaterial();
+                    
+                    // Load and add nuclides
+                    for (const nuclide of materialDef.nuclides) {
+                        // First load the nuclide data if needed
+                        await loadNuclideData(nuclide.name);
+                        
+                        // Then add to material
+                        wasmMaterial.add_nuclide(nuclide.name, nuclide.fraction);
+                    }
+                    
+                    // Set density
+                    wasmMaterial.set_density(materialDef.density.unit, materialDef.density.value);
+                    
+                    // Calculate cross sections
+                    await calculateCrossSections(wasmMaterial, materialId, materialDef.name);
+                    
+                    // Update our local reference
+                    material = materialData[materialId];
+                    
+                    // Hide loading indicator
+                    document.getElementById('loading').style.display = 'none';
+                }
+                
+                // Save the current selection if possible
+                const currentSelection = reactionSelect.value;
+                
+                // Clear and rebuild the reaction select options
+                reactionSelect.innerHTML = '';
+                
+                // Get all available reactions for this material and sort them
+                const availableReactions = Array.from(material.availableReactions);
+                availableReactions.sort((a, b) => {
+                    // Always put "total" first
+                    if (a === 'total') return -1;
+                    if (b === 'total') return 1;
+                    // Then sort numerically
+                    return parseInt(a) - parseInt(b);
+                });
+                
+                // Add options for each available reaction
+                availableReactions.forEach(rxId => {
+                    const option = document.createElement('option');
+                    option.value = rxId;
+                    // For display, use "Total" for total reaction or "MT X" for others
+                    option.textContent = rxId === 'total' ? 'Total' : `MT ${rxId}`;
+                    reactionSelect.appendChild(option);
+                });
+                
+                // Try to restore previous selection if it's still valid
+                if (Array.from(reactionSelect.options).some(opt => opt.value === currentSelection)) {
+                    reactionSelect.value = currentSelection;
+                } else if (reactionSelect.options.length > 0) {
+                    // Default to first available option
+                    reactionSelect.selectedIndex = 0;
+                }
+                
+                updatePlot();
+            }
+            
             // Add event listeners for selects
-            materialSelect.addEventListener('change', updatePlot);
+            materialSelect.addEventListener('change', () => {
+                updateAvailableReactions().catch(error => {
+                    console.error('Error updating available reactions:', error);
+                });
+            });
             reactionSelect.addEventListener('change', updatePlot);
             
-            // Set defaults for first row (natural lithium, total)
+            // Set defaults for first row (pure li6, total)
             if (reactionsContainer.children.length === 1) {
-                materialSelect.value = 'natural_lithium';
-                reactionSelect.value = 'total';
+                materialSelect.value = 'pure_li6';
             }
-            // Set defaults for second row (enriched lithium, MT 2)
+            // Set defaults for second row (natural lithium, MT 2)
             else if (reactionsContainer.children.length === 2) {
+                materialSelect.value = 'natural_lithium';
+            }
+            // Set defaults for third row (enriched lithium, MT 2)
+            else if (reactionsContainer.children.length === 3) {
                 materialSelect.value = 'enriched_lithium';
-                reactionSelect.value = '2';
             }
             
-            updatePlot();
+            // Initialize the reaction select based on the default material
+            updateAvailableReactions().catch(error => {
+                console.error('Error initializing available reactions:', error);
+            });
         }
         
         // Update the plot based on selected reactions
-        function updatePlot() {
-            if (!Object.keys(materialData).length) return; // No data yet
-            
-            const plotData = [];
-            let colorIndex = 0;
-            
+        async function updatePlot() {
             // Get all reaction rows
             const rows = document.querySelectorAll('.reaction-row');
+            if (rows.length === 0) return; // No rows yet
+            
+            const plotData = [];
             
             // Create traces for each selected reaction
-            rows.forEach(row => {
+            for (const row of rows) {
                 const materialSelect = row.querySelector('.material-select');
                 const reactionSelect = row.querySelector('.reaction-select');
                 
                 const materialId = materialSelect.value;
                 const mt = reactionSelect.value;
-                const material = materialData[materialId];
-                const mtName = mtReactions[mt]?.name || `MT ${mt}`;
                 
-                if (!material || !material.crossSections[mt]) {
-                    console.warn(`No data for ${material?.name} MT ${mt}`);
-                    return;
+                // If material data isn't loaded, trigger a load by calling updateAvailableReactions
+                if (!materialData[materialId]) {
+                    // Skip this row for now - data will be loaded when updateAvailableReactions is called
+                    continue;
                 }
+                
+                const material = materialData[materialId];
+                
+                // Skip if material doesn't have the selected reaction
+                if (!material.crossSections[mt]) {
+                    console.warn(`No data for ${material?.name} MT ${mt}`);
+                    continue;
+                }
+                
+                // Create name for the trace - Material name + reaction ID
+                const mtName = mt === 'total' ? 'Total' : `MT ${mt}`;
                 
                 // Convert energy to eV
                 const xValues = material.energyGrid.map(e => e);
@@ -359,15 +489,9 @@
                     y: yValues,
                     type: 'scatter',
                     mode: 'lines',
-                    name: `${material.name} - ${mtName}`,
-                    line: {
-                        color: colors[colorIndex % colors.length],
-                        width: 2
-                    }
+                    name: `${material.name} - ${mtName}`
                 });
-                
-                colorIndex++;
-            });
+            }
             
             // Define the layout
             const layout = {

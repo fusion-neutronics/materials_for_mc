@@ -41,13 +41,14 @@ The package can be compiled to WebAssembly for use in web browsers:
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --target web --features wasm
 
-# Serve the demo page locally
+# Serve the demo pages locally
 python -m http.server 8000
-# Open the demo page in your browser
+# Open the demo pages in your browser:
 # http://localhost:8000/macroscopic_xs_plotter.html
+# http://localhost:8000/reaction_plotter.html
 ```
 
-The WebAssembly demo includes:
+The WebAssembly demos include:
 - Material creation and manipulation
 - Cross section calculation and visualization
 - Predefined materials (Natural Lithium and Enriched Lithium)
