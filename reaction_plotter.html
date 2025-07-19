@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materials for MC - Reaction Plotter</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .control-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .plot-container {
+            width: 100%;
+            height: 600px;
+            margin-top: 20px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+            color: #666;
+        }
+        .info-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .reaction-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .reaction-delete {
+            margin-left: 10px;
+            color: red;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .add-reaction-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .add-reaction-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Materials for MC - Reaction Plotter</h1>
+        
+        <div class="control-panel">
+            <div class="control-group">
+                <label>Add Reactions to Plot:</label>
+                <div id="reactions-container"></div>
+                <button id="add-reaction-btn" class="add-reaction-btn">Add Reaction</button>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">Loading cross sections...</div>
+        
+        <div id="plot" class="plot-container"></div>
+    </div>
+
+    <script type="module">
+        // Import the WASM module
+        import init, { WasmConfig, WasmMaterial } from './pkg/materials_for_mc.js';
+
+        // Material definitions
+        const materialDefinitions = {
+            natural_lithium: {
+                name: "Natural Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.07 },
+                    { name: "Li7", fraction: 0.93 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            },
+            enriched_lithium: {
+                name: "Enriched Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.20 },
+                    { name: "Li7", fraction: 0.80 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            }
+        };
+
+        // Cross section data storage
+        const materialData = {};
+        
+        // Color palette for plotting
+        const colors = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+        ];
+
+        // MT reaction definitions with friendly names
+        const mtReactions = {
+            "total": { id: "total", name: "Total" },
+            "2": { id: "2", name: "Elastic Scattering (MT 2)" },
+            "3": { id: "3", name: "Non-elastic (MT 3)" },
+            "4": { id: "4", name: "Inelastic (MT 4)" },
+            "16": { id: "16", name: "n,2n (MT 16)" },
+            "102": { id: "102", name: "n,γ (MT 102)" },
+            "103": { id: "103", name: "n,p (MT 103)" },
+            "104": { id: "104", name: "n,d (MT 104)" },
+            "105": { id: "105", name: "n,t (MT 105)" },
+            "106": { id: "106", name: "n,He-3 (MT 106)" },
+            "107": { id: "107", name: "n,α (MT 107)" }
+        };
+
+        // Initialize the application
+        async function init_app() {
+            // Initialize the WASM module
+            await init();
+            
+            // Load the nuclide data from JSON files
+            await loadNuclideData();
+            
+            // Load all materials upfront
+            await loadAllMaterials();
+            
+            // Set up event listeners
+            document.getElementById('add-reaction-btn').addEventListener('click', addReactionRow);
+            
+            // Add initial reaction row (natural lithium total)
+            addReactionRow();
+        }
+
+        // Load nuclide data from JSON files
+        async function loadNuclideData() {
+            const nuclideFiles = {
+                "Li6": "tests/li6_neutron.json",
+                "Li7": "tests/li7_neutron.json"
+            };
+            
+            for (const [nuclide, filePath] of Object.entries(nuclideFiles)) {
+                try {
+                    // Fetch the JSON file
+                    const response = await fetch(filePath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
+                    }
+                    
+                    // Get the JSON content as text
+                    const jsonContent = await response.text();
+                    
+                    // Set the nuclide data in the WASM module
+                    WasmConfig.set_nuclide_data(nuclide, jsonContent);
+                    
+                    console.log(`Loaded nuclide data for ${nuclide}`);
+                } catch (error) {
+                    console.error(`Error loading nuclide data for ${nuclide}:`, error);
+                }
+            }
+        }
+
+        // Load all materials upfront
+        async function loadAllMaterials() {
+            document.getElementById('loading').style.display = 'block';
+            
+            // Process each material
+            for (const [materialId, materialDef] of Object.entries(materialDefinitions)) {
+                try {
+                    // Create the material in WASM
+                    const material = new WasmMaterial();
+                    
+                    // Add nuclides
+                    for (const nuclide of materialDef.nuclides) {
+                        material.add_nuclide(nuclide.name, nuclide.fraction);
+                    }
+                    
+                    // Set density
+                    material.set_density(materialDef.density.unit, materialDef.density.value);
+                    
+                    // Calculate cross sections
+                    await calculateCrossSections(material, materialId, materialDef.name);
+                    
+                } catch (error) {
+                    console.error(`Error processing material ${materialId}:`, error);
+                }
+            }
+            
+            document.getElementById('loading').style.display = 'none';
+            updatePlot();
+        }
+
+        // Calculate cross sections for a material
+        async function calculateCrossSections(material, materialId, materialName) {
+            try {
+                // Calculate macroscopic cross sections
+                const macroXS = await material.calculate_macroscopic_xs_neutron();
+                
+                // Calculate total cross section
+                const totalXS = await material.calculate_total_xs_neutron();
+                
+                // Store the cross section data
+                materialData[materialId] = {
+                    name: materialName,
+                    energyGrid: macroXS.energy_grid,
+                    crossSections: {
+                        ...macroXS.cross_sections,
+                        ...totalXS.cross_sections
+                    }
+                };
+                
+                return true;
+            } catch (error) {
+                console.error(`Error calculating cross sections for ${materialId}:`, error);
+                return false;
+            }
+        }
+        
+        // Add a new reaction row
+        function addReactionRow() {
+            const reactionsContainer = document.getElementById('reactions-container');
+            const rowId = Date.now(); // Unique ID for the row
+            
+            const row = document.createElement('div');
+            row.className = 'reaction-row';
+            row.id = `reaction-row-${rowId}`;
+            
+            // Create material select
+            const materialSelect = document.createElement('select');
+            materialSelect.className = 'material-select';
+            materialSelect.dataset.rowId = rowId;
+            materialSelect.innerHTML = Object.entries(materialDefinitions)
+                .map(([id, def]) => `<option value="${id}">${def.name}</option>`)
+                .join('');
+            
+            // Create reaction select (MT number)
+            const reactionSelect = document.createElement('select');
+            reactionSelect.className = 'reaction-select';
+            reactionSelect.dataset.rowId = rowId;
+            reactionSelect.innerHTML = Object.values(mtReactions)
+                .map(rx => `<option value="${rx.id}">${rx.name}</option>`)
+                .join('');
+            
+            // Create delete button
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'reaction-delete';
+            deleteBtn.textContent = '✖';
+            deleteBtn.dataset.rowId = rowId;
+            deleteBtn.addEventListener('click', () => {
+                document.getElementById(`reaction-row-${rowId}`).remove();
+                updatePlot();
+            });
+            
+            // Combine elements
+            row.appendChild(document.createTextNode('Material: '));
+            row.appendChild(materialSelect);
+            row.appendChild(document.createTextNode(' Reaction: '));
+            row.appendChild(reactionSelect);
+            row.appendChild(deleteBtn);
+            
+            reactionsContainer.appendChild(row);
+            
+            // Add event listeners for selects
+            materialSelect.addEventListener('change', updatePlot);
+            reactionSelect.addEventListener('change', updatePlot);
+            
+            // Set defaults for first row (natural lithium, total)
+            if (reactionsContainer.children.length === 1) {
+                materialSelect.value = 'natural_lithium';
+                reactionSelect.value = 'total';
+            }
+            // Set defaults for second row (enriched lithium, MT 2)
+            else if (reactionsContainer.children.length === 2) {
+                materialSelect.value = 'enriched_lithium';
+                reactionSelect.value = '2';
+            }
+            
+            updatePlot();
+        }
+        
+        // Update the plot based on selected reactions
+        function updatePlot() {
+            if (!Object.keys(materialData).length) return; // No data yet
+            
+            const plotData = [];
+            let colorIndex = 0;
+            
+            // Get all reaction rows
+            const rows = document.querySelectorAll('.reaction-row');
+            
+            // Create traces for each selected reaction
+            rows.forEach(row => {
+                const materialSelect = row.querySelector('.material-select');
+                const reactionSelect = row.querySelector('.reaction-select');
+                
+                const materialId = materialSelect.value;
+                const mt = reactionSelect.value;
+                const material = materialData[materialId];
+                const mtName = mtReactions[mt]?.name || `MT ${mt}`;
+                
+                if (!material || !material.crossSections[mt]) {
+                    console.warn(`No data for ${material?.name} MT ${mt}`);
+                    return;
+                }
+                
+                // Convert energy to eV
+                const xValues = material.energyGrid.map(e => e);
+                const yValues = material.crossSections[mt];
+                
+                // Create a trace for Plotly
+                plotData.push({
+                    x: xValues,
+                    y: yValues,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `${material.name} - ${mtName}`,
+                    line: {
+                        color: colors[colorIndex % colors.length],
+                        width: 2
+                    }
+                });
+                
+                colorIndex++;
+            });
+            
+            // Define the layout
+            const layout = {
+                title: 'Macroscopic Cross Sections',
+                xaxis: {
+                    title: 'Energy (eV)',
+                    type: 'log'
+                },
+                yaxis: {
+                    title: 'Cross Section (cm⁻¹)',
+                    type: 'log'
+                },
+                hovermode: 'closest',
+                legend: {
+                    x: 0,
+                    y: 1
+                }
+            };
+            
+            // Create the plot
+            Plotly.newPlot('plot', plotData, layout);
+        }
+
+        // Start the application
+        init_app().catch(console.error);
+    </script>
+</body>
+</html>
