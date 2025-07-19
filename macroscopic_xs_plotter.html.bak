@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materials for MC - Cross Section Plotter</title>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .control-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #plot {
+            width: 100%;
+            height: 600px;
+        }
+        .material-container {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        .reaction-list {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .reaction-column {
+            flex: 1;
+            min-width: 150px;
+            padding-right: 15px;
+        }
+        .reaction-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .reaction-item input {
+            margin-right: 10px;
+        }
+        .reaction-group-header {
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 3px;
+        }
+        .category-toggle {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .category-toggle input {
+            margin-right: 5px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+            color: #666;
+        }
+        .info-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Materials for MC - Cross Section Plotter</h1>
+        
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="material-select">Select Materials:</label>
+                <select id="material-select" multiple="multiple">
+                    <option value="natural_lithium">Natural Lithium (7% Li6, 93% Li7)</option>
+                    <option value="enriched_lithium">Enriched Lithium (20% Li6, 80% Li7)</option>
+                </select>
+                <div class="info-text">Select materials to view their cross sections</div>
+            </div>
+        </div>
+        
+        <div id="materials-container"></div>
+        
+        <div class="loading" id="loading">Loading cross sections...</div>
+        
+        <div id="plot"></div>
+    </div>
+
+    <script type="module">
+        // Import the WASM module
+        import init, { WasmConfig, WasmMaterial } from './pkg/materials_for_mc.js';
+
+        // Material definitions
+        const materialDefinitions = {
+            natural_lithium: {
+                name: "Natural Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.07 },
+                    { name: "Li7", fraction: 0.93 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            },
+            enriched_lithium: {
+                name: "Enriched Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.20 },
+                    { name: "Li7", fraction: 0.80 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            }
+        };
+
+        // Cross section data storage
+        const materialData = {};
+        
+        // Store global user preferences for MT selections (shared across materials)
+        const userMtSelections = {};
+        
+        // Store which MT numbers are globally selected (across materials)
+        const globalMtPreferences = {};
+        
+        // Whether we've already loaded materials before
+        let hasLoadedMaterials = false;
+        
+        // Color palette for plotting
+        const colors = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+        ];
+
+        // Initialize the application
+        async function init_app() {
+            // Initialize the WASM module
+            await init();
+            
+            // Load the nuclide data from JSON files
+            await loadNuclideData();
+            
+            // Initialize Select2 for better dropdown
+            $(document).ready(function() {
+                $('#material-select').select2({
+                    placeholder: "Select materials...",
+                    allowClear: true
+                }).on('change', function() {
+                    // Auto-load materials when selection changes
+                    loadSelectedMaterials();
+                });
+                
+                // Auto-select the first material to load initially
+                if ($('#material-select option').length > 0) {
+                    $('#material-select').val(['natural_lithium']).trigger('change');
+                }
+            });
+        }
+
+        // Load nuclide data from JSON files
+        async function loadNuclideData() {
+            const nuclideFiles = {
+                "Li6": "tests/li6_neutron.json",
+                "Li7": "tests/li7_neutron.json"
+            };
+            
+            for (const [nuclide, filePath] of Object.entries(nuclideFiles)) {
+                try {
+                    // Fetch the JSON file
+                    const response = await fetch(filePath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
+                    }
+                    
+                    // Get the JSON content as text
+                    const jsonContent = await response.text();
+                    
+                    // Set the nuclide data in the WASM module
+                    WasmConfig.set_nuclide_data(nuclide, jsonContent);
+                    
+                    console.log(`Loaded nuclide data for ${nuclide}`);
+                } catch (error) {
+                    console.error(`Error loading nuclide data for ${nuclide}:`, error);
+                }
+            }
+        }
+
+        // Load selected materials
+        async function loadSelectedMaterials() {
+            const select = document.getElementById('material-select');
+            const selectedMaterials = Array.from(select.selectedOptions).map(option => option.value);
+            
+            if (selectedMaterials.length === 0) {
+                alert('Please select at least one material');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            
+            // Clear previous materials container
+            const materialsContainer = document.getElementById('materials-container');
+            materialsContainer.innerHTML = '';
+            
+            // Process each selected material
+            for (const materialId of selectedMaterials) {
+                const materialDef = materialDefinitions[materialId];
+                
+                if (!materialDef) continue;
+                
+                try {
+                    // Create the material in WASM
+                    const material = new WasmMaterial();
+                    
+                    // Add nuclides
+                    for (const nuclide of materialDef.nuclides) {
+                        material.add_nuclide(nuclide.name, nuclide.fraction);
+                    }
+                    
+                    // Set density
+                    material.set_density(materialDef.density.unit, materialDef.density.value);
+                    
+                    // Calculate cross sections
+                    await calculateCrossSections(material, materialId, materialDef.name);
+                    
+                    // Create UI elements for the material
+                    createMaterialUI(materialId, materialDef.name);
+                } catch (error) {
+                    console.error(`Error processing material ${materialId}:`, error);
+                }
+            }
+            
+            // Hide loading indicator
+            document.getElementById('loading').style.display = 'none';
+            
+            // Attach event listeners to reaction checkboxes
+            document.querySelectorAll('.reaction-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (event) => {
+                    // Update the stored selection for this material and MT
+                    const materialId = event.target.dataset.material;
+                    const mt = event.target.dataset.mt;
+                    
+                    // Initialize if not exists
+                    if (!userMtSelections[materialId]) {
+                        userMtSelections[materialId] = {};
+                    }
+                    
+                    // Store the checkbox state
+                    userMtSelections[materialId][mt] = event.target.checked;
+                    
+                    // Update the global preference for this MT
+                    globalMtPreferences[mt] = event.target.checked;
+                    
+                    // Update the plot
+                    updatePlot();
+                });
+            });
+            
+            // Update category checkboxes based on whether all items in category are checked
+            document.querySelectorAll('.category-checkbox').forEach(categoryCheckbox => {
+                const materialId = categoryCheckbox.dataset.material;
+                const category = categoryCheckbox.dataset.category;
+                const mts = getMtNumbersForCategory(materialId, category);
+                
+                // Check if all MTs in this category are selected
+                const allChecked = mts.every(mt => userMtSelections[materialId][mt]);
+                categoryCheckbox.checked = allChecked;
+            });
+            
+            // Attach event listeners to category checkboxes
+            document.querySelectorAll('.category-checkbox').forEach(categoryCheckbox => {
+                // Add change event listener
+                categoryCheckbox.addEventListener('change', (event) => {
+                    const materialId = event.target.dataset.material;
+                    const category = event.target.dataset.category;
+                    const isChecked = event.target.checked;
+                    
+                    // Get all MT numbers for this category
+                    const mts = getMtNumbersForCategory(materialId, category);
+                    
+                    // Set all checkboxes in this category
+                    mts.forEach(mt => {
+                        // Update the UI checkbox
+                        const checkbox = document.getElementById(`${materialId}-${mt}`);
+                        if (checkbox) {
+                            checkbox.checked = isChecked;
+                        }
+                        
+                        // Update the stored selection
+                        if (!userMtSelections[materialId]) {
+                            userMtSelections[materialId] = {};
+                        }
+                        userMtSelections[materialId][mt] = isChecked;
+                        
+                        // Update the global preference
+                        globalMtPreferences[mt] = isChecked;
+                    });
+                    
+                    // Update the plot
+                    updatePlot();
+                });
+            });
+                    
+                    // Update the plot
+                    updatePlot();
+                });
+            });
+            
+            // Helper function to get MT numbers for a category
+            function getMtNumbersForCategory(materialId, category) {
+                if (!materialData[materialId]) return [];
+                
+                const material = materialData[materialId];
+                const mtNumbers = Object.keys(material.crossSections);
+                
+                // Create categories
+                const mtCategories = {
+                    "special": ["total"],
+                    "neutron_yield": [],
+                    "elastic": [],
+                    "inelastic": [],
+                    "absorption": [],
+                    "others": []
+                };
+                
+                // Categorize MT numbers
+                mtNumbers.forEach(mt => {
+                    if (mt === "total") return; // Handle "total" separately
+                    
+                    const mtNum = parseInt(mt);
+                    
+                    if (mtNum >= 201 && mtNum <= 207) {
+                        mtCategories.neutron_yield.push(mt);
+                    } else if (mtNum === 2) {
+                        mtCategories.elastic.push(mt);
+                    } else if (mtNum >= 4 && mtNum <= 91) {
+                        mtCategories.inelastic.push(mt);
+                    } else if ([102, 103, 104, 105, 106, 107].includes(mtNum)) {
+                        mtCategories.absorption.push(mt);
+                    } else {
+                        mtCategories.others.push(mt);
+                    }
+                });
+                
+                return mtCategories[category] || [];
+            }
+            
+            // Update the plot with initial selections
+            updatePlot();
+        }
+
+        // Calculate cross sections for a material
+        async function calculateCrossSections(material, materialId, materialName) {
+            try {
+                // Calculate macroscopic cross sections
+                const macroXS = await material.calculate_macroscopic_xs_neutron();
+                
+                // Calculate total cross section
+                const totalXS = await material.calculate_total_xs_neutron();
+                
+                // Store the cross section data
+                materialData[materialId] = {
+                    name: materialName,
+                    energyGrid: macroXS.energy_grid,
+                    crossSections: {
+                        ...macroXS.cross_sections,
+                        ...totalXS.cross_sections
+                    }
+                };
+                
+                return true;
+            } catch (error) {
+                console.error(`Error calculating cross sections for ${materialId}:`, error);
+                return false;
+            }
+        }
+
+        // Create UI elements for a material
+        function createMaterialUI(materialId, materialName) {
+            const materialsContainer = document.getElementById('materials-container');
+            const material = materialData[materialId];
+            
+            if (!material) return;
+            
+            // Create a container for this material
+            const materialContainer = document.createElement('div');
+            materialContainer.className = 'material-container';
+            materialContainer.innerHTML = `
+                <h3>${materialName}</h3>
+                <div class="reaction-list" id="reactions-${materialId}"></div>
+            `;
+            
+            materialsContainer.appendChild(materialContainer);
+            
+            // Add reaction checkboxes
+            const reactionsContainer = document.getElementById(`reactions-${materialId}`);
+            const mtNumbers = Object.keys(material.crossSections).sort((a, b) => {
+                // Sort numerically, but put "total" at the top
+                if (a === "total") return -1;
+                if (b === "total") return 1;
+                return parseInt(a) - parseInt(b);
+            });
+            
+            // Initialize material-specific selections if not already done
+            if (!userMtSelections[materialId]) {
+                userMtSelections[materialId] = {};
+                
+                // For first-time users, default to showing only "total"
+                if (!hasLoadedMaterials) {
+                    mtNumbers.forEach(mt => {
+                        // First material loaded - just show total
+                        const isDefault = (mt === "total");
+                        userMtSelections[materialId][mt] = isDefault;
+                        
+                        // Initialize the global preferences with these defaults
+                        globalMtPreferences[mt] = isDefault;
+                    });
+                    hasLoadedMaterials = true;
+                } else {
+                    // For subsequent materials, use the global preferences
+                    mtNumbers.forEach(mt => {
+                        // If we have a global preference for this MT, use it
+                        if (mt in globalMtPreferences) {
+                            userMtSelections[materialId][mt] = globalMtPreferences[mt];
+                        } else {
+                            // New MT that wasn't in previous materials - default to false
+                            userMtSelections[materialId][mt] = false;
+                            globalMtPreferences[mt] = false;
+                        }
+                    });
+                }
+            }
+            
+            // Organize MT numbers into categories
+            const mtCategories = {
+                "special": ["total"],
+                "neutron_yield": [],
+                "elastic": [],
+                "inelastic": [],
+                "absorption": [],
+                "others": []
+            };
+            
+            // Categorize MT numbers
+            mtNumbers.forEach(mt => {
+                if (mt === "total") return; // Already handled
+                
+                const mtNum = parseInt(mt);
+                
+                if (mtNum >= 201 && mtNum <= 207) {
+                    mtCategories.neutron_yield.push(mt);
+                } else if (mtNum === 2) {
+                    mtCategories.elastic.push(mt);
+                } else if (mtNum >= 4 && mtNum <= 91) {
+                    mtCategories.inelastic.push(mt);
+                } else if ([102, 103, 104, 105, 106, 107].includes(mtNum)) {
+                    mtCategories.absorption.push(mt);
+                } else {
+                    mtCategories.others.push(mt);
+                }
+            });
+            
+            // Determine columns based on number of MT reactions
+            const numReactions = mtNumbers.length;
+            const columnCount = numReactions <= 10 ? 1 :
+                               (numReactions <= 20 ? 2 : 
+                               (numReactions <= 30 ? 3 : 4));
+            
+            // Create columns
+            for (let i = 0; i < columnCount; i++) {
+                const column = document.createElement('div');
+                column.className = 'reaction-column';
+                column.id = `reaction-column-${materialId}-${i}`;
+                reactionsContainer.appendChild(column);
+            }
+            
+            // Helper function to add MT reaction to a column
+            function addMtToColumn(mt, columnIndex) {
+                const column = document.getElementById(`reaction-column-${materialId}-${columnIndex}`);
+                const item = document.createElement('div');
+                item.className = 'reaction-item';
+                
+                // Use the stored selection for this material and MT
+                const isChecked = userMtSelections[materialId][mt];
+                const checkedAttr = isChecked ? 'checked' : '';
+                
+                const mtLabel = mt === "total" ? "Total" : `MT ${mt}`;
+                
+                item.innerHTML = `
+                    <input type="checkbox" id="${materialId}-${mt}" class="reaction-checkbox" 
+                           data-material="${materialId}" data-mt="${mt}" ${checkedAttr}>
+                    <label for="${materialId}-${mt}">${mtLabel}</label>
+                `;
+                
+                column.appendChild(item);
+            }
+            
+            // Helper function to add a category header
+            function addCategoryHeader(category, displayName, columnIndex) {
+                if (mtCategories[category].length === 0) return;
+                
+                const column = document.getElementById(`reaction-column-${materialId}-${columnIndex}`);
+                const header = document.createElement('div');
+                header.className = 'reaction-group-header';
+                
+                // Create a checkbox for the entire category
+                header.innerHTML = `
+                    <div class="category-toggle">
+                        <input type="checkbox" id="${materialId}-category-${category}" 
+                               class="category-checkbox" data-material="${materialId}" 
+                               data-category="${category}">
+                        <label for="${materialId}-category-${category}">${displayName}</label>
+                    </div>
+                `;
+                
+                column.appendChild(header);
+            }
+            
+            // Calculate items per column (roughly balanced)
+            let currentColumn = 0;
+            
+            // Always put "total" in the first column
+            addMtToColumn("total", 0);
+            
+            // Distribute categories across columns
+            const categories = [
+                { id: "neutron_yield", name: "Neutron Yield" },
+                { id: "elastic", name: "Elastic Scattering" },
+                { id: "inelastic", name: "Inelastic Scattering" },
+                { id: "absorption", name: "Absorption" },
+                { id: "others", name: "Other Reactions" }
+            ];
+            
+            // Calculate total items per column for balanced distribution
+            const totalItems = mtNumbers.length - 1; // Excluding "total"
+            const itemsPerColumn = Math.ceil(totalItems / columnCount);
+            let itemCount = 1; // Starting after "total"
+            
+            // Distribute categories to columns
+            for (const category of categories) {
+                const items = mtCategories[category.id];
+                if (items.length === 0) continue;
+                
+                // Check if we need to move to the next column
+                if (currentColumn > 0 && itemCount + items.length > (currentColumn + 1) * itemsPerColumn) {
+                    currentColumn = Math.min(currentColumn + 1, columnCount - 1);
+                }
+                
+                addCategoryHeader(category.id, category.name, currentColumn);
+                
+                // Add items in this category
+                for (const mt of items) {
+                    addMtToColumn(mt, currentColumn);
+                    itemCount++;
+                    
+                    // Check if we need to move to the next column
+                    if (itemCount > (currentColumn + 1) * itemsPerColumn && currentColumn < columnCount - 1) {
+                        currentColumn++;
+                    }
+                }
+            }
+        }
+
+        // Update the plot based on selected reactions
+        function updatePlot() {
+            const plotData = [];
+            let colorIndex = 0;
+            
+            // Get all checked reaction checkboxes
+            const checkedReactions = document.querySelectorAll('.reaction-checkbox:checked');
+            
+            // Create traces for each selected reaction
+            checkedReactions.forEach(checkbox => {
+                const materialId = checkbox.dataset.material;
+                const mt = checkbox.dataset.mt;
+                const material = materialData[materialId];
+                
+                if (!material || !material.crossSections[mt]) return;
+                
+                // Convert energy to eV (log scale)
+                const xValues = material.energyGrid.map(e => e);
+                const yValues = material.crossSections[mt];
+                
+                // Create a trace for Plotly
+                plotData.push({
+                    x: xValues,
+                    y: yValues,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `${material.name} - MT ${mt}`,
+                    line: {
+                        color: colors[colorIndex % colors.length],
+                        width: 2
+                    }
+                });
+                
+                colorIndex++;
+            });
+            
+            // Define the layout
+            const layout = {
+                title: 'Macroscopic Cross Sections',
+                xaxis: {
+                    title: 'Energy (eV)',
+                    type: 'log'
+                },
+                yaxis: {
+                    title: 'Cross Section (cm⁻¹)',
+                    type: 'log'
+                },
+                hovermode: 'closest',
+                legend: {
+                    x: 0,
+                    y: 1
+                }
+            };
+            
+            // Create the plot
+            Plotly.newPlot('plot', plotData, layout);
+        }
+
+        // Start the application
+        init_app().catch(console.error);
+    </script>
+</body>
+</html>
