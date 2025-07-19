@@ -38,12 +38,11 @@ cargo run
 The package can be compiled to WebAssembly for use in web browsers:
 
 ```bash
-# Build the WASM package
-./build_wasm.sh
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+wasm-pack build --target web --features wasm
 
 # Serve the demo page locally
-./serve.sh
-
+python -m http.server 8000
 # Open the demo page in your browser
 # http://localhost:8000/macroscopic_xs_plotter.html
 ```
