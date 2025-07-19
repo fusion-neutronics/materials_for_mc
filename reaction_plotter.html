@@ -40,6 +40,13 @@
             flex: 1;
             min-width: 250px;
         }
+        .control-group:first-child {
+            flex: 7; /* 70% of the space */
+        }
+        .control-group:last-child {
+            flex: 3; /* 30% of the space */
+            max-width: 280px;
+        }
         .filter-container {
             margin-bottom: 15px;
             display: flex;
@@ -91,7 +98,7 @@
         }
         .reaction-row {
             display: grid;
-            grid-template-columns: 1fr 1fr auto;
+            grid-template-columns: 6fr 4fr auto; /* 60:40 split between material and reaction */
             gap: 10px;
             align-items: center;
             margin-bottom: 6px;
@@ -122,16 +129,77 @@
             font-weight: bold;
             margin-bottom: 2px;
         }
+        .scale-options {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        .radio-group input[type="radio"] {
+            margin-right: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-top: -15px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        #download-data-btn {
+            background-color: #2196F3;
+            margin-top: 15px;
+            width: 100%;
+        }
+        #download-data-btn:hover {
+            background-color: #0b7dda;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Materials for MC - Reaction Plotter</h1>
+        <h1>Materials Macroscopic Cross Section Plotter</h1>
+        <div class="subtitle"> A collection of materials with on the fly macroscopic cross section calculation by Jon Shimwell. See my other projects on <a href="https://xsplot.com" target="_blank">xsplot.com</a> </div>
         
         <div class="control-panel">
             <div class="control-group">
                 <div id="reactions-container" class="reactions-container"></div>
-                <button id="add-reaction-btn" class="add-reaction-btn">Add Reaction</button>
+                <button id="add-reaction-btn" class="add-reaction-btn">Add MAterial Reaction</button>
+            </div>
+            
+            <div class="control-group">
+                <div class="scale-options">
+                    <label>X-Axis Scale:</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="x-scale" value="log" checked> Logarithmic
+                        </label>
+                        <label>
+                            <input type="radio" name="x-scale" value="linear"> Linear
+                        </label>
+                    </div>
+                    
+                    <label>Y-Axis Scale:</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="y-scale" value="log" checked> Logarithmic
+                        </label>
+                        <label>
+                            <input type="radio" name="y-scale" value="linear"> Linear
+                        </label>
+                    </div>
+                    
+                    <button id="download-data-btn" class="add-reaction-btn">Download Plot Data</button>
+                </div>
             </div>
         </div>
         
@@ -181,6 +249,12 @@
             
             // Set up event listeners
             document.getElementById('add-reaction-btn').addEventListener('click', addReactionRow);
+            document.getElementById('download-data-btn').addEventListener('click', downloadPlotData);
+            
+            // Set up scale option event listeners
+            document.querySelectorAll('input[name="x-scale"], input[name="y-scale"]').forEach(radio => {
+                radio.addEventListener('change', updatePlot);
+            });
             
             // Add initial reaction row (pure Li6 total)
             addReactionRow();
@@ -493,16 +567,20 @@
                 });
             }
             
+            // Get the selected scale options
+            const xScaleType = document.querySelector('input[name="x-scale"]:checked').value;
+            const yScaleType = document.querySelector('input[name="y-scale"]:checked').value;
+            
             // Define the layout
             const layout = {
                 title: 'Macroscopic Cross Sections',
                 xaxis: {
                     title: 'Energy (eV)',
-                    type: 'log'
+                    type: xScaleType
                 },
                 yaxis: {
                     title: 'Cross Section (cm⁻¹)',
-                    type: 'log'
+                    type: yScaleType
                 },
                 hovermode: 'closest',
                 legend: {
@@ -513,6 +591,75 @@
             
             // Create the plot
             Plotly.newPlot('plot', plotData, layout);
+        }
+        
+        // Function to download plot data as JSON
+        function downloadPlotData() {
+            // Get all reaction rows
+            const rows = document.querySelectorAll('.reaction-row');
+            if (rows.length === 0) {
+                alert('No data to download. Please add at least one reaction first.');
+                return;
+            }
+            
+            const exportData = [];
+            
+            // Create data objects for each selected reaction
+            for (const row of rows) {
+                const materialSelect = row.querySelector('.material-select');
+                const reactionSelect = row.querySelector('.reaction-select');
+                
+                const materialId = materialSelect.value;
+                const mt = reactionSelect.value;
+                
+                // Skip if material data isn't loaded
+                if (!materialData[materialId]) {
+                    continue;
+                }
+                
+                const material = materialData[materialId];
+                
+                // Skip if material doesn't have the selected reaction
+                if (!material.crossSections[mt]) {
+                    continue;
+                }
+                
+                // Create name for the dataset
+                const mtName = mt === 'total' ? 'Total' : `MT ${mt}`;
+                
+                // Get the energy and cross section data
+                const energyValues = material.energyGrid;
+                const xsValues = material.crossSections[mt];
+                
+                // Add to export data with separate energy and xs arrays
+                exportData.push({
+                    material: material.name,
+                    reaction: mtName,
+                    reactionId: mt,
+                    energy_eV: energyValues,
+                    xs_per_cm: xsValues
+                });
+            }
+            
+            // Create a JSON string
+            const jsonData = JSON.stringify(exportData, null, 2);
+            
+            // Create a blob and download link
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a temporary link element and trigger download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'reaction_plot_data.json';
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
         }
 
         // Start the application
