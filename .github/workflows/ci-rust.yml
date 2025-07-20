@@ -27,7 +27,7 @@ jobs:
         run: cargo test --verbose
       - name: Test examples
         run: |
-          cd example_use
+          cd examples/rust
           cargo build --verbose
           cargo run
 

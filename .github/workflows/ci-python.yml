@@ -33,5 +33,5 @@ jobs:
           pip install pytest maturin numpy
           maturin develop --features pyo3
           pytest
-          cd example_use
+          cd examples/python
           python use_in_python.py
