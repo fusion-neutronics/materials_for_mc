@@ -6,6 +6,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // Global cache for nuclides to avoid reloading
@@ -33,8 +34,6 @@ pub struct Nuclide {
     #[serde(default)]
     pub reactions: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
 }
-
-
 
 impl Nuclide {
     /// Get the energy grid for a specific temperature
@@ -87,19 +86,8 @@ impl Nuclide {
     }
 }
 
-// Read a single nuclide from a JSON file
-pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let path_ref = path.as_ref();
-    println!("Reading {}", path_ref.display());
-    let file = File::open(path_ref)?;
-    let reader = BufReader::new(file);
-    
-    // First read the JSON into a Value to check its structure
-    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
-    
-    // Initialize a new Nuclide
+// Parse a nuclide from a JSON value
+fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
     let mut nuclide = Nuclide {
         name: None,
         element: None,
@@ -111,7 +99,7 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
         energy: None,
         reactions: HashMap::new(),
     };
-    
+
     // Parse basic metadata
     if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
         nuclide.name = Some(name.to_string());
@@ -208,11 +196,23 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
                             }
                         }
                         
-                        // Calculate energy grid from threshold_idx and main energy grid
-                        if let Some(energy_grids) = &nuclide.energy {
-                            if let Some(energy_grid) = energy_grids.get(temp) {
-                                if reaction.threshold_idx < energy_grid.len() {
-                                    reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
+                        // Get energy (some reactions may have their own energy grid)
+                        if let Some(energy) = reaction_obj.get("energy") {
+                            if let Some(energy_arr) = energy.as_array() {
+                                reaction.energy = energy_arr
+                                    .iter()
+                                    .filter_map(|v| v.as_f64())
+                                    .collect();
+                            }
+                        }
+                        
+                        // Calculate energy grid from threshold_idx and main energy grid if not already set
+                        if reaction.energy.is_empty() {
+                            if let Some(energy_grids) = &nuclide.energy {
+                                if let Some(energy_grid) = energy_grids.get(temp) {
+                                    if reaction.threshold_idx < energy_grid.len() {
+                                        reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
+                                    }
                                 }
                             }
                         }
@@ -222,7 +222,10 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
                 }
             }
             
-            nuclide.reactions.insert(temp.clone(), temp_reactions);
+            // Only insert if we found reactions
+            if !temp_reactions.is_empty() {
+                nuclide.reactions.insert(temp.clone(), temp_reactions);
+            }
         }
     } 
     // Check if we have the newer format with "incident_particle" field
@@ -312,125 +315,29 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     Ok(nuclide)
 }
 
+// Read a single nuclide from a JSON file
+pub fn read_nuclide_from_json<P: AsRef<Path>>(
+    path: P,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    let path_ref = path.as_ref();
+    println!("Reading {}", path_ref.display());
+    let file = File::open(path_ref)?;
+    let reader = BufReader::new(file);
+    
+    // Parse the JSON file
+    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
+    
+    // Use the shared parsing function
+    parse_nuclide_from_json_value(json_value)
+}
+
 // Read a nuclide from a JSON string
 pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn std::error::Error>> {
     // Parse the JSON string
     let json_value: serde_json::Value = serde_json::from_str(json_content)?;
     
-    // Use the same parsing logic as read_nuclide_from_json but skip file reading
+    // Use the shared parsing function
     parse_nuclide_from_json_value(json_value)
-}
-
-// Parse a nuclide from a JSON value (refactored from read_nuclide_from_json)
-fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let mut nuclide = Nuclide {
-        name: None,
-        element: None,
-        atomic_symbol: None,
-        atomic_number: None,
-        neutron_number: None,
-        mass_number: None,
-        library: None,
-        energy: None,
-        reactions: HashMap::new(),
-    };
-
-    // Parse the nuclide name if present
-    if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
-        nuclide.name = Some(name.to_string());
-    }
-    
-    // Handle energy grids for each temperature
-    let mut energy_map = HashMap::new();
-    
-    // Check if we have the modern format with "energy" field
-    if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
-        for (temp, energy_arr) in energy_obj {
-            if let Some(energy_values) = energy_arr.as_array() {
-                let energy_vec: Vec<f64> = energy_values
-                    .iter()
-                    .filter_map(|v| v.as_f64())
-                    .collect();
-                energy_map.insert(temp.clone(), energy_vec);
-            }
-        }
-        nuclide.energy = Some(energy_map);
-    }
-    
-    // Process reactions - check multiple formats
-    
-    // Check if we have the old format with "reactions" field
-    if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
-        for (temp, mt_reactions) in reactions_obj {
-            let mut temp_reactions = HashMap::new();
-            
-            // Process all MT reactions for this temperature
-            if let Some(mt_obj) = mt_reactions.as_object() {
-                for (mt, reaction_data) in mt_obj {
-                    if let Some(reaction_obj) = reaction_data.as_object() {
-                        let mut reaction = Reaction {
-                            cross_section: Vec::new(),
-                            threshold_idx: 0,
-                            interpolation: Vec::new(),
-                            energy: Vec::new(),
-                        };
-                        
-                        // Get cross section (might be named "xs" in old format)
-                        if let Some(xs) = reaction_obj.get("cross_section").or_else(|| reaction_obj.get("xs")) {
-                            if let Some(xs_arr) = xs.as_array() {
-                                reaction.cross_section = xs_arr
-                                    .iter()
-                                    .filter_map(|v| v.as_f64())
-                                    .collect();
-                            }
-                        }
-                        
-                        // Get threshold_idx
-                        if let Some(idx) = reaction_obj.get("threshold_idx").and_then(|v| v.as_u64()) {
-                            reaction.threshold_idx = idx as usize;
-                        }
-                        
-                        // Get interpolation
-                        if let Some(interp) = reaction_obj.get("interpolation") {
-                            if let Some(interp_arr) = interp.as_array() {
-                                reaction.interpolation = interp_arr
-                                    .iter()
-                                    .filter_map(|v| v.as_i64())
-                                    .map(|v| v as i32)
-                                    .collect();
-                            }
-                        }
-                        
-                        // Get energy (some reactions may have their own energy grid)
-                        if let Some(energy) = reaction_obj.get("energy") {
-                            if let Some(energy_arr) = energy.as_array() {
-                                reaction.energy = energy_arr
-                                    .iter()
-                                    .filter_map(|v| v.as_f64())
-                                    .collect();
-                            }
-                        }
-                        
-                        // Insert the reaction into the temperature's map
-                        temp_reactions.insert(mt.clone(), reaction);
-                    }
-                }
-            }
-            
-            // Only insert if we found reactions
-            if !temp_reactions.is_empty() {
-                nuclide.reactions.insert(temp.clone(), temp_reactions);
-            }
-        }
-    }
-    
-    // Check if we need to add the particle type field (future-proofing)
-    // This is a placeholder for future implementation
-    
-    println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    println!("Found {} temperature(s) with reaction data", nuclide.reactions.len());
-    
-    Ok(nuclide)
 }
 
 // Get a nuclide from the cache or load it from the specified JSON file
