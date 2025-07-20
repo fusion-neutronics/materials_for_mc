@@ -260,7 +260,7 @@
             addReactionRow();
         }
 
-        // Load nuclide data from JSON file
+        // Load nuclide data from GitHub URL
         async function loadNuclideData(nuclide) {
             // If we've already loaded this nuclide, don't load it again
             if (window.loadedNuclides && window.loadedNuclides.has(nuclide)) {
@@ -272,10 +272,12 @@
                 window.loadedNuclides = new Set();
             }
             
-            const filePath = `tests/${nuclide.toLowerCase()}_neutron.json`;
+            // GitHub repository URL for TENDL 2021 data
+            const baseUrl = "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/";
+            const filePath = `${baseUrl}${nuclide}.json`;
             
             try {
-                // Fetch the JSON file
+                // Fetch the JSON file from GitHub
                 const response = await fetch(filePath);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
@@ -290,7 +292,7 @@
                 // Mark this nuclide as loaded
                 window.loadedNuclides.add(nuclide);
                 
-                console.log(`Loaded nuclide data for ${nuclide}`);
+                console.log(`Loaded nuclide data for ${nuclide} from GitHub`);
             } catch (error) {
                 console.error(`Error loading nuclide data for ${nuclide}:`, error);
             }
