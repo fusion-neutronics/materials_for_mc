@@ -5,11 +5,14 @@ mod nuclide;
 mod utilities;
 mod config;
 mod reaction;
+mod element;
+
 pub use material::Material;
 pub use materials::Materials;
 pub use utilities::{interpolate_linear, interpolate_log_log};
 pub use config::Config;
 pub use reaction::Reaction;
+pub use element::*;
 
 // Import PyO3 items conditionally
 #[cfg(feature = "pyo3")]
@@ -28,6 +31,8 @@ mod materials_python;
 mod nuclide_python;
 #[cfg(feature = "pyo3")]
 mod config_python;
+#[cfg(feature = "pyo3")]
+mod element_python;
 
 // Re-export Python modules for Maturin to find
 #[cfg(feature = "pyo3")]
@@ -40,6 +45,8 @@ pub use nuclide_python::*;
 pub use nuclide_python::PyNuclide as Nuclide;
 #[cfg(feature = "pyo3")]
 pub use config_python::*;
+#[cfg(feature = "pyo3")]
+pub use element_python::*;
 
 // If you have a main Python module entry point, update it to include PyMaterials:
 #[cfg(feature = "pyo3")]
@@ -50,6 +57,7 @@ fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<nuclide_python::PyNuclide>()?;
     m.add_class::<nuclide_python::PyReaction>()?;
     m.add_class::<config_python::PyConfig>()?;
+    m.add_class::<element_python::PyElement>()?;
     m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
     Ok(())
 }
@@ -63,6 +71,8 @@ mod config_wasm;
 mod nuclide_wasm;
 #[cfg(feature = "wasm")]
 mod reaction_wasm;
+#[cfg(feature = "wasm")]
+mod element_wasm;
 
 // WASM setup
 #[cfg(feature = "wasm")]
@@ -83,3 +93,5 @@ pub use config_wasm::*;
 pub use nuclide_wasm::*;
 #[cfg(feature = "wasm")]
 pub use reaction_wasm::*;
+#[cfg(feature = "wasm")]
+pub use element_wasm::*;

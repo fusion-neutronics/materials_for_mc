@@ -12,4 +12,12 @@ fn main() {
     mat.volume(Some(100.0)).unwrap();
 
     println!("{:?}", mat);
+
+    // Create a second material and add element Li (lithium) with natural abundances
+    let mut lithium_mat = Material::new();
+    lithium_mat.add_element("Li", 1.0).unwrap();
+    lithium_mat.set_density("g/cm3", 0.534).unwrap(); // Lithium density
+    lithium_mat.volume(Some(50.0)).unwrap();
+
+    println!("Lithium material: {:?}", lithium_mat);
 }

@@ -53,7 +53,7 @@ The package can be compiled to WebAssembly for use in web browsers:
 ```bash
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --target web --features wasm
-wasm-pack build --target web --features wasm --out-dir examples/wasm/pkg
+cp -r pkg examples/wasm/
 # Serve the demo pages locally
 python -m http.server 8000
 # Open the demo pages in your browser, I use firefox here but others should also work.
@@ -65,6 +65,26 @@ The WebAssembly demos include:
 - Cross section calculation and visualization
 - Predefined materials
 - Interactive plotting with Plotly
+
+## Element and Natural Abundance Support
+
+You can now add elements to a material using their natural isotopic abundances. This is available via the `add_element_with_natural_abundances` method on `Material`:
+
+```rust
+use materials_for_mc::{Material, ElementExtensions};
+
+let mut mat = Material::new();
+mat.add_element_with_natural_abundances("Li", 1.0).unwrap(); // Adds natural lithium
+```
+
+To see all available elements:
+
+```rust
+let elements = Material::get_available_elements();
+println!("Available elements: {:?}", elements);
+```
+
+This feature uses IUPAC 2013 natural abundances and supports all stable elements.
 
 ## Testing
 
