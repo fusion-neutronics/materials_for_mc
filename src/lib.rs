@@ -4,10 +4,12 @@ mod materials;
 mod nuclide;
 mod utilities;
 mod config;
+mod reaction;
 pub use material::Material;
 pub use materials::Materials;
 pub use utilities::{interpolate_linear, interpolate_log_log};
 pub use config::Config;
+pub use reaction::Reaction;
 
 // Import PyO3 items conditionally
 #[cfg(feature = "pyo3")]
@@ -51,3 +53,33 @@ fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
     Ok(())
 }
+
+// WASM Modules
+#[cfg(feature = "wasm")]
+mod material_wasm;
+#[cfg(feature = "wasm")]
+mod config_wasm;
+#[cfg(feature = "wasm")]
+mod nuclide_wasm;
+#[cfg(feature = "wasm")]
+mod reaction_wasm;
+
+// WASM setup
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(start)]
+pub fn wasm_start() {
+    console_error_panic_hook::set_once();
+}
+
+// Export WASM modules
+#[cfg(feature = "wasm")]
+pub use material_wasm::*;
+#[cfg(feature = "wasm")]
+pub use config_wasm::*;
+#[cfg(feature = "wasm")]
+pub use nuclide_wasm::*;
+#[cfg(feature = "wasm")]
+pub use reaction_wasm::*;

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materials for MC - Reaction Plotter</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .control-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        .control-group:first-child {
+            flex: 7; /* 70% of the space */
+        }
+        .control-group:last-child {
+            flex: 3; /* 30% of the space */
+            max-width: 280px;
+        }
+        .filter-container {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .plot-container {
+            width: 100%;
+            height: 600px;
+            margin-top: 20px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+            color: #666;
+        }
+        .info-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .reactions-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: white;
+        }
+        .reaction-row {
+            display: grid;
+            grid-template-columns: 6fr 4fr auto; /* 60:40 split between material and reaction */
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 6px;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .reaction-delete {
+            color: red;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .add-reaction-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .add-reaction-btn:hover {
+            background-color: #45a049;
+        }
+        .reaction-label {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .scale-options {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        .radio-group input[type="radio"] {
+            margin-right: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-top: -15px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        #download-data-btn {
+            background-color: #2196F3;
+            margin-top: 15px;
+            width: 100%;
+        }
+        #download-data-btn:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Materials Macroscopic Cross Section Plotter</h1>
+        <div class="subtitle"> A collection of materials with on the fly macroscopic cross section calculation by Jon Shimwell. See my other projects on <a href="https://xsplot.com" target="_blank">xsplot.com</a> </div>
+        
+        <div class="control-panel">
+            <div class="control-group">
+                <div id="reactions-container" class="reactions-container"></div>
+                <button id="add-reaction-btn" class="add-reaction-btn">Add MAterial Reaction</button>
+            </div>
+            
+            <div class="control-group">
+                <div class="scale-options">
+                    <label>X-Axis Scale:</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="x-scale" value="log" checked> Logarithmic
+                        </label>
+                        <label>
+                            <input type="radio" name="x-scale" value="linear"> Linear
+                        </label>
+                    </div>
+                    
+                    <label>Y-Axis Scale:</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="y-scale" value="log" checked> Logarithmic
+                        </label>
+                        <label>
+                            <input type="radio" name="y-scale" value="linear"> Linear
+                        </label>
+                    </div>
+                    
+                    <button id="download-data-btn" class="add-reaction-btn">Download Plot Data</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">Loading cross sections...</div>
+        
+        <div id="plot" class="plot-container"></div>
+    </div>
+
+    <script type="module">
+        // Import the WASM module
+        import init, { WasmConfig, WasmMaterial } from './pkg/materials_for_mc.js';
+
+        // Material definitions
+        const materialDefinitions = {
+            pure_li6: {
+                name: "Pure Li-6",
+                nuclides: [
+                    { name: "Li6", fraction: 1.0 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            },
+            natural_lithium: {
+                name: "Natural Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.07 },
+                    { name: "Li7", fraction: 0.93 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            },
+            enriched_lithium: {
+                name: "Enriched Lithium",
+                nuclides: [
+                    { name: "Li6", fraction: 0.20 },
+                    { name: "Li7", fraction: 0.80 }
+                ],
+                density: { value: 0.534, unit: "g/cm3" }
+            }
+        };
+
+        // Cross section data storage
+        const materialData = {};
+        
+        // Initialize the application
+        async function init_app() {
+            // Initialize the WASM module
+            await init();
+            
+            // Set up event listeners
+            document.getElementById('add-reaction-btn').addEventListener('click', addReactionRow);
+            document.getElementById('download-data-btn').addEventListener('click', downloadPlotData);
+            
+            // Set up scale option event listeners
+            document.querySelectorAll('input[name="x-scale"], input[name="y-scale"]').forEach(radio => {
+                radio.addEventListener('change', updatePlot);
+            });
+            
+            // Add initial reaction row (pure Li6 total)
+            addReactionRow();
+        }
+
+        // Load nuclide data from GitHub URL
+        async function loadNuclideData(nuclide) {
+            // If we've already loaded this nuclide, don't load it again
+            if (window.loadedNuclides && window.loadedNuclides.has(nuclide)) {
+                return;
+            }
+            
+            // Initialize loaded nuclides tracking set if it doesn't exist
+            if (!window.loadedNuclides) {
+                window.loadedNuclides = new Set();
+            }
+            
+            // GitHub repository URL for TENDL 2021 data
+            const baseUrl = "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/";
+            const filePath = `${baseUrl}${nuclide}.json`;
+            
+            try {
+                // Fetch the JSON file from GitHub
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`);
+                }
+                
+                // Get the JSON content as text
+                const jsonContent = await response.text();
+                
+                // Set the nuclide data in the WASM module
+                WasmConfig.set_nuclide_data(nuclide, jsonContent);
+                
+                // Mark this nuclide as loaded
+                window.loadedNuclides.add(nuclide);
+                
+                console.log(`Loaded nuclide data for ${nuclide} from GitHub`);
+            } catch (error) {
+                console.error(`Error loading nuclide data for ${nuclide}:`, error);
+            }
+        }
+
+        // Load all materials upfront
+        async function loadAllMaterials() {
+            document.getElementById('loading').style.display = 'block';
+            
+            // Process each material
+            for (const [materialId, materialDef] of Object.entries(materialDefinitions)) {
+                try {
+                    // Create the material in WASM
+                    const material = new WasmMaterial();
+                    
+                    // Load and add nuclides
+                    for (const nuclide of materialDef.nuclides) {
+                        // First load the nuclide data if needed
+                        await loadNuclideData(nuclide.name);
+                        
+                        // Then add to material
+                        material.add_nuclide(nuclide.name, nuclide.fraction);
+                    }
+                    
+                    // Set density
+                    material.set_density(materialDef.density.unit, materialDef.density.value);
+                    
+                    // Calculate cross sections
+                    await calculateCrossSections(material, materialId, materialDef.name);
+                    
+                } catch (error) {
+                    console.error(`Error processing material ${materialId}:`, error);
+                }
+            }
+            
+            document.getElementById('loading').style.display = 'none';
+            updatePlot();
+        }
+
+        // Calculate cross sections for a material
+        async function calculateCrossSections(material, materialId, materialName) {
+            try {
+                // Calculate macroscopic cross sections
+                const macroXS = await material.calculate_macroscopic_xs_neutron();
+                
+                // Calculate total cross section
+                const totalXS = await material.calculate_total_xs_neutron();
+                
+                // Store the cross section data
+                materialData[materialId] = {
+                    name: materialName,
+                    energyGrid: macroXS.energy_grid,
+                    crossSections: {
+                        ...macroXS.cross_sections,
+                        ...totalXS.cross_sections
+                    },
+                    // Store the available reactions for this material
+                    availableReactions: new Set(
+                        ['total', ...Object.keys(macroXS.cross_sections)]
+                    )
+                };
+                
+                return true;
+            } catch (error) {
+                console.error(`Error calculating cross sections for ${materialId}:`, error);
+                return false;
+            }
+        }
+        
+        // Add a new reaction row
+        function addReactionRow() {
+            const reactionsContainer = document.getElementById('reactions-container');
+            const rowId = Date.now(); // Unique ID for the row
+            
+            const row = document.createElement('div');
+            row.className = 'reaction-row';
+            row.id = `reaction-row-${rowId}`;
+            
+            // Create material select with labels
+            const materialLabel = document.createElement('div');
+            materialLabel.className = 'reaction-label';
+            materialLabel.textContent = 'Material:';
+            
+            const materialSelect = document.createElement('select');
+            materialSelect.className = 'material-select';
+            materialSelect.dataset.rowId = rowId;
+            materialSelect.innerHTML = Object.entries(materialDefinitions)
+                .map(([id, def]) => `<option value="${id}">${def.name}</option>`)
+                .join('');
+            
+            // Create reaction select with labels
+            const reactionLabel = document.createElement('div');
+            reactionLabel.className = 'reaction-label';
+            reactionLabel.textContent = 'Reaction:';
+            
+            const reactionSelect = document.createElement('select');
+            reactionSelect.className = 'reaction-select';
+            reactionSelect.dataset.rowId = rowId;
+            
+            // Create delete button
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'reaction-delete';
+            deleteBtn.textContent = '✖';
+            deleteBtn.dataset.rowId = rowId;
+            deleteBtn.addEventListener('click', () => {
+                document.getElementById(`reaction-row-${rowId}`).remove();
+                updatePlot();
+            });
+            
+            // Create material container
+            const materialContainer = document.createElement('div');
+            materialContainer.appendChild(materialLabel);
+            materialContainer.appendChild(materialSelect);
+            
+            // Create reaction container
+            const reactionContainer = document.createElement('div');
+            reactionContainer.appendChild(reactionLabel);
+            reactionContainer.appendChild(reactionSelect);
+            
+            // Combine elements
+            row.appendChild(materialContainer);
+            row.appendChild(reactionContainer);
+            row.appendChild(deleteBtn);
+            
+            reactionsContainer.appendChild(row);
+            
+            // Update the available reactions for the selected material
+            async function updateAvailableReactions() {
+                const materialId = materialSelect.value;
+                let material = materialData[materialId];
+                
+                // If the material data isn't loaded yet, load it now
+                if (!material || !material.availableReactions) {
+                    console.log(`Loading material data for ${materialId}...`);
+                    
+                    // Show loading indicator
+                    document.getElementById('loading').style.display = 'block';
+                    
+                    // Get the material definition
+                    const materialDef = materialDefinitions[materialId];
+                    
+                    // Create the material in WASM
+                    const wasmMaterial = new WasmMaterial();
+                    
+                    // Load and add nuclides
+                    for (const nuclide of materialDef.nuclides) {
+                        // First load the nuclide data if needed
+                        await loadNuclideData(nuclide.name);
+                        
+                        // Then add to material
+                        wasmMaterial.add_nuclide(nuclide.name, nuclide.fraction);
+                    }
+                    
+                    // Set density
+                    wasmMaterial.set_density(materialDef.density.unit, materialDef.density.value);
+                    
+                    // Calculate cross sections
+                    await calculateCrossSections(wasmMaterial, materialId, materialDef.name);
+                    
+                    // Update our local reference
+                    material = materialData[materialId];
+                    
+                    // Hide loading indicator
+                    document.getElementById('loading').style.display = 'none';
+                }
+                
+                // Save the current selection if possible
+                const currentSelection = reactionSelect.value;
+                
+                // Clear and rebuild the reaction select options
+                reactionSelect.innerHTML = '';
+                
+                // Get all available reactions for this material and sort them
+                const availableReactions = Array.from(material.availableReactions);
+                availableReactions.sort((a, b) => {
+                    // Always put "total" first
+                    if (a === 'total') return -1;
+                    if (b === 'total') return 1;
+                    // Then sort numerically
+                    return parseInt(a) - parseInt(b);
+                });
+                
+                // Add options for each available reaction
+                availableReactions.forEach(rxId => {
+                    const option = document.createElement('option');
+                    option.value = rxId;
+                    // For display, use "Total" for total reaction or "MT X" for others
+                    option.textContent = rxId === 'total' ? 'Total' : `MT ${rxId}`;
+                    reactionSelect.appendChild(option);
+                });
+                
+                // Try to restore previous selection if it's still valid
+                if (Array.from(reactionSelect.options).some(opt => opt.value === currentSelection)) {
+                    reactionSelect.value = currentSelection;
+                } else if (reactionSelect.options.length > 0) {
+                    // Default to first available option
+                    reactionSelect.selectedIndex = 0;
+                }
+                
+                updatePlot();
+            }
+            
+            // Add event listeners for selects
+            materialSelect.addEventListener('change', () => {
+                updateAvailableReactions().catch(error => {
+                    console.error('Error updating available reactions:', error);
+                });
+            });
+            reactionSelect.addEventListener('change', updatePlot);
+            
+            // Set defaults for first row (pure li6, total)
+            if (reactionsContainer.children.length === 1) {
+                materialSelect.value = 'pure_li6';
+            }
+            // Set defaults for second row (natural lithium, MT 2)
+            else if (reactionsContainer.children.length === 2) {
+                materialSelect.value = 'natural_lithium';
+            }
+            // Set defaults for third row (enriched lithium, MT 2)
+            else if (reactionsContainer.children.length === 3) {
+                materialSelect.value = 'enriched_lithium';
+            }
+            
+            // Initialize the reaction select based on the default material
+            updateAvailableReactions().catch(error => {
+                console.error('Error initializing available reactions:', error);
+            });
+        }
+        
+        // Update the plot based on selected reactions
+        async function updatePlot() {
+            // Get all reaction rows
+            const rows = document.querySelectorAll('.reaction-row');
+            if (rows.length === 0) return; // No rows yet
+            
+            const plotData = [];
+            
+            // Create traces for each selected reaction
+            for (const row of rows) {
+                const materialSelect = row.querySelector('.material-select');
+                const reactionSelect = row.querySelector('.reaction-select');
+                
+                const materialId = materialSelect.value;
+                const mt = reactionSelect.value;
+                
+                // If material data isn't loaded, trigger a load by calling updateAvailableReactions
+                if (!materialData[materialId]) {
+                    // Skip this row for now - data will be loaded when updateAvailableReactions is called
+                    continue;
+                }
+                
+                const material = materialData[materialId];
+                
+                // Skip if material doesn't have the selected reaction
+                if (!material.crossSections[mt]) {
+                    console.warn(`No data for ${material?.name} MT ${mt}`);
+                    continue;
+                }
+                
+                // Create name for the trace - Material name + reaction ID
+                const mtName = mt === 'total' ? 'Total' : `MT ${mt}`;
+                
+                // Convert energy to eV
+                const xValues = material.energyGrid.map(e => e);
+                const yValues = material.crossSections[mt];
+                
+                // Create a trace for Plotly
+                plotData.push({
+                    x: xValues,
+                    y: yValues,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `${material.name} - ${mtName}`
+                });
+            }
+            
+            // Get the selected scale options
+            const xScaleType = document.querySelector('input[name="x-scale"]:checked').value;
+            const yScaleType = document.querySelector('input[name="y-scale"]:checked').value;
+            
+            // Define the layout
+            const layout = {
+                title: 'Macroscopic Cross Sections',
+                xaxis: {
+                    title: 'Energy (eV)',
+                    type: xScaleType
+                },
+                yaxis: {
+                    title: 'Cross Section (cm⁻¹)',
+                    type: yScaleType
+                },
+                hovermode: 'closest',
+                legend: {
+                    x: 0,
+                    y: 1
+                }
+            };
+            
+            // Create the plot
+            Plotly.newPlot('plot', plotData, layout);
+        }
+        
+        // Function to download plot data as JSON
+        function downloadPlotData() {
+            // Get all reaction rows
+            const rows = document.querySelectorAll('.reaction-row');
+            if (rows.length === 0) {
+                alert('No data to download. Please add at least one reaction first.');
+                return;
+            }
+            
+            const exportData = [];
+            
+            // Create data objects for each selected reaction
+            for (const row of rows) {
+                const materialSelect = row.querySelector('.material-select');
+                const reactionSelect = row.querySelector('.reaction-select');
+                
+                const materialId = materialSelect.value;
+                const mt = reactionSelect.value;
+                
+                // Skip if material data isn't loaded
+                if (!materialData[materialId]) {
+                    continue;
+                }
+                
+                const material = materialData[materialId];
+                
+                // Skip if material doesn't have the selected reaction
+                if (!material.crossSections[mt]) {
+                    continue;
+                }
+                
+                // Create name for the dataset
+                const mtName = mt === 'total' ? 'Total' : `MT ${mt}`;
+                
+                // Get the energy and cross section data
+                const energyValues = material.energyGrid;
+                const xsValues = material.crossSections[mt];
+                
+                // Add to export data with separate energy and xs arrays
+                exportData.push({
+                    material: material.name,
+                    reaction: mtName,
+                    reactionId: mt,
+                    energy_eV: energyValues,
+                    xs_per_cm: xsValues
+                });
+            }
+            
+            // Create a JSON string
+            const jsonData = JSON.stringify(exportData, null, 2);
+            
+            // Create a blob and download link
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a temporary link element and trigger download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'reaction_plot_data.json';
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // Start the application
+        init_app().catch(console.error);
+    </script>
+</body>
+</html>

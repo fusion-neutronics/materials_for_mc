@@ -6,6 +6,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // Global cache for nuclides to avoid reloading
@@ -33,8 +34,6 @@ pub struct Nuclide {
     #[serde(default)]
     pub reactions: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
 }
-
-
 
 impl Nuclide {
     /// Get the energy grid for a specific temperature
@@ -87,19 +86,8 @@ impl Nuclide {
     }
 }
 
-// Read a single nuclide from a JSON file
-pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let path_ref = path.as_ref();
-    println!("Reading {}", path_ref.display());
-    let file = File::open(path_ref)?;
-    let reader = BufReader::new(file);
-    
-    // First read the JSON into a Value to check its structure
-    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
-    
-    // Initialize a new Nuclide
+// Parse a nuclide from a JSON value
+fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
     let mut nuclide = Nuclide {
         name: None,
         element: None,
@@ -111,7 +99,7 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
         energy: None,
         reactions: HashMap::new(),
     };
-    
+
     // Parse basic metadata
     if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
         nuclide.name = Some(name.to_string());
@@ -208,11 +196,23 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
                             }
                         }
                         
-                        // Calculate energy grid from threshold_idx and main energy grid
-                        if let Some(energy_grids) = &nuclide.energy {
-                            if let Some(energy_grid) = energy_grids.get(temp) {
-                                if reaction.threshold_idx < energy_grid.len() {
-                                    reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
+                        // Get energy (some reactions may have their own energy grid)
+                        if let Some(energy) = reaction_obj.get("energy") {
+                            if let Some(energy_arr) = energy.as_array() {
+                                reaction.energy = energy_arr
+                                    .iter()
+                                    .filter_map(|v| v.as_f64())
+                                    .collect();
+                            }
+                        }
+                        
+                        // Calculate energy grid from threshold_idx and main energy grid if not already set
+                        if reaction.energy.is_empty() {
+                            if let Some(energy_grids) = &nuclide.energy {
+                                if let Some(energy_grid) = energy_grids.get(temp) {
+                                    if reaction.threshold_idx < energy_grid.len() {
+                                        reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
+                                    }
                                 }
                             }
                         }
@@ -222,7 +222,10 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
                 }
             }
             
-            nuclide.reactions.insert(temp.clone(), temp_reactions);
+            // Only insert if we found reactions
+            if !temp_reactions.is_empty() {
+                nuclide.reactions.insert(temp.clone(), temp_reactions);
+            }
         }
     } 
     // Check if we have the newer format with "incident_particle" field
@@ -312,6 +315,31 @@ pub fn read_nuclide_from_json<P: AsRef<std::path::Path>>(
     Ok(nuclide)
 }
 
+// Read a single nuclide from a JSON file
+pub fn read_nuclide_from_json<P: AsRef<Path>>(
+    path: P,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    let path_ref = path.as_ref();
+    println!("Reading {}", path_ref.display());
+    let file = File::open(path_ref)?;
+    let reader = BufReader::new(file);
+    
+    // Parse the JSON file
+    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
+    
+    // Use the shared parsing function
+    parse_nuclide_from_json_value(json_value)
+}
+
+// Read a nuclide from a JSON string
+pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Parse the JSON string
+    let json_value: serde_json::Value = serde_json::from_str(json_content)?;
+    
+    // Use the shared parsing function
+    parse_nuclide_from_json_value(json_value)
+}
+
 // Get a nuclide from the cache or load it from the specified JSON file
 pub fn get_or_load_nuclide(
     nuclide_name: &str, 
@@ -325,12 +353,13 @@ pub fn get_or_load_nuclide(
         }
     }
     
-    // Not in cache, load from JSON
+    // Not in cache, load from JSON file
     let path = json_path_map.get(nuclide_name)
         .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
     
     let nuclide = read_nuclide_from_json(path)?;
     let arc_nuclide = Arc::new(nuclide);
+    
     // Store in cache
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();

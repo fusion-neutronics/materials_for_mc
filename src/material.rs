@@ -111,8 +111,15 @@ impl Material {
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
-            let nuclide = get_or_load_nuclide(&nuclide_name, &config.cross_sections)?;
-            self.nuclide_data.insert(nuclide_name.clone(), nuclide);
+            // Load from the provided JSON path map
+            match get_or_load_nuclide(&nuclide_name, &config.cross_sections) {
+                Ok(nuclide) => {
+                    self.nuclide_data.insert(nuclide_name.clone(), nuclide);
+                },
+                Err(e) => {
+                    return Err(format!("Failed to load nuclide '{}': {}", nuclide_name, e).into());
+                }
+            }
         }
         
         Ok(())

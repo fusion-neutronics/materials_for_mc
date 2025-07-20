@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-materials_for_mc = { path = "../" }
+materials_for_mc = { path = "../../" }
