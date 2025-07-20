@@ -9,135 +9,201 @@ use crate::material::Material;
 static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     let mut abundances = HashMap::new();
     
-    // Hydrogen and Helium
+    // Hydrogen
     abundances.insert("H1", 0.99984426);
     abundances.insert("H2", 0.00015574);
+    
+    // Helium
     abundances.insert("He3", 0.000002);
     abundances.insert("He4", 0.999998);
     
-    // Lithium, Beryllium, Boron
+    // Lithium
     abundances.insert("Li6", 0.07589);
     abundances.insert("Li7", 0.92411);
+    
+    // Beryllium
     abundances.insert("Be9", 1.0);
+    
+    // Boron
     abundances.insert("B10", 0.1982);
     abundances.insert("B11", 0.8018);
     
-    // Carbon, Nitrogen, Oxygen, Fluorine, Neon
+    // Carbon
     abundances.insert("C12", 0.988922);
     abundances.insert("C13", 0.011078);
+    
+    // Nitrogen
     abundances.insert("N14", 0.996337);
     abundances.insert("N15", 0.003663);
+    
+    // Oxygen
     abundances.insert("O16", 0.9976206);
     abundances.insert("O17", 0.000379);
     abundances.insert("O18", 0.0020004);
+    
+    // Fluorine
     abundances.insert("F19", 1.0);
+    
+    // Neon
     abundances.insert("Ne20", 0.9048);
     abundances.insert("Ne21", 0.0027);
     abundances.insert("Ne22", 0.0925);
     
-    // Sodium, Magnesium, Aluminum, Silicon, Phosphorus
+    // Sodium
     abundances.insert("Na23", 1.0);
+    
+    // Magnesium
     abundances.insert("Mg24", 0.78951);
     abundances.insert("Mg25", 0.1002);
     abundances.insert("Mg26", 0.11029);
+    
+    // Aluminum
     abundances.insert("Al27", 1.0);
+    
+    // Silicon
     abundances.insert("Si28", 0.9222968);
     abundances.insert("Si29", 0.0468316);
     abundances.insert("Si30", 0.0308716);
+    
+    // Phosphorus
     abundances.insert("P31", 1.0);
     
-    // Sulfur, Chlorine, Argon, Potassium, Calcium
+    // Sulfur
     abundances.insert("S32", 0.9504074);
     abundances.insert("S33", 0.0074869);
     abundances.insert("S34", 0.0419599);
     abundances.insert("S36", 0.0001458);
+
+    // Chlorine
     abundances.insert("Cl35", 0.757647);
     abundances.insert("Cl37", 0.242353);
+
+    // Argon
     abundances.insert("Ar36", 0.003336);
     abundances.insert("Ar38", 0.000629);
     abundances.insert("Ar40", 0.996035);
+
+    // Potassium
     abundances.insert("K39", 0.932581);
     abundances.insert("K40", 0.000117);
     abundances.insert("K41", 0.067302);
+
+    // Calcium
     abundances.insert("Ca40", 0.96941);
     abundances.insert("Ca42", 0.00647);
     abundances.insert("Ca43", 0.00135);
     abundances.insert("Ca44", 0.02086);
     abundances.insert("Ca46", 0.00004);
     abundances.insert("Ca48", 0.00187);
-    
-    // Scandium, Titanium, Vanadium, Chromium, Manganese
+
+    // Scandium
     abundances.insert("Sc45", 1.0);
+
+    // Titanium
     abundances.insert("Ti46", 0.0825);
     abundances.insert("Ti47", 0.0744);
     abundances.insert("Ti48", 0.7372);
     abundances.insert("Ti49", 0.0541);
     abundances.insert("Ti50", 0.0518);
+
+    // Vanadium
     abundances.insert("V50", 0.0025);
     abundances.insert("V51", 0.9975);
+
+    // Chromium
     abundances.insert("Cr50", 0.04345);
     abundances.insert("Cr52", 0.83789);
     abundances.insert("Cr53", 0.09501);
     abundances.insert("Cr54", 0.02365);
+
+    // Manganese
     abundances.insert("Mn55", 1.0);
     
-    // Iron, Cobalt, Nickel, Copper, Zinc
+    // Iron
     abundances.insert("Fe54", 0.05845);
     abundances.insert("Fe56", 0.91754);
     abundances.insert("Fe57", 0.02119);
     abundances.insert("Fe58", 0.00282);
+
+    // Cobalt
     abundances.insert("Co59", 1.0);
+
+    // Nickel
     abundances.insert("Ni58", 0.680769);
     abundances.insert("Ni60", 0.262231);
     abundances.insert("Ni61", 0.011399);
     abundances.insert("Ni62", 0.036345);
     abundances.insert("Ni64", 0.009256);
+
+    // Copper
     abundances.insert("Cu63", 0.6915);
     abundances.insert("Cu65", 0.3085);
+
+    // Zinc
     abundances.insert("Zn64", 0.4917);
     abundances.insert("Zn66", 0.2773);
     abundances.insert("Zn67", 0.0404);
     abundances.insert("Zn68", 0.1845);
     abundances.insert("Zn70", 0.0061);
-    
-    // Gallium through Rubidium
+
+    // Gallium
     abundances.insert("Ga69", 0.60108);
     abundances.insert("Ga71", 0.39892);
+
+    // Germanium
     abundances.insert("Ge70", 0.2052);
     abundances.insert("Ge72", 0.2745);
     abundances.insert("Ge73", 0.0776);
     abundances.insert("Ge74", 0.3652);
     abundances.insert("Ge76", 0.0775);
+
+    // Arsenic
     abundances.insert("As75", 1.0);
+
+    // Selenium
     abundances.insert("Se74", 0.0086);
     abundances.insert("Se76", 0.0923);
     abundances.insert("Se77", 0.076);
     abundances.insert("Se78", 0.2369);
     abundances.insert("Se80", 0.498);
     abundances.insert("Se82", 0.0882);
+
+    // Bromine
     abundances.insert("Br79", 0.50686);
     abundances.insert("Br81", 0.49314);
+
+    // Krypton
     abundances.insert("Kr78", 0.00355);
     abundances.insert("Kr80", 0.02286);
     abundances.insert("Kr82", 0.11593);
     abundances.insert("Kr83", 0.115);
     abundances.insert("Kr84", 0.56987);
     abundances.insert("Kr86", 0.17279);
+
+    // Rubidium
     abundances.insert("Rb85", 0.7217);
     abundances.insert("Rb87", 0.2783);
-    
-    // Strontium through Molybdenum
+
+    // Strontium
     abundances.insert("Sr84", 0.0056);
     abundances.insert("Sr86", 0.0986);
     abundances.insert("Sr87", 0.07);
     abundances.insert("Sr88", 0.8258);
+
+    // Yttrium
     abundances.insert("Y89", 1.0);
+
+    // Zirconium
     abundances.insert("Zr90", 0.5145);
     abundances.insert("Zr91", 0.1122);
     abundances.insert("Zr92", 0.1715);
     abundances.insert("Zr94", 0.1738);
     abundances.insert("Zr96", 0.028);
+
+    // Niobium
     abundances.insert("Nb93", 1.0);
+
+    // Molybdenum
     abundances.insert("Mo92", 0.14649);
     abundances.insert("Mo94", 0.09187);
     abundances.insert("Mo95", 0.15873);
@@ -146,7 +212,7 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Mo98", 0.24292);
     abundances.insert("Mo100", 0.09744);
     
-    // Ruthenium through Silver
+    // Ruthenium
     abundances.insert("Ru96", 0.0554);
     abundances.insert("Ru98", 0.0187);
     abundances.insert("Ru99", 0.1276);
@@ -154,17 +220,23 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Ru101", 0.1706);
     abundances.insert("Ru102", 0.3155);
     abundances.insert("Ru104", 0.1862);
+
+    // Rhodium
     abundances.insert("Rh103", 1.0);
+
+    // Palladium
     abundances.insert("Pd102", 0.0102);
     abundances.insert("Pd104", 0.1114);
     abundances.insert("Pd105", 0.2233);
     abundances.insert("Pd106", 0.2733);
     abundances.insert("Pd108", 0.2646);
     abundances.insert("Pd110", 0.1172);
+
+    // Silver
     abundances.insert("Ag107", 0.51839);
     abundances.insert("Ag109", 0.48161);
-    
-    // Cadmium through Xenon
+
+    // Cadmium
     abundances.insert("Cd106", 0.01245);
     abundances.insert("Cd108", 0.00888);
     abundances.insert("Cd110", 0.1247);
@@ -173,8 +245,12 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Cd113", 0.12227);
     abundances.insert("Cd114", 0.28754);
     abundances.insert("Cd116", 0.07512);
+
+    // Indium
     abundances.insert("In113", 0.04281);
     abundances.insert("In115", 0.95719);
+
+    // Tin
     abundances.insert("Sn112", 0.0097);
     abundances.insert("Sn114", 0.0066);
     abundances.insert("Sn115", 0.0034);
@@ -185,8 +261,12 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Sn120", 0.3258);
     abundances.insert("Sn122", 0.0463);
     abundances.insert("Sn124", 0.0579);
+
+    // Antimony
     abundances.insert("Sb121", 0.5721);
     abundances.insert("Sb123", 0.4279);
+
+    // Tellurium
     abundances.insert("Te120", 0.0009);
     abundances.insert("Te122", 0.0255);
     abundances.insert("Te123", 0.0089);
@@ -195,7 +275,11 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Te126", 0.1884);
     abundances.insert("Te128", 0.3174);
     abundances.insert("Te130", 0.3408);
+
+    // Iodine
     abundances.insert("I127", 1.0);
+
+    // Xenon
     abundances.insert("Xe124", 0.00095);
     abundances.insert("Xe126", 0.00089);
     abundances.insert("Xe128", 0.0191);
@@ -205,9 +289,11 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Xe132", 0.26909);
     abundances.insert("Xe134", 0.10436);
     abundances.insert("Xe136", 0.08857);
-    
-    // Cesium through Gadolinium
+
+    // Cesium
     abundances.insert("Cs133", 1.0);
+
+    // Barium
     abundances.insert("Ba130", 0.0011);
     abundances.insert("Ba132", 0.001);
     abundances.insert("Ba134", 0.0242);
@@ -215,13 +301,21 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Ba136", 0.0785);
     abundances.insert("Ba137", 0.1123);
     abundances.insert("Ba138", 0.717);
+
+    // Lanthanum
     abundances.insert("La138", 0.0008881);
     abundances.insert("La139", 0.9991119);
+
+    // Cerium
     abundances.insert("Ce136", 0.00186);
     abundances.insert("Ce138", 0.00251);
     abundances.insert("Ce140", 0.88449);
     abundances.insert("Ce142", 0.11114);
+
+    // Praseodymium
     abundances.insert("Pr141", 1.0);
+
+    // Neodymium
     abundances.insert("Nd142", 0.27153);
     abundances.insert("Nd143", 0.12173);
     abundances.insert("Nd144", 0.23798);
@@ -229,6 +323,8 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Nd146", 0.17189);
     abundances.insert("Nd148", 0.05756);
     abundances.insert("Nd150", 0.05638);
+
+    // Samarium
     abundances.insert("Sm144", 0.0308);
     abundances.insert("Sm147", 0.15);
     abundances.insert("Sm148", 0.1125);
@@ -236,8 +332,12 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Sm150", 0.0737);
     abundances.insert("Sm152", 0.2674);
     abundances.insert("Sm154", 0.2274);
+
+    // Europium
     abundances.insert("Eu151", 0.4781);
     abundances.insert("Eu153", 0.5219);
+
+    // Gadolinium
     abundances.insert("Gd152", 0.002);
     abundances.insert("Gd154", 0.0218);
     abundances.insert("Gd155", 0.148);
@@ -245,9 +345,11 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Gd157", 0.1565);
     abundances.insert("Gd158", 0.2484);
     abundances.insert("Gd160", 0.2186);
-    
-    // Terbium through Lutetium
+
+    // Terbium
     abundances.insert("Tb159", 1.0);
+
+    // Dysprosium
     abundances.insert("Dy156", 0.00056);
     abundances.insert("Dy158", 0.00095);
     abundances.insert("Dy160", 0.02329);
@@ -255,14 +357,22 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Dy162", 0.25475);
     abundances.insert("Dy163", 0.24896);
     abundances.insert("Dy164", 0.2826);
+
+    // Holmium
     abundances.insert("Ho165", 1.0);
+
+    // Erbium
     abundances.insert("Er162", 0.00139);
     abundances.insert("Er164", 0.01601);
     abundances.insert("Er166", 0.33503);
     abundances.insert("Er167", 0.22869);
     abundances.insert("Er168", 0.26978);
     abundances.insert("Er170", 0.1491);
+
+    // Thulium
     abundances.insert("Tm169", 1.0);
+
+    // Ytterbium
     abundances.insert("Yb168", 0.00123);
     abundances.insert("Yb170", 0.02982);
     abundances.insert("Yb171", 0.14086);
@@ -270,25 +380,35 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Yb173", 0.16103);
     abundances.insert("Yb174", 0.32025);
     abundances.insert("Yb176", 0.12995);
+
+    // Lutetium
     abundances.insert("Lu175", 0.97401);
     abundances.insert("Lu176", 0.02599);
     
-    // Hafnium through Mercury
+    // Hafnium
     abundances.insert("Hf174", 0.0016);
     abundances.insert("Hf176", 0.0526);
     abundances.insert("Hf177", 0.186);
     abundances.insert("Hf178", 0.2728);
     abundances.insert("Hf179", 0.1362);
     abundances.insert("Hf180", 0.3508);
+
+    // Tantalum
     abundances.insert("Ta180_m1", 0.0001201);
     abundances.insert("Ta181", 0.9998799);
+
+    // Tungsten
     abundances.insert("W180", 0.0012);
     abundances.insert("W182", 0.265);
     abundances.insert("W183", 0.1431);
     abundances.insert("W184", 0.3064);
     abundances.insert("W186", 0.2843);
+
+    // Rhenium
     abundances.insert("Re185", 0.374);
     abundances.insert("Re187", 0.626);
+
+    // Osmium
     abundances.insert("Os184", 0.0002);
     abundances.insert("Os186", 0.0159);
     abundances.insert("Os187", 0.0196);
@@ -296,15 +416,23 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Os189", 0.1615);
     abundances.insert("Os190", 0.2626);
     abundances.insert("Os192", 0.4078);
+
+    // Iridium
     abundances.insert("Ir191", 0.373);
     abundances.insert("Ir193", 0.627);
+
+    // Platinum
     abundances.insert("Pt190", 0.00012);
     abundances.insert("Pt192", 0.00782);
     abundances.insert("Pt194", 0.32864);
     abundances.insert("Pt195", 0.33775);
     abundances.insert("Pt196", 0.25211);
     abundances.insert("Pt198", 0.07356);
+
+    // Gold
     abundances.insert("Au197", 1.0);
+
+    // Mercury
     abundances.insert("Hg196", 0.0015);
     abundances.insert("Hg198", 0.1004);
     abundances.insert("Hg199", 0.1694);
@@ -312,18 +440,28 @@ static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     abundances.insert("Hg201", 0.1317);
     abundances.insert("Hg202", 0.2974);
     abundances.insert("Hg204", 0.0682);
-    
-    // Thallium through Uranium
+
+    // Thallium
     abundances.insert("Tl203", 0.29524);
     abundances.insert("Tl205", 0.70476);
+
+    // Lead
     abundances.insert("Pb204", 0.014);
     abundances.insert("Pb206", 0.241);
     abundances.insert("Pb207", 0.221);
     abundances.insert("Pb208", 0.524);
+
+    // Bismuth
     abundances.insert("Bi209", 1.0);
+
+    // Thorium
     abundances.insert("Th230", 0.0002);
     abundances.insert("Th232", 0.9998);
+
+    // Protactinium
     abundances.insert("Pa231", 1.0);
+
+    // Uranium
     abundances.insert("U234", 0.000054);
     abundances.insert("U235", 0.007204);
     abundances.insert("U238", 0.992742);

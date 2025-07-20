@@ -66,25 +66,6 @@ The WebAssembly demos include:
 - Predefined materials
 - Interactive plotting with Plotly
 
-## Element and Natural Abundance Support
-
-You can now add elements to a material using their natural isotopic abundances. This is available via the `add_element_with_natural_abundances` method on `Material`:
-
-```rust
-use materials_for_mc::{Material, ElementExtensions};
-
-let mut mat = Material::new();
-mat.add_element_with_natural_abundances("Li", 1.0).unwrap(); // Adds natural lithium
-```
-
-To see all available elements:
-
-```rust
-let elements = Material::get_available_elements();
-println!("Available elements: {:?}", elements);
-```
-
-This feature uses IUPAC 2013 natural abundances and supports all stable elements.
 
 ## Testing
 
