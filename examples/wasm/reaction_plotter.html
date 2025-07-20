@@ -223,9 +223,8 @@
             },
             natural_lithium: {
                 name: "Natural Lithium",
-                nuclides: [
-                    { name: "Li6", fraction: 0.07 },
-                    { name: "Li7", fraction: 0.93 }
+                elements: [
+                    { name: "Li", fraction: 1.0 }
                 ],
                 density: { value: 0.534, unit: "g/cm3" }
             },
@@ -309,12 +308,28 @@
                     const material = new WasmMaterial();
                     
                     // Load and add nuclides
-                    for (const nuclide of materialDef.nuclides) {
-                        // First load the nuclide data if needed
-                        await loadNuclideData(nuclide.name);
-                        
-                        // Then add to material
-                        material.add_nuclide(nuclide.name, nuclide.fraction);
+                    if (Array.isArray(materialDef.nuclides)) {
+                        for (const nuclide of materialDef.nuclides) {
+                            await loadNuclideData(nuclide.name);
+                            material.add_nuclide(nuclide.name, nuclide.fraction);
+                        }
+                    }
+                    // Load and add elements
+                    if (Array.isArray(materialDef.elements)) {
+                        for (const element of materialDef.elements) {
+                            // For natural abundance elements, WASM will expand to nuclides
+                            // Load all nuclide data for the element before adding
+                            const elementNuclides = {
+                                "Li": ["Li6", "Li7"],
+                                // Add more elements here as needed
+                            };
+                            if (elementNuclides[element.name]) {
+                                for (const nuclide of elementNuclides[element.name]) {
+                                    await loadNuclideData(nuclide);
+                                }
+                            }
+                            material.add_element(element.name, element.fraction);
+                        }
                     }
                     
                     // Set density
@@ -438,12 +453,28 @@
                     const wasmMaterial = new WasmMaterial();
                     
                     // Load and add nuclides
-                    for (const nuclide of materialDef.nuclides) {
-                        // First load the nuclide data if needed
-                        await loadNuclideData(nuclide.name);
-                        
-                        // Then add to material
-                        wasmMaterial.add_nuclide(nuclide.name, nuclide.fraction);
+                    if (Array.isArray(materialDef.nuclides)) {
+                        for (const nuclide of materialDef.nuclides) {
+                            await loadNuclideData(nuclide.name);
+                            wasmMaterial.add_nuclide(nuclide.name, nuclide.fraction);
+                        }
+                    }
+                    // Load and add elements
+                    if (Array.isArray(materialDef.elements)) {
+                        for (const element of materialDef.elements) {
+                            // For natural abundance elements, WASM will expand to nuclides
+                            // Load all nuclide data for the element before adding
+                            const elementNuclides = {
+                                "Li": ["Li6", "Li7"],
+                                // Add more elements here as needed
+                            };
+                            if (elementNuclides[element.name]) {
+                                for (const nuclide of elementNuclides[element.name]) {
+                                    await loadNuclideData(nuclide);
+                                }
+                            }
+                            wasmMaterial.add_element(element.name, element.fraction);
+                        }
                     }
                     
                     // Set density
@@ -552,20 +583,13 @@
                     continue;
                 }
                 
-                // Create name for the trace - Material name + reaction ID
-                const mtName = mt === 'total' ? 'Total' : `MT ${mt}`;
-                
-                // Convert energy to eV
-                const xValues = material.energyGrid.map(e => e);
-                const yValues = material.crossSections[mt];
-                
                 // Create a trace for Plotly
                 plotData.push({
-                    x: xValues,
-                    y: yValues,
+                    x: material.energyGrid,
+                    y: material.crossSections[mt],
                     type: 'scatter',
                     mode: 'lines',
-                    name: `${material.name} - ${mtName}`
+                    name: `${material.name} - ${mt === 'total' ? 'Total' : `MT ${mt}`}`
                 });
             }
             

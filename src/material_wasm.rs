@@ -31,6 +31,14 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
+    pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), JsValue> {
+        use crate::element::ElementExtensions;
+        self.inner
+            .add_element(element, fraction)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    #[wasm_bindgen]
     pub fn set_density(&mut self, unit: &str, value: f64) -> Result<(), JsValue> {
         self.inner.set_density(unit, value)
             .map_err(|e| JsValue::from_str(&e))
