@@ -13,6 +13,7 @@ pub use utilities::{interpolate_linear, interpolate_log_log};
 pub use config::Config;
 pub use reaction::Reaction;
 pub use element::*;
+pub use crate::element::ElementExtensions;
 
 // Import PyO3 items conditionally
 #[cfg(feature = "pyo3")]
