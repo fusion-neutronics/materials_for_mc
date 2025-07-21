@@ -673,11 +673,11 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_add_element_with_natural_abundances() {
+    fn test_add_element() {
         let mut material = Material::new();
         
         // Test adding natural lithium
-        let result = material.add_element_with_natural_abundances("Li", 1.0);
+        let result = material.add_element("Li", 1.0);
         assert!(result.is_ok());
         
         // Verify the isotopes were added correctly
@@ -690,7 +690,7 @@ mod tests {
         
         // Test adding an element with many isotopes
         let mut material2 = Material::new();
-        let result = material2.add_element_with_natural_abundances("Sn", 1.0); // Tin has 10 isotopes
+        let result = material2.add_element("Sn", 1.0); // Tin has 10 isotopes
         assert!(result.is_ok());
         assert_eq!(material2.nuclides.len(), 10);
     }
@@ -700,11 +700,11 @@ mod tests {
         let mut material = Material::new();
         
         // Test with negative fraction
-        let result = material.add_element_with_natural_abundances("Li", -1.0);
+        let result = material.add_element("Li", -1.0);
         assert!(result.is_err());
         
         // Test with invalid element
-        let result = material.add_element_with_natural_abundances("Xx", 1.0);
+        let result = material.add_element("Xx", 1.0);
         assert!(result.is_err());
     }
     
