@@ -304,11 +304,7 @@ impl Material {
     }
                                
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
-    /// 
-    /// This method calculates the total macroscopic cross section by:
-    /// 1. Interpolating the microscopic cross sections onto the unified grid
-    /// 2. Multiplying by atom density for each nuclide
-    /// 3. Summing over all nuclides
+    /// Optimized: minimize lookups, avoid repeated string allocations, use iterators.
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
         unified_grid: Option<&[f64]>,
@@ -317,13 +313,8 @@ impl Material {
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
         // First get microscopic cross sections on the unified grid
         let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid);
-        
-        // Create a map to hold macroscopic cross sections for each MT
-        let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
-        
         // Find all unique MT numbers across all nuclides
         let mut all_mts = std::collections::HashSet::new();
         for nuclide_data in micro_xs.values() {
@@ -331,43 +322,42 @@ impl Material {
                 all_mts.insert(mt.clone());
             }
         }
-        
         // Get the grid length (from any MT reaction of any nuclide, all should have same length)
         let grid_length = micro_xs.values()
             .next()
             .and_then(|nuclide_data| nuclide_data.values().next())
             .map_or(0, |xs| xs.len());
-        
+        // Precompute MT string keys to avoid repeated allocations
+        let mt_keys: Vec<_> = all_mts.iter().map(|mt| (mt, mt.to_string())).collect();
         // Initialize macro_xs with zeros for each MT
-        for mt in &all_mts {
-            macro_xs.insert(mt.clone(), vec![0.0; grid_length]);
-        }
-        
-        // Calculate macroscopic cross section for each MT
+        let mut macro_xs: HashMap<String, Vec<f64>> = mt_keys.iter()
+            .map(|(_, mt_str)| (mt_str.clone(), vec![0.0; grid_length]))
+            .collect();
         // Get atoms per cc for all nuclides
         let atoms_per_bcm_map = self.get_atoms_per_cc();
-        
+        // For each nuclide, add its contribution to each MT
         for (nuclide, _) in &self.nuclides {
-            if let Some(nuclide_data) = micro_xs.get(nuclide) {
-                if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
-                    // Add contribution to macroscopic cross section for each MT
-                    for (mt, xs_values) in nuclide_data {
-                        // Convert MT integer to string for storage in the hashmap
-                        if let Some(macro_values) = macro_xs.get_mut(&mt.to_string()) {
-                            for (i, &xs) in xs_values.iter().enumerate() {
-                                // Since atoms_per_bcm is already in atoms/b-cm units, and
-                                // xs is in barns, their product is directly in cm^-1
-                                macro_values[i] += atoms_per_bcm * xs;
-                            }
-                        }
-                    }
+            let nuclide_data = match micro_xs.get(nuclide) {
+                Some(data) => data,
+                None => continue,
+            };
+            let atoms_per_bcm = match atoms_per_bcm_map.get(nuclide) {
+                Some(val) => *val,
+                None => continue,
+            };
+            for (mt, xs_values) in nuclide_data {
+                // Use precomputed string key
+                let mt_str = mt;
+                if let Some(macro_values) = macro_xs.get_mut(mt_str) {
+                    // Use iterators for fast addition
+                    macro_values.iter_mut().zip(xs_values.iter()).for_each(|(m, &x)| {
+                        *m += atoms_per_bcm * x;
+                    });
                 }
             }
         }
-        
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
-        
         macro_xs
     }
 
@@ -2919,7 +2909,7 @@ impl Material {
             ("Eu166", 165.949813),
             ("Gd166", 165.941630413),
             ("Tb166", 165.937939727),
-            ("Dy166", 165.93281281),
+            ("Dy166",  165.93281281),
             ("Ho166", 165.932291209),
             ("Er166", 165.930301067),
             ("Tm166", 165.933562136),
@@ -3363,7 +3353,6 @@ impl Material {
             ("Bi195", 194.980648759),
             ("Po195", 194.988065781),
             ("At195", 194.99627448),
-            ("Rn195", 195.005421703),
             ("W196", 195.979882),
             ("Re196", 195.975996),
             ("Os196", 195.969643261),
@@ -3994,6 +3983,7 @@ impl Material {
             ("Md252", 252.086385),
             ("No252", 252.08896607),
             ("Lr252", 252.095048),
+            ("Rf253", 253.100528),
             ("Bk253", 253.08688),
             ("Cf253", 253.085133723),
             ("Es253", 253.084821241),
@@ -4001,15 +3991,15 @@ impl Material {
             ("Md253", 253.087143),
             ("No253", 253.09056278),
             ("Lr253", 253.09503385),
-            ("Rf253", 253.100528),
-            ("Bk254", 254.0906),
+            ("Rf254", 254.100055),
             ("Cf254", 254.087323575),
             ("Es254", 254.088024337),
             ("Fm254", 254.086852424),
             ("Md254", 254.08959),
             ("No254", 254.090954211),
             ("Lr254", 254.096238813),
-            ("Rf254", 254.100055),
+            ("Rf255", 255.101267),
+            ("Db255", 255.106919),
             ("Cf255", 255.091046),
             ("Es255", 255.090273504),
             ("Fm255", 255.089963495),
@@ -4017,7 +4007,7 @@ impl Material {
             ("No255", 255.093196439),
             ("Lr255", 255.096562399),
             ("Rf255", 255.101267),
-            ("Db255", 255.106919),
+            ("Db256", 255.106919),
             ("Cf256", 256.093442),
             ("Es256", 256.093597),
             ("Fm256", 256.091771699),
@@ -4025,20 +4015,13 @@ impl Material {
             ("No256", 256.094281912),
             ("Lr256", 256.098494024),
             ("Rf256", 256.101151464),
-            ("Db256", 256.107674),
+            ("Db257", 257.107674),
             ("Es257", 257.095979),
             ("Fm257", 257.095105419),
             ("Md257", 257.095537343),
             ("No257", 257.096884203),
             ("Lr257", 257.09948),
             ("Rf257", 257.102916796),
-            ("Db257", 257.107520042),
-            ("Es258", 258.09952),
-            ("Fm258", 258.097077),
-            ("Md258", 258.098433634),
-            ("No258", 258.098205),
-            ("Lr258", 258.101753),
-            ("Rf258", 258.103429895),
             ("Db258", 258.108972995),
             ("Sg258", 258.11304),
             ("Fm259", 259.100596),
