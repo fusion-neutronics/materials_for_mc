@@ -679,26 +679,16 @@ impl Material {
             }
         }
         
-        // Hard-coded atomic masses (in g/mol) for common nuclides
-        let mut atomic_masses = HashMap::new();
-        
-        // Lithium isotopes
-        atomic_masses.insert(String::from("Li6"), 6.01512288742);
-        atomic_masses.insert(String::from("Li7"), 7.016004);
-        
-        
-        // Avogadro's number (atoms/mol)
-        const AVOGADRO: f64 = 6.02214076e23;
-        
+        // Use canonical atomic masses from crate::data::ATOMIC_MASSES
+        let atomic_masses = &crate::data::ATOMIC_MASSES;
         // First, get the atomic masses for all nuclides
         let mut nuclide_masses = HashMap::new();
         for (nuclide, _) in &self.nuclides {
-            let mass = if let Some(mass_value) = atomic_masses.get(nuclide) {
+            let mass = if let Some(mass_value) = atomic_masses.get(nuclide.as_str()) {
                 *mass_value
             } else {
                 panic!("Atomic mass for nuclide '{}' not found in the database", nuclide);
             };
-            
             nuclide_masses.insert(nuclide.clone(), mass);
         }
         
@@ -721,6 +711,7 @@ impl Material {
             
             // For a mixture, use the formula:
             // atom_density = density * N_A / avg_molar_mass * normalized_fraction * 1e-24
+            const AVOGADRO: f64 = 6.02214076e23;
             let atom_density = density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
             
             atoms_per_cc.insert(nuclide.clone(), atom_density);
