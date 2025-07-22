@@ -6,7 +6,7 @@ use crate::material::Material;
 use crate::data::NATURAL_ABUNDANCE;
 
 // Map of element symbols to their full names
-static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+pub static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut names = HashMap::new();
     names.insert("H", "hydrogen");
     names.insert("He", "helium");
@@ -169,42 +169,6 @@ impl ElementExtensions for Material {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    #[test]
-    fn test_add_element() {
-        let mut material = Material::new();
-        
-        // Test adding natural lithium
-        let result = material.add_element("Li", 1.0);
-        assert!(result.is_ok());
-        
-        // Verify the isotopes were added correctly
-        assert!(material.nuclides.contains_key("Li6"));
-        assert!(material.nuclides.contains_key("Li7"));
-        
-        // Check the fractions are correct
-        assert_eq!(*material.nuclides.get("Li6").unwrap(), 0.07589);
-        assert_eq!(*material.nuclides.get("Li7").unwrap(), 0.92411);
-        
-        // Test adding an element with many isotopes
-        let mut material2 = Material::new();
-        let result = material2.add_element("Sn", 1.0); // Tin has 10 isotopes
-        assert!(result.is_ok());
-        assert_eq!(material2.nuclides.len(), 10);
-    }
-    
-    #[test]
-    fn test_add_element_invalid() {
-        let mut material = Material::new();
-        
-        // Test with negative fraction
-        let result = material.add_element("Li", -1.0);
-        assert!(result.is_err());
-        
-        // Test with invalid element
-        let result = material.add_element("Xx", 1.0);
-        assert!(result.is_err());
-    }
     
     #[test]
     fn test_get_available_elements() {

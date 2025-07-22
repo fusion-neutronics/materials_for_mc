@@ -101,4 +101,4 @@ def test_add_element_not_found():
     mat = Material()
     with pytest.raises(Exception) as excinfo:
         mat.add_element('Xx', 1.0)
-    assert 'not found' in str(excinfo.value)
+    assert 'not a recognized element symbol' in str(excinfo.value)

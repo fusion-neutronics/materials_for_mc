@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
-use crate::data::NATURAL_ABUNDANCE;
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -732,6 +731,10 @@ impl Material {
     }
 
     pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), String> {
+        if fraction <= 0.0 {
+            return Err(String::from("Fraction must be positive"));
+        }
+
         // Get the element symbol in proper case (first letter uppercase, rest lowercase)
         let element_sym = if element.len() >= 2 {
             let mut e = element.to_lowercase();
@@ -740,6 +743,11 @@ impl Material {
         } else {
             element.to_uppercase()
         };
+
+        // Check if the element symbol is canonical
+        if !crate::element::ELEMENT_NAMES.contains_key(element_sym.as_str()) {
+            return Err(format!("Element '{}' is not a recognized element symbol", element));
+        }
 
         // Get the isotopes for this element
         let element_isotopes = crate::element::get_element_isotopes();

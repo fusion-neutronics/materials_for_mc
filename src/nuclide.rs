@@ -332,6 +332,7 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
 }
 
 // Read a nuclide from a JSON string
+#[allow(dead_code)]
 pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn std::error::Error>> {
     // Parse the JSON string
     let json_value: serde_json::Value = serde_json::from_str(json_content)?;
