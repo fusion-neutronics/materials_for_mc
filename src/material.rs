@@ -171,79 +171,56 @@ impl Material {
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
     /// 
     /// This method interpolates the microscopic cross sections for each nuclide
-    /// onto the unified energy grid for all available MT reactions.
+    /// onto the unified energy grid for all available MT reactions, or only for the specified MTs if provided.
     /// If unified_energy_grid is None, it will use the cached grid or build a new one.
+    /// If mt_filter is Some, only those MTs will be included (by string match).
     /// Returns a nested HashMap: nuclide -> mt -> cross_section values
     pub fn calculate_microscopic_xs_neutron(
         &mut self,
         unified_energy_grid: Option<&[f64]>,
+        mt_filter: Option<&Vec<String>>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
         // Get the grid (either from parameter or from cache/build)
         let grid = match unified_energy_grid {
             Some(grid) => grid.to_vec(),
             None => self.unified_energy_grid_neutron(),
         };
-        
         let mut micro_xs: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
         let temp_with_k = format!("{}K", temperature);
-        
-        println!("Calculating microscopic cross sections for temperature: {} (or {})", temperature, temp_with_k);
-        
         for nuclide in self.nuclides.keys() {
             let mut nuclide_xs = HashMap::new();
-            
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
-                println!("Processing nuclide: {}", nuclide);
-                
-                // Try to get reactions for this temperature
                 let temp_reactions = nuclide_data.reactions.get(temperature)
                     .or_else(|| nuclide_data.reactions.get(&temp_with_k));
-                
                 if let Some(temp_reactions) = temp_reactions {
-                    println!("Found reactions for temperature");
-                    
-                    // Get the energy grid for this nuclide and temperature
                     if let Some(energy_map) = &nuclide_data.energy {
                         let energy_grid = energy_map.get(temperature)
                             .or_else(|| energy_map.get(&temp_with_k));
-                        
                         if let Some(energy_grid) = energy_grid {
-                            println!("Found energy grid for temperature");
-                            
-                            // Process all MT reactions using the shared energy grid
-                            for (mt, reaction) in temp_reactions {
-                                println!("Processing MT: {}", mt);
-                                
-                                // Create a vector to store interpolated cross sections
+                            // Only process the requested MTs if mt_filter is Some
+                            let mt_iter: Box<dyn Iterator<Item = (&String, &crate::nuclide::Reaction)>> =
+                                if let Some(mt_list) = mt_filter {
+                                    Box::new(temp_reactions.iter().filter(move |(k, _)| mt_list.contains(k)))
+                                } else {
+                                    Box::new(temp_reactions.iter())
+                                };
+                            for (mt, reaction) in mt_iter {
                                 let mut xs_values = Vec::with_capacity(grid.len());
-                                
-                                // Create a subslice of the energy grid starting at threshold_idx
                                 let threshold_idx = reaction.threshold_idx;
                                 let reaction_energy = if threshold_idx < energy_grid.len() {
                                     &energy_grid[threshold_idx..]
                                 } else {
-                                    // If threshold is past the end of the grid, this reaction doesn't exist
-                                    println!("Warning: threshold_idx {} is beyond energy grid length {}", threshold_idx, energy_grid.len());
                                     continue;
                                 };
-                                
-                                // Make sure the reaction xs has the right length
                                 if reaction.cross_section.len() != reaction_energy.len() {
-                                    // Mismatch between energy grid and cross section array lengths
-                                    println!("Warning: cross section length {} doesn't match energy grid length {} for nuclide {} MT {}", 
-                                            reaction.cross_section.len(), reaction_energy.len(), nuclide, mt);
                                     continue;
                                 }
-                                
-                                // Interpolate cross sections onto unified grid
                                 for &grid_energy in &grid {
-                                    // If the energy is below threshold, xs is 0
                                     if grid_energy < reaction_energy[0] {
                                         xs_values.push(0.0);
                                     } else {
@@ -251,35 +228,16 @@ impl Material {
                                         xs_values.push(xs);
                                     }
                                 }
-                                
                                 nuclide_xs.insert(mt.clone(), xs_values);
                             }
-                        } else {
-                            println!("No energy grid found for temperature {} or {}", temperature, temp_with_k);
-                            
-                            // Print available temperatures
-                            println!("Available temperatures in energy map: {:?}", energy_map.keys().collect::<Vec<_>>());
                         }
-                    } else {
-                        println!("No energy grid found for nuclide");
                     }
-                } else {
-                    println!("No reactions found for temperature {} or {}", temperature, temp_with_k);
-                    
-                    // Print available temperatures
-                    println!("Available temperatures in reactions: {:?}", nuclide_data.reactions.keys().collect::<Vec<_>>());
                 }
-            } 
-            
-            // Only add the nuclide if we found cross section data
+            }
             if !nuclide_xs.is_empty() {
-                println!("Adding microscopic cross sections for nuclide: {} with {} MT values", nuclide, nuclide_xs.len());
                 micro_xs.insert(nuclide.clone(), nuclide_xs);
-            } else {
-                println!("No cross sections found for nuclide: {}", nuclide);
             }
         }
-        
         micro_xs
     }
                                
@@ -299,7 +257,7 @@ impl Material {
         }
         
         // First get microscopic cross sections on the unified grid
-        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid);
+        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid, None);
         
         // Create a map to hold macroscopic cross sections for each MT
         let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
@@ -1239,7 +1197,7 @@ mod tests {
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections
-        let micro_xs = material.calculate_microscopic_xs_neutron(Some(&grid));
+        let micro_xs = material.calculate_microscopic_xs_neutron(Some(&grid), None);
         // Check that both Li6 and Li7 are present
         assert!(micro_xs.contains_key("Li6"));
         assert!(micro_xs.contains_key("Li7"));
@@ -1266,7 +1224,7 @@ mod tests {
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for the material
-        let micro_xs_mat = material.calculate_microscopic_xs_neutron(Some(&grid));
+        let micro_xs_mat = material.calculate_microscopic_xs_neutron(Some(&grid), None);
         // Get the nuclide directly
         let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
         let temperature = &material.temperature;
@@ -1306,6 +1264,37 @@ mod tests {
                     assert!((a - b).abs() < tol, "Mismatch for MT {}: {} vs {}", mt, a, b);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_calculate_microscopic_xs_neutron_mt_filter() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        // Prepare the nuclide JSON map for Li6 and Li7
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        // Read in the nuclear data
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        // Build the unified energy grid
+        let grid = material.unified_energy_grid_neutron();
+        // Calculate microscopic cross sections for all MTs
+        let micro_xs_all = material.calculate_microscopic_xs_neutron(Some(&grid), None);
+        // Calculate microscopic cross sections for only MT="2"
+        let mt_filter = vec!["2".to_string()];
+        let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&grid), Some(&mt_filter));
+        // For each nuclide, only MT="2" should be present
+        for nuclide in &["Li6", "Li7"] {
+            assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
+            let xs_map = &micro_xs_mt2[*nuclide];
+            assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
+            assert!(xs_map.contains_key("2"), "Filtered result for {} missing MT=2", nuclide);
+            // The cross section array for MT=2 should match the unfiltered result
+            let xs_all = &micro_xs_all[*nuclide]["2"];
+            let xs_filtered = &xs_map["2"];
+            assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 xs do not match for {}", nuclide);
         }
     }
 } // close mod tests

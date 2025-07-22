@@ -208,3 +208,24 @@ def test_material_vs_nuclide_microscopic_xs_li6():
             # Compare arrays (allow small tolerance)
             np.testing.assert_allclose(xs_mat, xs_nuclide_interp, rtol=1e-10, err_msg=f"Mismatch for MT {mt}")
 
+
+def test_calculate_microscopic_xs_neutron_mt_filter():
+    mat = Material()
+    mat.add_element("Li", 1.0)
+    # Set up the nuclide JSON map for Li6 and Li7
+    nuclide_json_map = {"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"}
+    mat.read_nuclides_from_json(nuclide_json_map)
+    # Build the unified energy grid
+    grid = mat.unified_energy_grid_neutron()
+    # Calculate all MTs
+    xs_all = mat.calculate_microscopic_xs_neutron(grid)
+    # Calculate only MT=2
+    xs_mt2 = mat.calculate_microscopic_xs_neutron(grid, mt_filter=["2"])
+    # For each nuclide, only MT=2 should be present and match the unfiltered result
+    for nuclide in ["Li6", "Li7"]:
+        assert nuclide in xs_mt2, f"{nuclide} missing in filtered result"
+        xs_map = xs_mt2[nuclide]
+        assert list(xs_map.keys()) == ["2"], f"Filtered result for {nuclide} should have only MT=2"
+        xs_all_mt2 = xs_all[nuclide]["2"]
+        xs_filtered = xs_map["2"]
+        assert xs_all_mt2 == xs_filtered, f"Filtered and unfiltered MT=2 xs do not match for {nuclide}"
