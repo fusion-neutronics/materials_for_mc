@@ -202,6 +202,14 @@ impl PyMaterial {
             .add_element(&element, fraction)
             .map_err(|e| PyValueError::new_err(e))
     }
+
+    /// Get the sorted list of all unique MT numbers available in this material (across all nuclides)
+    #[getter]
+    fn reaction_mts(&mut self) -> PyResult<Vec<String>> {
+        self.internal
+            .reaction_mts()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 }
 
 
