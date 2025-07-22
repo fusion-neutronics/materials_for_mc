@@ -144,13 +144,16 @@ impl PyMaterial {
 
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
     /// If unified_energy_grid is None or not provided, it will use the cached grid or build a new one
-    #[pyo3(signature = (unified_energy_grid=None))]
+    /// If mt_filter is provided, only those MTs will be included (by string match)
+    #[pyo3(signature = (unified_energy_grid=None, mt_filter=None))]
     fn calculate_microscopic_xs_neutron(
         &mut self,
         unified_energy_grid: Option<Vec<f64>>,
+        mt_filter: Option<Vec<String>>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         let grid_ref = unified_energy_grid.as_ref().map(|g| g.as_slice());
-        self.internal.calculate_microscopic_xs_neutron(grid_ref)
+        let mt_filter_ref = mt_filter.as_ref();
+        self.internal.calculate_microscopic_xs_neutron(grid_ref, mt_filter_ref)
     }
 
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
