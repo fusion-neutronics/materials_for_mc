@@ -729,6 +729,36 @@ impl Material {
         
         atoms_per_cc
     }
+
+    pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), String> {
+        // Get the element symbol in proper case (first letter uppercase, rest lowercase)
+        let element_sym = if element.len() >= 2 {
+            let mut e = element.to_lowercase();
+            e.replace_range(0..1, &element[0..1].to_uppercase());
+            e
+        } else {
+            element.to_uppercase()
+        };
+
+        // Get the isotopes for this element
+        let element_isotopes = crate::element::get_element_isotopes();
+
+        // Check if the element exists in our database
+        let isotopes = element_isotopes.get(element_sym.as_str()).ok_or_else(|| {
+            format!("Element '{}' not found in the natural abundance database", element)
+        })?;
+
+        // Add each isotope with its natural abundance
+        for &isotope in isotopes {
+            let abundance = crate::element::NATURAL_ABUNDANCE.get(isotope).unwrap();
+            let isotope_fraction = fraction * abundance;
+            // Only add isotopes with non-zero fractions
+            if isotope_fraction > 0.0 {
+                self.add_nuclide(isotope, isotope_fraction)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
