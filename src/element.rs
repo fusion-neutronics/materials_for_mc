@@ -39,41 +39,36 @@ pub fn get_element_isotopes() -> HashMap<&'static str, Vec<&'static str>> {
     element_isotopes
 }
 
-/// Extension trait for Material to add element-related functionality
-pub trait ElementExtensions {
-    /// Get the list of available elements
-    fn get_available_elements() -> Vec<String>;
-}
-
-impl ElementExtensions for Material {
-    /// Get the list of available elements
-    fn get_available_elements() -> Vec<String> {
-        let element_isotopes = get_element_isotopes();
-        let mut elements: Vec<String> = element_isotopes.keys()
-            .map(|&elem| elem.to_string())
-            .collect();
-        elements.sort();
-        elements
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_get_available_elements() {
-        let elements = Material::get_available_elements();
-        
-        // Check that some common elements are in the list
-        assert!(elements.contains(&"H".to_string()));
-        assert!(elements.contains(&"He".to_string()));
-        assert!(elements.contains(&"Li".to_string()));
-        assert!(elements.contains(&"U".to_string()));
-        
-        // Check that the list is sorted
-        let mut sorted_elements = elements.clone();
-        sorted_elements.sort();
-        assert_eq!(elements, sorted_elements);
+    fn test_get_element_isotopes_lithium() {
+        let element_isotopes = get_element_isotopes();
+        let li_isotopes = element_isotopes.get("Li").expect("Li should be present");
+        // Lithium should have Li6 and Li7
+        assert!(li_isotopes.contains(&"Li6"));
+        assert!(li_isotopes.contains(&"Li7"));
+        assert_eq!(li_isotopes.len(), 2);
+    }
+
+    #[test]
+    fn test_get_element_isotopes_tin() {
+        let element_isotopes = get_element_isotopes();
+        let sn_isotopes = element_isotopes.get("Sn").expect("Sn should be present");
+        // Tin has 10 stable isotopes
+        let expected = ["Sn112","Sn114","Sn115","Sn116","Sn117","Sn118","Sn119","Sn120","Sn122","Sn124"];
+        for iso in &expected {
+            assert!(sn_isotopes.contains(iso), "{} should be in Sn isotopes", iso);
+        }
+        assert_eq!(sn_isotopes.len(), expected.len());
+    }
+
+    #[test]
+    fn test_get_element_isotopes_nonexistent() {
+        let element_isotopes = get_element_isotopes();
+        assert!(element_isotopes.get("Xx").is_none());
     }
 }
+

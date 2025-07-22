@@ -1,4 +1,4 @@
-name: Test usage with Rust
+name: Test usage with WASM
 
 on:
   push:
