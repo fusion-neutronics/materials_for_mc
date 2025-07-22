@@ -1133,6 +1133,25 @@ mod tests {
     }
 
     #[test]
+    fn test_mean_free_path_lithium_14mev() {
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        material.set_density("g/cm3", 0.534).unwrap(); // lithium density
+        // Set up mock cross section data for 14 MeV (1.4e7 eV)
+        // We'll use a simple grid and cross section for demonstration
+        let energy_grid = vec![1e6, 1.4e7, 1e8]; // eV
+        let total_xs = vec![1.0, 0.5, 0.2]; // barns * atoms/cm³, so cm⁻¹
+        material.unified_energy_grid_neutron = energy_grid.clone();
+        material.macroscopic_xs_neutron.insert("total".to_string(), total_xs.clone());
+        // 14 MeV = 1.4e7 eV
+        let mfp = material.mean_free_path_neutron(1.4e7);
+        assert!(mfp.is_some());
+        let mfp_val = mfp.unwrap();
+        // At 14 MeV, total_xs = 0.5, so mean free path = 1/0.5 = 2.0 cm
+        assert!((mfp_val - 2.0).abs() < 1e-6, "Expected 2.0 cm, got {}", mfp_val);
+    }
+
+    #[test]
     fn test_add_element() {
         let mut material = Material::new();
         // Test adding natural lithium

@@ -112,3 +112,20 @@ def test_add_element_not_found():
     with pytest.raises(Exception) as excinfo:
         mat.add_element('Xx', 1.0)
     assert 'not a recognized element symbol' in str(excinfo.value)
+
+def test_mean_free_path_lithium_14mev():
+    from materials_for_mc import Config
+    import math
+    mat = Material()
+    mat.add_element('Li', 1.0)
+    mat.set_density('g/cm3', 0.534)  # lithium density
+    # Set up real cross-section data for both Li6 and Li7
+    Config.set_cross_sections({
+        "Li6": "tests/li6_neutron.json",
+        "Li7": "tests/li7_neutron.json"
+    })
+    # This will trigger loading and calculation
+    mfp = mat.mean_free_path_neutron(14e6)
+    assert mfp is not None
+    # The expected value is about 14.963768069986559 cm at 14 MeV (checked with openmc)
+    assert math.isclose(mfp, 14.96376919723369, rel_tol=1e-9), f"Expected ~2.5 cm, got {mfp}"
