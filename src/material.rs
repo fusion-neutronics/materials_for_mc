@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
+use crate::data::ELEMENT_NAMES;
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -345,11 +346,11 @@ impl Material {
         
         // Calculate macroscopic cross section for each MT
         // Get atoms per cc for all nuclides
-        let atoms_per_cc_map = self.get_atoms_per_cc();
+        let atoms_per_bcm_map = self.get_atoms_per_cc();
         
         for (nuclide, _) in &self.nuclides {
             if let Some(nuclide_data) = micro_xs.get(nuclide) {
-                if let Some(atoms_per_bcm) = atoms_per_cc_map.get(nuclide) {
+                if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
                     // Add contribution to macroscopic cross section for each MT
                     for (mt, xs_values) in nuclide_data {
                         // Convert MT integer to string for storage in the hashmap
@@ -729,6 +730,61 @@ impl Material {
         
         atoms_per_cc
     }
+
+    pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), String> {
+        if fraction <= 0.0 {
+            return Err(String::from("Fraction must be positive"));
+        }
+
+        // Canonicalize input: trim only (do not lowercase or otherwise change user input)
+        let input = element.trim();
+
+        // Try to match as symbol (case-sensitive, exact match)
+        let mut found_symbol: Option<String> = None;
+        for (symbol, name) in ELEMENT_NAMES.iter() {
+            if *symbol == input {
+                found_symbol = Some(symbol.to_string());
+                break;
+            }
+        }
+        // If not found as symbol, try to match as name (case-sensitive, exact match)
+        if found_symbol.is_none() {
+            for (symbol, name) in ELEMENT_NAMES.iter() {
+                if *name == input {
+                    found_symbol = Some(symbol.to_string());
+                    break;
+                }
+            }
+        }
+        let element_sym = match found_symbol {
+            Some(sym) => sym,
+            None => {
+                return Err(format!(
+                    "Element '{}' is not a recognized element symbol or name (case-sensitive, must match exactly)",
+                    element
+                ));
+            }
+        };
+
+        // Get the isotopes for this element
+        let element_isotopes = crate::element::get_element_isotopes();
+
+        // Check if the element exists in our database
+        let isotopes = element_isotopes.get(element_sym.as_str()).ok_or_else(|| {
+            format!("Element '{}' not found in the natural abundance database", element_sym)
+        })?;
+
+        // Add each isotope with its natural abundance
+        for &isotope in isotopes {
+            let abundance = crate::data::NATURAL_ABUNDANCE.get(isotope).unwrap();
+            let isotope_fraction = fraction * abundance;
+            // Only add isotopes with non-zero fractions
+            if isotope_fraction > 0.0 {
+                self.add_nuclide(isotope, isotope_fraction)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1074,6 +1130,62 @@ mod tests {
         // Test outside of range (should use endpoint value)
         assert_eq!(material.mean_free_path_neutron(0.1), Some(1.0)); // Below range
         assert_eq!(material.mean_free_path_neutron(1e9), Some(256.0)); // Above range
+    }
+
+    #[test]
+    fn test_add_element() {
+        let mut material = Material::new();
+        // Test adding natural lithium
+        let result = material.add_element("Li", 1.0);
+        assert!(result.is_ok());
+        // Verify the isotopes were added correctly
+        assert!(material.nuclides.contains_key("Li6"));
+        assert!(material.nuclides.contains_key("Li7"));
+        // Check the fractions are correct
+        assert_eq!(*material.nuclides.get("Li6").unwrap(), 0.07589);
+        assert_eq!(*material.nuclides.get("Li7").unwrap(), 0.92411);
+        // Test adding an element with many isotopes
+        let mut material2 = Material::new();
+        let result = material2.add_element("Sn", 1.0); // Tin has 10 isotopes
+        assert!(result.is_ok());
+        assert_eq!(material2.nuclides.len(), 10);
+    }
+
+    #[test]
+    fn test_add_element_invalid() {
+        let mut material = Material::new();
+        // Test with negative fraction
+        let result = material.add_element("Li", -1.0);
+        assert!(result.is_err());
+        // Test with invalid element
+        let result = material.add_element("Xx", 1.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_element_by_symbol_and_name() {
+        let mut material = Material::new();
+        // By symbol (case-sensitive, exact match)
+        assert!(material.add_element("Li", 1.0).is_ok());
+        assert!(material.nuclides.contains_key("Li6"));
+        assert!(material.nuclides.contains_key("Li7"));
+        // By full name (case-sensitive, exact match)
+        let mut material2 = Material::new();
+        assert!(material2.add_element("gold", 1.0).is_ok());
+        assert!(material2.nuclides.contains_key("Au197"));
+        // By full name (lowercase) - should fail
+        let mut material3 = Material::new();
+        assert!(material3.add_element("Lithium", 1.0).is_err());
+        // By symbol (lowercase) - should fail
+        let mut material4 = Material::new();
+        assert!(material4.add_element("li", 1.0).is_err());
+        // By symbol (uppercase) - should fail
+        let mut material5 = Material::new();
+        assert!(material5.add_element("LI", 1.0).is_err());
+        // Invalid name
+        let mut material6 = Material::new();
+        let result = material6.add_element("notanelement", 1.0);
+        assert!(result.is_err());
     }
 
 }

@@ -196,6 +196,12 @@ impl PyMaterial {
     fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
         self.internal.mean_free_path_neutron(energy)
     }
+
+    fn add_element(&mut self, element: String, fraction: f64) -> PyResult<()> {
+        self.internal
+            .add_element(&element, fraction)
+            .map_err(|e| PyValueError::new_err(e))
+    }
 }
 
 

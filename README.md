@@ -53,7 +53,7 @@ The package can be compiled to WebAssembly for use in web browsers:
 ```bash
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --target web --features wasm
-wasm-pack build --target web --features wasm --out-dir examples/wasm/pkg
+cp -r pkg examples/wasm/
 # Serve the demo pages locally
 python -m http.server 8000
 # Open the demo pages in your browser, I use firefox here but others should also work.
@@ -65,6 +65,7 @@ The WebAssembly demos include:
 - Cross section calculation and visualization
 - Predefined materials
 - Interactive plotting with Plotly
+
 
 ## Testing
 

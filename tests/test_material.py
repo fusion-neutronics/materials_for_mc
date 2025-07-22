@@ -84,3 +84,31 @@ def test_material_data_xs_reading():
     
     assert len(material.nuclides) == 1
     assert len(grid) > 0, "Energy grid should not be empty"
+
+def test_add_element_lithium():
+    mat = Material()
+    mat.add_element('Li', 1.0)
+    nuclides = dict(mat.nuclides)
+    # Should contain Li6 and Li7 with correct fractions
+    assert 'Li6' in nuclides
+    assert 'Li7' in nuclides
+    # Natural abundances from IUPAC
+    assert abs(nuclides['Li6'] - 0.07589) < 1e-5
+    assert abs(nuclides['Li7'] - 0.92411) < 1e-5
+    mat = Material()
+
+    mat.add_element('lithium', 1.0)
+    nuclides = dict(mat.nuclides)
+    # Should contain Li6 and Li7 with correct fractions
+    assert 'Li6' in nuclides
+    assert 'Li7' in nuclides
+    # Natural abundances from IUPAC
+    assert abs(nuclides['Li6'] - 0.07589) < 1e-5
+    assert abs(nuclides['Li7'] - 0.92411) < 1e-5
+
+
+def test_add_element_not_found():
+    mat = Material()
+    with pytest.raises(Exception) as excinfo:
+        mat.add_element('Xx', 1.0)
+    assert 'not a recognized element symbol' in str(excinfo.value)
