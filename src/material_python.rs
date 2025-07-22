@@ -198,7 +198,6 @@ impl PyMaterial {
     }
 
     fn add_element(&mut self, element: String, fraction: f64) -> PyResult<()> {
-        use crate::element::ElementExtensions;
         self.internal
             .add_element(&element, fraction)
             .map_err(|e| PyValueError::new_err(e))

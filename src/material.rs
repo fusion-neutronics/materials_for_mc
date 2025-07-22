@@ -736,22 +736,21 @@ impl Material {
             return Err(String::from("Fraction must be positive"));
         }
 
-        // Canonicalize input: trim and lowercase
+        // Canonicalize input: trim only (do not lowercase or otherwise change user input)
         let input = element.trim();
-        let input_lower = input.to_lowercase();
 
-        // Try to match as symbol (case-insensitive)
+        // Try to match as symbol (case-sensitive, exact match)
         let mut found_symbol: Option<String> = None;
         for (symbol, name) in ELEMENT_NAMES.iter() {
-            if symbol.to_lowercase() == input_lower {
+            if *symbol == input {
                 found_symbol = Some(symbol.to_string());
                 break;
             }
         }
-        // If not found as symbol, try to match as name (case-insensitive)
+        // If not found as symbol, try to match as name (case-sensitive, exact match)
         if found_symbol.is_none() {
             for (symbol, name) in ELEMENT_NAMES.iter() {
-                if name.to_lowercase() == input_lower {
+                if *name == input {
                     found_symbol = Some(symbol.to_string());
                     break;
                 }
@@ -761,7 +760,7 @@ impl Material {
             Some(sym) => sym,
             None => {
                 return Err(format!(
-                    "Element '{}' is not a recognized element symbol or name",
+                    "Element '{}' is not a recognized element symbol or name (case-sensitive, must match exactly)",
                     element
                 ));
             }
@@ -1166,28 +1165,26 @@ mod tests {
     #[test]
     fn test_add_element_by_symbol_and_name() {
         let mut material = Material::new();
-        // By symbol (case-insensitive)
-        assert!(material.add_element("li", 1.0).is_ok());
+        // By symbol (case-sensitive, exact match)
+        assert!(material.add_element("Li", 1.0).is_ok());
         assert!(material.nuclides.contains_key("Li6"));
         assert!(material.nuclides.contains_key("Li7"));
-        // By full name (case-insensitive)
+        // By full name (case-sensitive, exact match)
         let mut material2 = Material::new();
-        assert!(material2.add_element("lithium", 1.0).is_ok());
-        assert!(material2.nuclides.contains_key("Li6"));
-        assert!(material2.nuclides.contains_key("Li7"));
-        // By full name (capitalized)
+        assert!(material2.add_element("gold", 1.0).is_ok());
+        assert!(material2.nuclides.contains_key("Au197"));
+        // By full name (lowercase) - should fail
         let mut material3 = Material::new();
-        assert!(material3.add_element("Lithium", 1.0).is_ok());
-        assert!(material3.nuclides.contains_key("Li6"));
-        assert!(material3.nuclides.contains_key("Li7"));
-        // By symbol (capitalized)
+        assert!(material3.add_element("Lithium", 1.0).is_err());
+        // By symbol (lowercase) - should fail
         let mut material4 = Material::new();
-        assert!(material4.add_element("LI", 1.0).is_ok());
-        assert!(material4.nuclides.contains_key("Li6"));
-        assert!(material4.nuclides.contains_key("Li7"));
-        // Invalid name
+        assert!(material4.add_element("li", 1.0).is_err());
+        // By symbol (uppercase) - should fail
         let mut material5 = Material::new();
-        let result = material5.add_element("notanelement", 1.0);
+        assert!(material5.add_element("LI", 1.0).is_err());
+        // Invalid name
+        let mut material6 = Material::new();
+        let result = material6.add_element("notanelement", 1.0);
         assert!(result.is_err());
     }
 
