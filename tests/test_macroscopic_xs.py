@@ -4,7 +4,7 @@ from materials_for_mc import Material, Config
 
 def test_macroscopic_xs_neutron():
 
-    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     # Create a material with Li6 and Li7
     material = Material()
     material.add_nuclide("Li6", 0.5)
@@ -40,7 +40,7 @@ def test_macroscopic_xs_neutron():
 
 def test_macroscopic_xs_with_atoms_per_cc():
     # Create a material with Li isotopes that have defined atomic masses
-    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     material = Material()
     material.add_nuclide("Li6", 0.5)
     material.add_nuclide("Li7", 0.5)
@@ -76,7 +76,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
 
 def test_macroscopic_xs_calculation_formula():
     # Create a test material with nuclides that have defined atomic masses
-    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     material = Material()
     material.add_nuclide("Li6", 1.0)  # Using a single nuclide for simplicity
     material.set_density("g/cm3", 1.0)

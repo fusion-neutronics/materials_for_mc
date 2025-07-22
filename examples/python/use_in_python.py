@@ -1,7 +1,7 @@
 import materials_for_mc as m4mc
 m4mc.Config.set_cross_sections({
-    "Li6": "tests/li6_neutron.json",
-    "Li7": "tests/li7_neutron.json"
+    "Li6": "tests/Li6.json",
+    "Li7": "tests/Li7.json"
 })
 
 mat1 = m4mc.Material()

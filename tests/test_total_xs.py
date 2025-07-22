@@ -3,7 +3,7 @@ from materials_for_mc import Material, Config
 
 def test_calculate_total_xs_neutron():
     # Set up global Config
-    Config.set_cross_sections({"Li6": "tests/li6_neutron.json", "Li7": "tests/li7_neutron.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     
     # Create a material
     material = Material()

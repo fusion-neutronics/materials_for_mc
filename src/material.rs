@@ -1198,4 +1198,25 @@ mod tests {
         assert!(result.is_err());
     }
 
-}
+    #[test]
+    fn test_add_element_beryllium_and_iron() {
+        let mut mat_be = Material::new();
+        assert!(mat_be.add_element("Be", 1.0).is_ok());
+        // Beryllium has only one stable isotope
+        assert_eq!(mat_be.nuclides.len(), 1);
+        assert!(mat_be.nuclides.contains_key("Be9"));
+        // Check the fraction is 1.0 for Be9
+        assert_eq!(*mat_be.nuclides.get("Be9").unwrap(), 1.0);
+
+        let mut mat_fe = Material::new();
+        assert!(mat_fe.add_element("Fe", 1.0).is_ok());
+        // Iron has four stable isotopes
+        assert!(mat_fe.nuclides.contains_key("Fe54"));
+        assert!(mat_fe.nuclides.contains_key("Fe56"));
+        assert!(mat_fe.nuclides.contains_key("Fe57"));
+        assert!(mat_fe.nuclides.contains_key("Fe58"));
+        // Check that the sum of fractions is 1.0 (within tolerance)
+        let sum: f64 = mat_fe.nuclides.values().sum();
+        assert!((sum - 1.0).abs() < 1e-6);
+    }
+} // close mod tests
