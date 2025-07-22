@@ -776,6 +776,24 @@ impl Material {
         }
         Ok(())
     }
+    
+    /// Returns a sorted list of all unique MT numbers available in this material (across all nuclides).
+    /// Ensures all nuclide JSON data is loaded.
+    pub fn reaction_mts(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        // Ensure all nuclides are loaded using the global config
+        self.ensure_nuclides_loaded()?;
+        let mut mt_set = std::collections::HashSet::new();
+        for nuclide in self.nuclide_data.values() {
+            if let Some(mts) = nuclide.reaction_mts() {
+                for mt in mts {
+                    mt_set.insert(mt);
+                }
+            }
+        }
+        let mut mt_vec: Vec<String> = mt_set.into_iter().collect();
+        mt_vec.sort();
+        Ok(mt_vec)
+    }
 }
 
 #[cfg(test)]
@@ -1218,5 +1236,24 @@ mod tests {
         // Check that the sum of fractions is 1.0 (within tolerance)
         let sum: f64 = mat_fe.nuclides.values().sum();
         assert!((sum - 1.0).abs() < 1e-6);
+    }
+    #[test]
+    fn test_material_reaction_mts_lithium() {
+        use crate::material::Material;
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        // Prepare the nuclide JSON map for Li6 and Li7
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        // Read in the nuclear data
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        // This will load Li6 and Li7, so the MTs should be the union of both
+        let mts = material.reaction_mts().expect("Failed to get reaction MTs");
+        let expected = vec![
+            "102", "103", "104", "105", "16", "2", "203", "204", "205", "207", "24", "25", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82"
+        ].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(mts, expected, "Material lithium MT list does not match expected");
     }
 } // close mod tests

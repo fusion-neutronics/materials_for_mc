@@ -368,3 +368,37 @@ pub fn get_or_load_nuclide(
     
     Ok(arc_nuclide)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_reaction_mts_li6() {
+        // Load Li6 nuclide from test JSON
+        let path = Path::new("tests/Li6.json");
+        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let mts = nuclide.reaction_mts().expect("No MTs found");
+        // Example: check that some expected MTs are present (update as needed)
+        // You can update this list to match the actual MTs in your Li6.json
+        let expected = vec!["102", "103", "105", "2", "203", "204", "205", "207", "24", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81"].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        for mt in &expected {
+            assert!(mts.contains(mt), "Expected MT {} in Li6", mt);
+        }
+        // Optionally, check the total number of MTs if you want strictness
+        // assert_eq!(mts.len(), expected.len());
+    }
+
+    #[test]
+    fn test_reaction_mts_li7() {
+        // Load Li7 nuclide from test JSON
+        let path = std::path::Path::new("tests/Li7.json");
+        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li7.json");
+        let mts = nuclide.reaction_mts().expect("No MTs found");
+        let expected = vec![
+            "102", "104", "16", "2", "203", "204", "205", "207", "24", "25", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82"
+        ].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(mts, expected, "Li7 MT list does not match expected");
+    }
+}
