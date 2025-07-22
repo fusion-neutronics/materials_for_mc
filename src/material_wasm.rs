@@ -149,11 +149,11 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
-    pub fn get_available_mt_numbers(&self) -> Array {
-        let result = self.inner.macroscopic_xs_neutron.keys()
-            .map(|k| JsValue::from_str(k))
-            .collect::<Array>();
-        result
+    pub fn reaction_mts(&mut self) -> Result<Array, JsValue> {
+        // Ensure nuclides are loaded and get the sorted MT list
+        let mts = self.inner.reaction_mts()
+            .map_err(|e| JsValue::from_str(&format!("Failed to get MT numbers: {}", e)))?;
+        Ok(mts.into_iter().map(JsValue::from).collect::<Array>())
     }
 
     #[wasm_bindgen]
