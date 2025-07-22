@@ -148,3 +148,63 @@ def test_material_reaction_mts_lithium():
     ]
     assert mts == expected, f"Material lithium MT list does not match expected. Got {mts}"
 
+def test_calculate_microscopic_xs_neutron_lithium():
+    from materials_for_mc import Material, Config
+    mat = Material()
+    mat.add_element('Li', 1.0)
+    Config.set_cross_sections({
+        "Li6": "tests/Li6.json",
+        "Li7": "tests/Li7.json"
+    })
+    grid = mat.unified_energy_grid_neutron()
+    micro_xs = mat.calculate_microscopic_xs_neutron(grid)
+    # Check both Li6 and Li7 are present
+    assert "Li6" in micro_xs
+    assert "Li7" in micro_xs
+    # Check that MT=2 is present for both
+    assert "2" in micro_xs["Li6"]
+    assert "2" in micro_xs["Li7"]
+    # Check that the cross section arrays are the same length as the grid
+    assert len(micro_xs["Li6"]["2"]) == len(grid)
+    assert len(micro_xs["Li7"]["2"]) == len(grid)
+
+def test_material_vs_nuclide_microscopic_xs_li6():
+    from materials_for_mc import Material, Config, Nuclide
+    import numpy as np
+    mat = Material()
+    mat.add_nuclide('Li6', 1.0)
+    Config.set_cross_sections({"Li6": "tests/Li6.json"})
+    grid = mat.unified_energy_grid_neutron()
+    micro_xs_mat = mat.calculate_microscopic_xs_neutron(grid)
+    # Get the nuclide directly
+    nuclide = Nuclide('Li6')
+    nuclide.read_nuclide_from_json('tests/Li6.json')
+    # Get the temperature string used by the material
+    temperature = mat.temperature
+    temp_with_k = f"{temperature}K"
+    # Get reactions and energy grid for nuclide
+    reactions = nuclide.reactions
+    assert reactions is not None, "No reactions for Li6"
+    energy_map = nuclide.energy
+    assert energy_map is not None, "No energy map for Li6"
+    energy_grid = energy_map.get(temperature)
+    assert energy_grid is not None, "No energy grid for Li6"
+    # For each MT in the material, compare the cross sections
+    for mt, xs_mat in micro_xs_mat['Li6'].items():
+        if mt in reactions:
+            reaction = reactions[mt]
+            threshold_idx = reaction.threshold_idx
+            nuclide_energy = energy_grid[threshold_idx:]
+            xs_nuclide = reaction.cross_section
+            # Interpolate nuclide xs onto the material grid
+            xs_nuclide_interp = []
+            for g in grid:
+                if g < nuclide_energy[0]:
+                    xs_nuclide_interp.append(0.0)
+                else:
+                    # Linear interpolation
+                    xs = np.interp(g, nuclide_energy, xs_nuclide)
+                    xs_nuclide_interp.append(xs)
+            # Compare arrays (allow small tolerance)
+            np.testing.assert_allclose(xs_mat, xs_nuclide_interp, rtol=1e-10, err_msg=f"Mismatch for MT {mt}")
+

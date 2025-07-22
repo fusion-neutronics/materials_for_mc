@@ -145,42 +145,23 @@ impl Material {
         let mut all_energies = Vec::new();
         let temperature = &self.temperature;
         let _particle = "neutron"; // This is now specifically for neutrons
-        
-        println!("Building unified energy grid for temperature: {}", temperature);
-        
+
         for nuclide in self.nuclides.keys() {
-            println!("Processing nuclide: {}", nuclide);
-            
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 // Check if there's a top-level energy grid
                 if let Some(energy_map) = &nuclide_data.energy {
-                    println!("Nuclide has top-level energy grid");
-                    
+
                     if let Some(energy_grid) = energy_map.get(temperature) {
-                        println!("Found energy grid for temperature: {}", temperature);
                         all_energies.extend(energy_grid);
-                    } else {
-                        println!("No energy grid found for temperature {}", temperature);
-                        
-                        // Print available temperatures
-                        println!("Available temperatures in energy map: {:?}", energy_map.keys().collect::<Vec<_>>());
                     }
-                } else {
-                    println!("Nuclide does not have top-level energy grid");
                 }
-            } else {
-                println!("No data found for nuclide: {}", nuclide);
             }
         }
-        
-        println!("Total number of energy points collected: {}", all_energies.len());
-        
+
         // Sort and deduplicate
         all_energies.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
         all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
-        
-        println!("Number of unique energy points after deduplication: {}", all_energies.len());
-        
+
         // Cache the result
         self.unified_energy_grid_neutron = all_energies.clone();
         
@@ -288,9 +269,7 @@ impl Material {
                     // Print available temperatures
                     println!("Available temperatures in reactions: {:?}", nuclide_data.reactions.keys().collect::<Vec<_>>());
                 }
-            } else {
-                println!("No nuclide data found for: {}", nuclide);
-            }
+            } 
             
             // Only add the nuclide if we found cross section data
             if !nuclide_xs.is_empty() {
@@ -461,16 +440,13 @@ impl Material {
         for &mt in sum_rules.keys() {
             add_to_processing_order(mt, &sum_rules, &mut processed_set, &mut processing_order);
         }
-        
-        println!("Processing order: {:?}", processing_order);
-        
+
         // Now process in the determined order
         for mt in processing_order {
             let mt_str = mt.to_string();
             
             // Skip if this MT already exists
             if xs_map.contains_key(&mt_str) {
-                println!("MT={} already exists in the cross section data, not recalculating", mt);
                 continue;
             }
             
@@ -484,7 +460,6 @@ impl Material {
             let mut has_constituents = false;
             
             // Sum the constituent MT numbers
-            println!("Calculating MT={} from its constituents", mt);
             for &constituent_mt in &sum_rules[&mt] {
                 let constituent_mt_str = constituent_mt.to_string();
                 if let Some(xs_values) = xs_map.get(&constituent_mt_str) {
@@ -492,21 +467,14 @@ impl Material {
                         mt_xs[i] += xs;
                     }
                     has_constituents = true;
-                    println!("  Added MT={} to the sum", constituent_mt);
                 }
             }
             
             // Only add this MT if at least one constituent was found
             if has_constituents {
-                println!("Adding calculated MT={} to the cross section data", mt);
                 xs_map.insert(mt_str, mt_xs);
-            } else {
-                println!("No constituents found for MT={}, not adding to cross section data", mt);
             }
         }
-        
-        println!("Finished hierarchical MT calculation");
-        println!("Final MT numbers: {:?}", xs_map.keys().collect::<Vec<_>>());
     }
     
     /// Calculate the total cross section for neutrons using MT=2 + MT=3
@@ -1255,5 +1223,89 @@ mod tests {
             "102", "103", "104", "105", "16", "2", "203", "204", "205", "207", "24", "25", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82"
         ].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert_eq!(mts, expected, "Material lithium MT list does not match expected");
+    }
+
+    #[test]
+    fn test_calculate_microscopic_xs_neutron_lithium() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        // Prepare the nuclide JSON map for Li6 and Li7
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        // Read in the nuclear data
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        // Build the unified energy grid
+        let grid = material.unified_energy_grid_neutron();
+        // Calculate microscopic cross sections
+        let micro_xs = material.calculate_microscopic_xs_neutron(Some(&grid));
+        // Check that both Li6 and Li7 are present
+        assert!(micro_xs.contains_key("Li6"));
+        assert!(micro_xs.contains_key("Li7"));
+        // Check that for a known MT (e.g., "2"), both nuclides have cross section data
+        let mt = "2";
+        assert!(micro_xs["Li6"].contains_key(mt), "Li6 missing MT=2");
+        assert!(micro_xs["Li7"].contains_key(mt), "Li7 missing MT=2");
+        // Check that the cross section arrays are the same length as the grid
+        assert_eq!(micro_xs["Li6"][mt].len(), grid.len());
+        assert_eq!(micro_xs["Li7"][mt].len(), grid.len());
+    }
+
+    #[test]
+    fn test_material_vs_nuclide_microscopic_xs_li6() {
+        use std::collections::HashMap;
+        use crate::nuclide::{get_or_load_nuclide};
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        // Prepare the nuclide JSON map for Li6
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        // Read in the nuclear data
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        // Build the unified energy grid
+        let grid = material.unified_energy_grid_neutron();
+        // Calculate microscopic cross sections for the material
+        let micro_xs_mat = material.calculate_microscopic_xs_neutron(Some(&grid));
+        // Get the nuclide directly
+        let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
+        let temperature = &material.temperature;
+        let temp_with_k = format!("{}K", temperature);
+        // Get reactions and energy grid for nuclide
+        let reactions = nuclide.reactions.get(temperature)
+            .or_else(|| nuclide.reactions.get(&temp_with_k))
+            .expect("No reactions for Li6");
+        let energy_map = nuclide.energy.as_ref().expect("No energy map for Li6");
+        let energy_grid = energy_map.get(temperature)
+            .or_else(|| energy_map.get(&temp_with_k))
+            .expect("No energy grid for Li6");
+        // For each MT in the material, compare the cross sections
+        for (mt, xs_mat) in &micro_xs_mat["Li6"] {
+            // Only compare if MT exists in nuclide
+            if let Some(reaction) = reactions.get(mt) {
+                let threshold_idx = reaction.threshold_idx;
+                let nuclide_energy = if threshold_idx < energy_grid.len() {
+                    &energy_grid[threshold_idx..]
+                } else {
+                    continue;
+                };
+                let xs_nuclide = &reaction.cross_section;
+                // Interpolate nuclide xs onto the material grid
+                let mut xs_nuclide_interp = Vec::with_capacity(grid.len());
+                for &g in &grid {
+                    if g < nuclide_energy[0] {
+                        xs_nuclide_interp.push(0.0);
+                    } else {
+                        let xs = crate::utilities::interpolate_linear(nuclide_energy, xs_nuclide, g);
+                        xs_nuclide_interp.push(xs);
+                    }
+                }
+                // Compare arrays (allow small tolerance)
+                let tol = 1e-10;
+                for (a, b) in xs_mat.iter().zip(xs_nuclide_interp.iter()) {
+                    assert!((a - b).abs() < tol, "Mismatch for MT {}: {} vs {}", mt, a, b);
+                }
+            }
+        }
     }
 } // close mod tests
