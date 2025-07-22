@@ -95,3 +95,6 @@ pub use nuclide_wasm::*;
 pub use reaction_wasm::*;
 #[cfg(feature = "wasm")]
 pub use element_wasm::*;
+
+// Declare the data module
+pub mod data;

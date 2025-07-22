@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
+use crate::data::NATURAL_ABUNDANCE;
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -750,7 +751,7 @@ impl Material {
 
         // Add each isotope with its natural abundance
         for &isotope in isotopes {
-            let abundance = crate::element::NATURAL_ABUNDANCE.get(isotope).unwrap();
+            let abundance = crate::data::NATURAL_ABUNDANCE.get(isotope).unwrap();
             let isotope_fraction = fraction * abundance;
             // Only add isotopes with non-zero fractions
             if isotope_fraction > 0.0 {
