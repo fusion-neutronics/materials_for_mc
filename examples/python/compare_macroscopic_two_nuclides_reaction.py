@@ -12,7 +12,7 @@ openmc_energies, openmc_xs = openmc.calculate_cexs(mat, [2], temperature=294)
 openmc_xs=openmc_xs[0]
 
 
-m4mc.Config.set_cross_sections({'Li6':'tests/li6_neutron.json', 'Li7':'tests/li7_neutron.json'})
+m4mc.Config.set_cross_sections({'Li6':'tests/li6.json', 'Li7':'tests/Li7.json'})
 mat1 = m4mc.Material()
 mat1.add_element('lithium', 1.0)
 mat1.set_density('g/cm3',20.)

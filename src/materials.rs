@@ -217,7 +217,7 @@ mod tests {
 
         // Prepare nuclide JSON map (adjust path as needed)
         let mut nuclide_json_map = HashMap::new();
-        nuclide_json_map.insert("Li6".to_string(), "tests/li6_neutron.json".to_string());
+        nuclide_json_map.insert("Li6".to_string(), "tests/li6.json".to_string());
 
         // Create a Materials collection and add many materials referencing the same nuclide
         let mut materials = super::Materials::new();
