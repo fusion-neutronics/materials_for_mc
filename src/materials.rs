@@ -142,24 +142,6 @@ impl Materials {
         
         Ok(())
     }
-
-    /// Returns a sorted list of all unique MT numbers available in this material (across all nuclides).
-    /// Ensures all nuclide JSON data is loaded.
-    pub fn reaction_mts(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        // Ensure all nuclides are loaded using the global config
-        self.ensure_nuclides_loaded()?;
-        let mut mt_set = std::collections::HashSet::new();
-        for nuclide in self.nuclide_data.values() {
-            if let Some(mts) = nuclide.reaction_mts() {
-                for mt in mts {
-                    mt_set.insert(mt);
-                }
-            }
-        }
-        let mut mt_vec: Vec<String> = mt_set.into_iter().collect();
-        mt_vec.sort();
-        Ok(mt_vec)
-    }
 }
 
 impl Default for Materials {
