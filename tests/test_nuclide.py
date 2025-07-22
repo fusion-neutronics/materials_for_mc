@@ -2,7 +2,7 @@ from materials_for_mc import Nuclide
 
 def test_read_li6_nuclide():
     nuc1 = Nuclide('Li6')
-    nuc1.read_nuclide_from_json('tests/li6.json')
+    nuc1.read_nuclide_from_json('tests/Li6.json')
     assert nuc1.element.lower() == 'lithium'
     assert nuc1.atomic_symbol == "Li"
     assert nuc1.atomic_number == 3

@@ -3,7 +3,7 @@ import pytest
 
 def test_read_li6_nuclide_new_format():
     nuc1 = Nuclide('Li6')
-    nuc1.read_nuclide_from_json('tests/li6.json')
+    nuc1.read_nuclide_from_json('tests/Li6.json')
     assert nuc1.atomic_symbol == "Li"
     assert nuc1.atomic_number == 3  # Using the field from the new format
     assert nuc1.mass_number == 6

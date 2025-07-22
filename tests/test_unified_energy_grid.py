@@ -3,7 +3,7 @@ from materials_for_mc import Material, Config
 
 def test_unified_energy_grid_neutron():
     # Set up global Config
-    Config.set_cross_sections({"Li6": "tests/li6.json", "Li7": "tests/Li7.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     
     material = Material()
     material.add_nuclide("Li6", 1.0)

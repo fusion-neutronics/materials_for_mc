@@ -36,7 +36,7 @@ def test_materials_data_reading():
     from materials_for_mc import Config
     
     # Set the cross-section paths in the global Config
-    Config.set_cross_sections({"Li6": "tests/li6.json", "Li7": "tests/Li7.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     
     material1 = Material()
     material1.add_nuclide("Li6", 1.0)

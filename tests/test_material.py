@@ -70,10 +70,10 @@ def test_material_data_xs_reading():
     
     # Print the current working directory and check if the file exists
     print(f"Current working directory: {os.getcwd()}")
-    print(f"File exists: {os.path.exists('tests/li6.json')}")
+    print(f"File exists: {os.path.exists('tests/Li6.json')}")
     
     # Set the cross-section path in the global Config
-    Config.set_cross_sections({"Li6": "tests/li6.json"})
+    Config.set_cross_sections({"Li6": "tests/Li6.json"})
     
     # Print the cross-sections to verify they're set correctly
     print(f"Cross-sections: {Config.get_cross_sections()}")
@@ -121,7 +121,7 @@ def test_mean_free_path_lithium_14mev():
     mat.set_density('g/cm3', 0.534)  # lithium density
     # Set up real cross-section data for both Li6 and Li7
     Config.set_cross_sections({
-        "Li6": "tests/li6.json",
+        "Li6": "tests/Li6.json",
         "Li7": "tests/Li7.json"
     })
     # This will trigger loading and calculation
