@@ -32,7 +32,6 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), JsValue> {
-        use crate::element::ElementExtensions;
         self.inner
             .add_element(element, fraction)
             .map_err(|e| JsValue::from_str(&e))
