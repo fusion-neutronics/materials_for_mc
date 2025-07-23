@@ -229,3 +229,21 @@ def test_calculate_microscopic_xs_neutron_mt_filter():
         xs_all_mt2 = xs_all[nuclide]["2"]
         xs_filtered = xs_map["2"]
         assert xs_all_mt2 == xs_filtered, f"Filtered and unfiltered MT=2 xs do not match for {nuclide}"
+
+def test_macroscopic_xs_neutron_mt_filter():
+    from materials_for_mc import Material
+    mat = Material()
+    mat.add_element("Li", 1.0)
+    mat.read_nuclides_from_json({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
+    mat.set_density("g/cm3", 1.0)
+    grid = mat.unified_energy_grid_neutron()
+    # Calculate all MTs
+    macro_xs_all = mat.calculate_macroscopic_xs_neutron(grid)
+    # Calculate only MT=2
+    macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(grid, mt_filter=["2"])
+    # Only MT=2 should be present in the filtered result
+    assert list(macro_xs_mt2.keys()) == ["2"], "Filtered macro_xs should have only MT=2"
+    # The cross section array for MT=2 should match the unfiltered result
+    xs_all = macro_xs_all["2"]
+    xs_filtered = macro_xs_mt2["2"]
+    assert xs_all == xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match"

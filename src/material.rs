@@ -203,12 +203,13 @@ impl Material {
                             .or_else(|| energy_map.get(&temp_with_k));
                         if let Some(energy_grid) = energy_grid {
                             // Only process the requested MTs if mt_filter is Some
-                            let mt_iter: Box<dyn Iterator<Item = (&String, &crate::nuclide::Reaction)>> =
-                                if let Some(mt_list) = mt_filter {
-                                    Box::new(temp_reactions.iter().filter(move |(k, _)| mt_list.contains(k)))
-                                } else {
-                                    Box::new(temp_reactions.iter())
-                                };
+                            let mt_set: Option<std::collections::HashSet<&String>> = mt_filter.map(|v| v.iter().collect());
+                            let mt_iter = temp_reactions.iter().filter(|(k, _)| {
+                                match &mt_set {
+                                    Some(set) => set.contains(k),
+                                    None => true,
+                                }
+                            });
                             for (mt, reaction) in mt_iter {
                                 let mut xs_values = Vec::with_capacity(grid.len());
                                 let threshold_idx = reaction.threshold_idx;
@@ -247,21 +248,20 @@ impl Material {
     /// 1. Interpolating the microscopic cross sections onto the unified grid
     /// 2. Multiplying by atom density for each nuclide
     /// 3. Summing over all nuclides
+    /// If mt_filter is Some, only those MTs will be included (by string match).
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
         unified_grid: Option<&[f64]>,
+        mt_filter: Option<&Vec<String>>,
     ) -> HashMap<String, Vec<f64>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
-        // First get microscopic cross sections on the unified grid
-        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid, None);
-        
+        // First get microscopic cross sections on the unified grid, passing mt_filter
+        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid, mt_filter);
         // Create a map to hold macroscopic cross sections for each MT
         let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
-        
         // Find all unique MT numbers across all nuclides
         let mut all_mts = std::collections::HashSet::new();
         for nuclide_data in micro_xs.values() {
@@ -269,32 +269,25 @@ impl Material {
                 all_mts.insert(mt.clone());
             }
         }
-        
         // Get the grid length (from any MT reaction of any nuclide, all should have same length)
         let grid_length = micro_xs.values()
             .next()
             .and_then(|nuclide_data| nuclide_data.values().next())
             .map_or(0, |xs| xs.len());
-        
         // Initialize macro_xs with zeros for each MT
         for mt in &all_mts {
             macro_xs.insert(mt.clone(), vec![0.0; grid_length]);
         }
-        
         // Calculate macroscopic cross section for each MT
         // Get atoms per cc for all nuclides
         let atoms_per_bcm_map = self.get_atoms_per_cc();
-        
         for (nuclide, _) in &self.nuclides {
             if let Some(nuclide_data) = micro_xs.get(nuclide) {
                 if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
                     // Add contribution to macroscopic cross section for each MT
                     for (mt, xs_values) in nuclide_data {
-                        // Convert MT integer to string for storage in the hashmap
                         if let Some(macro_values) = macro_xs.get_mut(&mt.to_string()) {
                             for (i, &xs) in xs_values.iter().enumerate() {
-                                // Since atoms_per_bcm is already in atoms/b-cm units, and
-                                // xs is in barns, their product is directly in cm^-1
                                 macro_values[i] += atoms_per_bcm * xs;
                             }
                         }
@@ -302,10 +295,8 @@ impl Material {
                 }
             }
         }
-        
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
-        
         macro_xs
     }
 
@@ -353,9 +344,6 @@ impl Material {
         if grid_length == 0 {
             return;
         }
-        
-        println!("Starting hierarchical MT calculation");
-        println!("Available MT numbers before: {:?}", xs_map.keys().collect::<Vec<_>>());
         
         // Create a dependency graph and processing order
         // We need to process MT numbers in dependency order (leaf nodes first)
@@ -454,7 +442,7 @@ impl Material {
         
         // Get the macroscopic cross sections (calculate if not already done)
         let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
-            self.calculate_macroscopic_xs_neutron(None)
+            self.calculate_macroscopic_xs_neutron(None, None)
         } else {
             self.macroscopic_xs_neutron.clone()
         };
@@ -482,9 +470,6 @@ impl Material {
                 total_xs[i] += xs;
             }
             has_mt2 = true;
-            println!("Added MT=2 (elastic) to total cross section");
-        } else {
-            println!("Warning: MT=2 (elastic) not found in cross section data");
         }
         
         // Add MT=3 (non-elastic)
@@ -494,9 +479,6 @@ impl Material {
                 total_xs[i] += xs;
             }
             has_mt3 = true;
-            println!("Added MT=3 (non-elastic) to total cross section");
-        } else {
-            println!("Warning: MT=3 (non-elastic) not found in cross section data");
         }
         
         // Create a new HashMap with the original data plus the total
@@ -504,10 +486,7 @@ impl Material {
         
         // Only add the total if we found at least one of MT=2 or MT=3
         if has_mt2 || has_mt3 {
-            println!("Adding calculated total cross section to the data");
             result.insert(String::from("total"), total_xs);
-        } else {
-            println!("Warning: Could not calculate total cross section, neither MT=2 nor MT=3 were found");
         }
         
         // Update the cached macroscopic cross sections
@@ -601,7 +580,6 @@ impl Material {
             "kg/m3" => density = density / 1000.0, // Convert kg/m³ to g/cm³
             _ => {
                 // For any other units, just use the value as is, but it may give incorrect results
-                println!("Warning: Unsupported density unit '{}' for atoms_per_cc calculation. Results may be incorrect.", self.density_units);
             }
         }
         
@@ -628,7 +606,6 @@ impl Material {
             weighted_mass_sum += fraction * mass;
         }
         let average_molar_mass = weighted_mass_sum / total_fraction;
-        println!("Average molar mass: {} g/mol", average_molar_mass);
         
         // Calculate atom densities using OpenMC's approach
         for (nuclide, &fraction) in &self.nuclides {
@@ -641,8 +618,6 @@ impl Material {
             let atom_density = density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
             
             atoms_per_cc.insert(nuclide.clone(), atom_density);
-            println!("Calculated atom density for {}: {} atoms/b-cm (fraction: {}, normalized: {}, mass: {} g/mol)", 
-                     nuclide, atom_density, fraction, normalized_fraction, mass);
         }
         
         atoms_per_cc
@@ -1289,12 +1264,75 @@ mod tests {
         for nuclide in &["Li6", "Li7"] {
             assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
             let xs_map = &micro_xs_mt2[*nuclide];
+            // Assert that only the requested MT is present
+            assert!(xs_map.keys().all(|k| k == "2"), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
             assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
-            assert!(xs_map.contains_key("2"), "Filtered result for {} missing MT=2", nuclide);
             // The cross section array for MT=2 should match the unfiltered result
             let xs_all = &micro_xs_all[*nuclide]["2"];
             let xs_filtered = &xs_map["2"];
             assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 xs do not match for {}", nuclide);
         }
     }
+
+    #[test]
+    fn test_calculate_macroscopic_xs_neutron_mt_filter() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        material.set_density("g/cm3", 0.534).unwrap();
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        let grid = material.unified_energy_grid_neutron();
+        // Calculate all MTs
+        let macro_xs_all = material.calculate_macroscopic_xs_neutron(Some(&grid), None);
+        // Calculate only MT=2
+        let mt_filter = vec!["2".to_string()];
+        let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&grid), Some(&mt_filter));
+        // Only MT=2 should be present in the filtered result
+        assert_eq!(macro_xs_mt2.len(), 1, "Filtered macro_xs should have only one MT");
+        assert!(macro_xs_mt2.contains_key("2"), "Filtered macro_xs missing MT=2");
+        // The cross section array for MT=2 should match the unfiltered result
+        let xs_all = &macro_xs_all["2"];
+        let xs_filtered = &macro_xs_mt2["2"];
+        assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match");
+    }
+
+    #[test]
+    fn test_panic_if_no_density_for_macroscopic_xs_and_mean_free_path() {
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+
+        // Prepare the nuclide JSON map for Li6
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        let grid = material.unified_energy_grid_neutron();
+
+        // Should panic when calculating macroscopic cross sections with no density
+        let result = std::panic::catch_unwind(move || {
+            let mut material = material;
+            material.calculate_macroscopic_xs_neutron(Some(&grid), None);
+        });
+        assert!(result.is_err(), "Should panic if density is not set for calculate_macroscopic_xs_neutron");
+
+        // Re-create material for the next test
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material.unified_energy_grid_neutron();
+
+        // Should panic when calculating mean free path with no density
+        let result = std::panic::catch_unwind(move || {
+            let mut material = material;
+            material.mean_free_path_neutron(1e6);
+        });
+        assert!(result.is_err(), "Should panic if density is not set for mean_free_path_neutron");
+    }
+
 } // close mod tests
+
+

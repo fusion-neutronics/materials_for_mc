@@ -1,9 +1,7 @@
 // Provides functionality for working with natural elements and their isotopic abundances
 use std::collections::HashMap;
-use once_cell::sync::Lazy;
 
-use crate::material::Material;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NAMES};
+use crate::data::{NATURAL_ABUNDANCE};
 
 /// Mapping from element symbol to list of isotopes for that element
 pub fn get_element_isotopes() -> HashMap<&'static str, Vec<&'static str>> {
