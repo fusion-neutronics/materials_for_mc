@@ -85,33 +85,30 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
-    pub fn calculate_macroscopic_xs_neutron(&mut self) -> Result<JsValue, JsValue> {
+    pub fn calculate_macroscopic_xs_neutron(&mut self, mt_filter: Option<Array>) -> Result<JsValue, JsValue> {
         // Check preconditions to avoid panics
         if self.inner.density.is_none() {
             return Err(JsValue::from_str("Cannot calculate macroscopic cross sections: Material has no density defined"));
         }
-        
         if self.inner.nuclides.is_empty() {
             return Err(JsValue::from_str("Cannot calculate macroscopic cross sections: Material has no nuclides defined"));
         }
-        
         // First ensure nuclides are loaded using our WASM-specific function
         if let Err(e) = self.ensure_nuclides_loaded() {
             return Err(JsValue::from_str(&format!("{}", e)));
         }
-        
-        // Now it's safer to call the methods
-        let xs = self.inner.calculate_macroscopic_xs_neutron(None);
+        // Convert JS Array to Option<Vec<String>>
+        let mt_filter_vec = mt_filter.map(|arr| {
+            arr.iter().filter_map(|v| v.as_string()).collect::<Vec<String>>()
+        });
+        let xs = self.inner.calculate_macroscopic_xs_neutron(None, mt_filter_vec.as_ref());
         let energy_grid = self.inner.unified_energy_grid_neutron.clone();
-        
         let data = MacroscopicXsResult {
             energy_grid,
             cross_sections: xs,
         };
-        
         let serialized = serde_json::to_string(&data)
             .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))?;
-        
         Ok(JSON::parse(&serialized)
             .map_err(|e| JsValue::from_str(&format!("JSON parse error: {:?}", e)))?)
     }
