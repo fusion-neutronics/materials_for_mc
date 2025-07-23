@@ -234,8 +234,8 @@ def test_macroscopic_xs_neutron_mt_filter():
     from materials_for_mc import Material
     mat = Material()
     mat.add_element("Li", 1.0)
-    nuclide_json_map = {"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"}
-    mat.read_nuclides_from_json(nuclide_json_map)
+    mat.read_nuclides_from_json({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
+    mat.set_density("g/cm3", 1.0)
     grid = mat.unified_energy_grid_neutron()
     # Calculate all MTs
     macro_xs_all = mat.calculate_macroscopic_xs_neutron(grid)

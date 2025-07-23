@@ -444,7 +444,7 @@ impl Material {
         
         // Get the macroscopic cross sections (calculate if not already done)
         let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
-            self.calculate_macroscopic_xs_neutron(None)
+            self.calculate_macroscopic_xs_neutron(None, None)
         } else {
             self.macroscopic_xs_neutron.clone()
         };
