@@ -345,9 +345,6 @@ impl Material {
             return;
         }
         
-        println!("Starting hierarchical MT calculation");
-        println!("Available MT numbers before: {:?}", xs_map.keys().collect::<Vec<_>>());
-        
         // Create a dependency graph and processing order
         // We need to process MT numbers in dependency order (leaf nodes first)
         let mut processing_order = Vec::new();
@@ -473,9 +470,6 @@ impl Material {
                 total_xs[i] += xs;
             }
             has_mt2 = true;
-            println!("Added MT=2 (elastic) to total cross section");
-        } else {
-            println!("Warning: MT=2 (elastic) not found in cross section data");
         }
         
         // Add MT=3 (non-elastic)
@@ -485,9 +479,6 @@ impl Material {
                 total_xs[i] += xs;
             }
             has_mt3 = true;
-            println!("Added MT=3 (non-elastic) to total cross section");
-        } else {
-            println!("Warning: MT=3 (non-elastic) not found in cross section data");
         }
         
         // Create a new HashMap with the original data plus the total
@@ -495,10 +486,7 @@ impl Material {
         
         // Only add the total if we found at least one of MT=2 or MT=3
         if has_mt2 || has_mt3 {
-            println!("Adding calculated total cross section to the data");
             result.insert(String::from("total"), total_xs);
-        } else {
-            println!("Warning: Could not calculate total cross section, neither MT=2 nor MT=3 were found");
         }
         
         // Update the cached macroscopic cross sections
@@ -592,7 +580,6 @@ impl Material {
             "kg/m3" => density = density / 1000.0, // Convert kg/m³ to g/cm³
             _ => {
                 // For any other units, just use the value as is, but it may give incorrect results
-                println!("Warning: Unsupported density unit '{}' for atoms_per_cc calculation. Results may be incorrect.", self.density_units);
             }
         }
         
@@ -619,7 +606,6 @@ impl Material {
             weighted_mass_sum += fraction * mass;
         }
         let average_molar_mass = weighted_mass_sum / total_fraction;
-        println!("Average molar mass: {} g/mol", average_molar_mass);
         
         // Calculate atom densities using OpenMC's approach
         for (nuclide, &fraction) in &self.nuclides {
@@ -632,8 +618,6 @@ impl Material {
             let atom_density = density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
             
             atoms_per_cc.insert(nuclide.clone(), atom_density);
-            println!("Calculated atom density for {}: {} atoms/b-cm (fraction: {}, normalized: {}, mass: {} g/mol)", 
-                     nuclide, atom_density, fraction, normalized_fraction, mass);
         }
         
         atoms_per_cc
@@ -1280,7 +1264,6 @@ mod tests {
         for nuclide in &["Li6", "Li7"] {
             assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
             let xs_map = &micro_xs_mt2[*nuclide];
-            println!("Filtered MTs for {}: {:?}", nuclide, xs_map.keys().collect::<Vec<_>>());
             // Assert that only the requested MT is present
             assert!(xs_map.keys().all(|k| k == "2"), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
             assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
