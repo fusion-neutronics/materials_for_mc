@@ -203,12 +203,13 @@ impl Material {
                             .or_else(|| energy_map.get(&temp_with_k));
                         if let Some(energy_grid) = energy_grid {
                             // Only process the requested MTs if mt_filter is Some
-                            let mt_iter: Box<dyn Iterator<Item = (&String, &crate::nuclide::Reaction)>> =
-                                if let Some(mt_list) = mt_filter {
-                                    Box::new(temp_reactions.iter().filter(move |(k, _)| mt_list.contains(k)))
-                                } else {
-                                    Box::new(temp_reactions.iter())
-                                };
+                            let mt_set: Option<std::collections::HashSet<&String>> = mt_filter.map(|v| v.iter().collect());
+                            let mt_iter = temp_reactions.iter().filter(|(k, _)| {
+                                match &mt_set {
+                                    Some(set) => set.contains(k),
+                                    None => true,
+                                }
+                            });
                             for (mt, reaction) in mt_iter {
                                 let mut xs_values = Vec::with_capacity(grid.len());
                                 let threshold_idx = reaction.threshold_idx;
