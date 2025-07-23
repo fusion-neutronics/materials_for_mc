@@ -1270,18 +1270,24 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
-        // Calculate all MTs
-        let macro_xs_all = material.calculate_macroscopic_xs_neutron(Some(&grid), None);
-        // Calculate only MT=2
+        // Calculate microscopic cross sections for all MTs
+        let micro_xs_all = material.calculate_microscopic_xs_neutron(Some(&grid), None);
+        // Calculate microscopic cross sections for only MT="2"
         let mt_filter = vec!["2".to_string()];
-        let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&grid), Some(&mt_filter));
-        // Only MT=2 should be present in the filtered result
-        assert_eq!(macro_xs_mt2.len(), 1, "Filtered macro_xs should have only one MT");
-        assert!(macro_xs_mt2.contains_key("2"), "Filtered macro_xs missing MT=2");
-        // The cross section array for MT=2 should match the unfiltered result
-        let xs_all = &macro_xs_all["2"];
-        let xs_filtered = &macro_xs_mt2["2"];
-        assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match");
+        let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&grid), Some(&mt_filter));
+        // For each nuclide, only MT="2" should be present
+        for nuclide in &["Li6", "Li7"] {
+            assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
+            let xs_map = &micro_xs_mt2[*nuclide];
+            println!("Filtered MTs for {}: {:?}", nuclide, xs_map.keys().collect::<Vec<_>>());
+            // Assert that only the requested MT is present
+            assert!(xs_map.keys().all(|k| k == "2"), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
+            assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
+            // The cross section array for MT=2 should match the unfiltered result
+            let xs_all = &micro_xs_all[*nuclide]["2"];
+            let xs_filtered = &xs_map["2"];
+            assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 xs do not match for {}", nuclide);
+        }
     }
 
     #[test]
@@ -1289,6 +1295,7 @@ mod tests {
         use std::collections::HashMap;
         let mut material = Material::new();
         material.add_element("Li", 1.0).unwrap();
+        material.set_density("g/cm3", 0.534).unwrap();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
@@ -1307,4 +1314,41 @@ mod tests {
         let xs_filtered = &macro_xs_mt2["2"];
         assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match");
     }
+
+    #[test]
+    fn test_panic_if_no_density_for_macroscopic_xs_and_mean_free_path() {
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+
+        // Prepare the nuclide JSON map for Li6
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        let grid = material.unified_energy_grid_neutron();
+
+        // Should panic when calculating macroscopic cross sections with no density
+        let result = std::panic::catch_unwind(move || {
+            let mut material = material;
+            material.calculate_macroscopic_xs_neutron(Some(&grid), None);
+        });
+        assert!(result.is_err(), "Should panic if density is not set for calculate_macroscopic_xs_neutron");
+
+        // Re-create material for the next test
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material.unified_energy_grid_neutron();
+
+        // Should panic when calculating mean free path with no density
+        let result = std::panic::catch_unwind(move || {
+            let mut material = material;
+            material.mean_free_path_neutron(1e6);
+        });
+        assert!(result.is_err(), "Should panic if density is not set for mean_free_path_neutron");
+    }
+
 } // close mod tests
+
+
