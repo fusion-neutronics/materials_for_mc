@@ -4141,3 +4141,18 @@ pub static ATOMIC_MASSES: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m.insert("Og295", 295.216178);
     m
 });
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_lithium_natural_abundance() {
+        let li6 = NATURAL_ABUNDANCE.get("Li6").copied().unwrap_or(0.0);
+        let li7 = NATURAL_ABUNDANCE.get("Li7").copied().unwrap_or(0.0);
+        let sum = li6 + li7;
+        assert!((li6 - 0.0759).abs() < 1e-4, "Li6 abundance incorrect: {}", li6);
+        assert!((li7 - 0.9241).abs() < 1e-4, "Li7 abundance incorrect: {}", li7);
+        assert!((sum - 1.0).abs() < 1e-3, "Li6 + Li7 should sum to 1, got {}", sum);
+    }
+}

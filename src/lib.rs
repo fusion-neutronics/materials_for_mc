@@ -48,19 +48,18 @@ pub use config_python::*;
 #[cfg(feature = "pyo3")]
 pub use element_python::*;
 
-// If you have a main Python module entry point, update it to include PyMaterials:
+// Declare the data module
+pub mod data;
+
+#[cfg(feature = "wasm")]
+mod data_wasm;
+#[cfg(feature = "wasm")]
+pub use data_wasm::*;
+
 #[cfg(feature = "pyo3")]
-#[pymodule]
-fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<material_python::PyMaterial>()?;
-    m.add_class::<materials_python::PyMaterials>()?;
-    m.add_class::<nuclide_python::PyNuclide>()?;
-    m.add_class::<nuclide_python::PyReaction>()?;
-    m.add_class::<config_python::PyConfig>()?;
-    m.add_class::<element_python::PyElement>()?;
-    m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
-    Ok(())
-}
+mod data_python;
+#[cfg(feature = "pyo3")]
+pub use data_python::*;
 
 // WASM Modules
 #[cfg(feature = "wasm")]
@@ -96,5 +95,17 @@ pub use reaction_wasm::*;
 #[cfg(feature = "wasm")]
 pub use element_wasm::*;
 
-// Declare the data module
-pub mod data;
+// If you have a main Python module entry point, update it to include PyMaterials:
+#[cfg(feature = "pyo3")]
+#[pymodule]
+fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<material_python::PyMaterial>()?;
+    m.add_class::<materials_python::PyMaterials>()?;
+    m.add_class::<nuclide_python::PyNuclide>()?;
+    m.add_class::<nuclide_python::PyReaction>()?;
+    m.add_class::<config_python::PyConfig>()?;
+    m.add_class::<element_python::PyElement>()?;
+    m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::data_python::natural_abundance, m)?)?;
+    Ok(())
+}
