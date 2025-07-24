@@ -177,18 +177,14 @@ impl Material {
     /// Returns a nested HashMap: nuclide -> mt -> cross_section values
     pub fn calculate_microscopic_xs_neutron(
         &mut self,
-        unified_energy_grid: Option<&[f64]>,
         mt_filter: Option<&Vec<String>>,
     ) -> HashMap<String, HashMap<String, Vec<f64>>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        // Get the grid (either from parameter or from cache/build)
-        let grid = match unified_energy_grid {
-            Some(grid) => grid.to_vec(),
-            None => self.unified_energy_grid_neutron(),
-        };
+        // Always use the cached grid or build it automatically
+        let grid = self.unified_energy_grid_neutron();
         let mut micro_xs: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
         let temp_with_k = format!("{}K", temperature);
@@ -259,7 +255,7 @@ impl Material {
             panic!("Error loading nuclides: {}", e);
         }
         // First get microscopic cross sections on the unified grid, passing mt_filter
-        let micro_xs = self.calculate_microscopic_xs_neutron(unified_grid, mt_filter);
+        let micro_xs = self.calculate_microscopic_xs_neutron(mt_filter);
         // Create a map to hold macroscopic cross sections for each MT
         let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
         // Find all unique MT numbers across all nuclides
@@ -1172,7 +1168,7 @@ mod tests {
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections
-        let micro_xs = material.calculate_microscopic_xs_neutron(Some(&grid), None);
+        let micro_xs = material.calculate_microscopic_xs_neutron(None);
         // Check that both Li6 and Li7 are present
         assert!(micro_xs.contains_key("Li6"));
         assert!(micro_xs.contains_key("Li7"));
@@ -1199,7 +1195,7 @@ mod tests {
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for the material
-        let micro_xs_mat = material.calculate_microscopic_xs_neutron(Some(&grid), None);
+        let micro_xs_mat = material.calculate_microscopic_xs_neutron(None);
         // Get the nuclide directly
         let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
         let temperature = &material.temperature;
@@ -1256,10 +1252,10 @@ mod tests {
         // Build the unified energy grid
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for all MTs
-        let micro_xs_all = material.calculate_microscopic_xs_neutron(Some(&grid), None);
+        let micro_xs_all = material.calculate_microscopic_xs_neutron(None);
         // Calculate microscopic cross sections for only MT="2"
         let mt_filter = vec!["2".to_string()];
-        let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&grid), Some(&mt_filter));
+        let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&mt_filter));
         // For each nuclide, only MT="2" should be present
         for nuclide in &["Li6", "Li7"] {
             assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);

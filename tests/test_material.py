@@ -156,8 +156,7 @@ def test_calculate_microscopic_xs_neutron_lithium():
         "Li6": "tests/Li6.json",
         "Li7": "tests/Li7.json"
     })
-    grid = mat.unified_energy_grid_neutron()
-    micro_xs = mat.calculate_microscopic_xs_neutron(grid)
+    micro_xs = mat.calculate_microscopic_xs_neutron()
     # Check both Li6 and Li7 are present
     assert "Li6" in micro_xs
     assert "Li7" in micro_xs
@@ -165,6 +164,7 @@ def test_calculate_microscopic_xs_neutron_lithium():
     assert "2" in micro_xs["Li6"]
     assert "2" in micro_xs["Li7"]
     # Check that the cross section arrays are the same length as the grid
+    grid = mat.unified_energy_grid_neutron()
     assert len(micro_xs["Li6"]["2"]) == len(grid)
     assert len(micro_xs["Li7"]["2"]) == len(grid)
 
@@ -174,8 +174,8 @@ def test_material_vs_nuclide_microscopic_xs_li6():
     mat = Material()
     mat.add_nuclide('Li6', 1.0)
     Config.set_cross_sections({"Li6": "tests/Li6.json"})
+    micro_xs_mat = mat.calculate_microscopic_xs_neutron()
     grid = mat.unified_energy_grid_neutron()
-    micro_xs_mat = mat.calculate_microscopic_xs_neutron(grid)
     # Get the nuclide directly
     nuclide = Nuclide('Li6')
     nuclide.read_nuclide_from_json('tests/Li6.json')
@@ -215,12 +215,10 @@ def test_calculate_microscopic_xs_neutron_mt_filter():
     # Set up the nuclide JSON map for Li6 and Li7
     nuclide_json_map = {"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"}
     mat.read_nuclides_from_json(nuclide_json_map)
-    # Build the unified energy grid
-    grid = mat.unified_energy_grid_neutron()
     # Calculate all MTs
-    xs_all = mat.calculate_microscopic_xs_neutron(grid)
+    xs_all = mat.calculate_microscopic_xs_neutron()
     # Calculate only MT=2
-    xs_mt2 = mat.calculate_microscopic_xs_neutron(grid, mt_filter=["2"])
+    xs_mt2 = mat.calculate_microscopic_xs_neutron(mt_filter=["2"])
     # For each nuclide, only MT=2 should be present and match the unfiltered result
     for nuclide in ["Li6", "Li7"]:
         assert nuclide in xs_mt2, f"{nuclide} missing in filtered result"
@@ -236,11 +234,10 @@ def test_macroscopic_xs_neutron_mt_filter():
     mat.add_element("Li", 1.0)
     mat.read_nuclides_from_json({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     mat.set_density("g/cm3", 1.0)
-    grid = mat.unified_energy_grid_neutron()
     # Calculate all MTs
-    macro_xs_all = mat.calculate_macroscopic_xs_neutron(grid)
+    macro_xs_all = mat.calculate_macroscopic_xs_neutron()
     # Calculate only MT=2
-    macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(grid, mt_filter=["2"])
+    macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(mt_filter=["2"])
     # Only MT=2 should be present in the filtered result
     assert list(macro_xs_mt2.keys()) == ["2"], "Filtered macro_xs should have only MT=2"
     # The cross section array for MT=2 should match the unfiltered result

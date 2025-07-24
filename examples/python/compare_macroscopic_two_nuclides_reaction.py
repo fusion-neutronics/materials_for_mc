@@ -19,7 +19,7 @@ mat1.set_density('g/cm3',20.)
 
 mat1.temperature = "294"  # Set temperature directly on the material
 
-mat1.calculate_macroscopic_xs_neutron()
+mat1.calculate_macroscopic_xs_neutron()  # returns energy, cross section pairs
 my_macro = mat1.macroscopic_xs_neutron['2']
 # Get the unified energy grid}')
 

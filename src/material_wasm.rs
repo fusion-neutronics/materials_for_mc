@@ -101,7 +101,7 @@ impl WasmMaterial {
         let mt_filter_vec = mt_filter.map(|arr| {
             arr.iter().filter_map(|v| v.as_string()).collect::<Vec<String>>()
         });
-        let xs = self.inner.calculate_macroscopic_xs_neutron(None, mt_filter_vec.as_ref());
+        let xs = self.inner.calculate_macroscopic_xs_neutron(mt_filter_vec.as_ref());
         let energy_grid = self.inner.unified_energy_grid_neutron.clone();
         let data = MacroscopicXsResult {
             energy_grid,

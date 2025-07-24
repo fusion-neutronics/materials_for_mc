@@ -15,7 +15,7 @@ mat2.add_nuclide('Be9',1)
 mat2.set_density('g/cm3',2.)
 mat2.temperature = "294"
 mat2.read_nuclides_from_json({'Be9':'tests/Be9.json'})
-mat2.calculate_macroscopic_xs_neutron(None, ['16'])  # should return energy, cross section pairs, should have arguments the other way around or not have a unified energy grid cross section
+mat2.calculate_macroscopic_xs_neutron(['16'])  # returns energy, cross section pairs
 my_macro = mat2.macroscopic_xs_neutron['16']
 my_energies = mat2.unified_energy_grid_neutron()
 
