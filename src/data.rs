@@ -1,9 +1,28 @@
+/// Recursively collect all descendant MT numbers for a given parent MT number using sum rules, returning a sorted Vec<i32>
+pub fn get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
+    fn collect(mt_num: i32, out: &mut std::collections::HashSet<i32>) {
+        if let Some(children) = crate::data::SUM_RULES.get(&mt_num) {
+            for &child in children {
+                if out.insert(child) {
+                    collect(child, out);
+                }
+            }
+        }
+    }
+    let mut out = std::collections::HashSet::new();
+    out.insert(mt_num); // Always include mt_num itself
+    collect(mt_num, &mut out);
+    let mut v: Vec<i32> = out.into_iter().collect();
+    v.sort();
+    v
+}
 /// Returns true if the given MT string is a hierarchical MT (i.e., present in SUM_RULES)
 pub fn is_hierarchical_mt(mt: &str) -> bool {
     mt.parse::<i32>().map_or(false, |mt_num| SUM_RULES.contains_key(&mt_num))
 }
 pub static SUM_RULES: Lazy<HashMap<i32, Vec<i32>>> = Lazy::new(|| {
     HashMap::from([
+        (1, vec![2, 3]),
         (3, vec![4, 5, 11, 16, 17, 22, 23, 24, 25, 27, 28, 29, 30, 32, 33, 34, 35,
                36, 37, 41, 42, 44, 45, 152, 153, 154, 156, 157, 158, 159, 160,
                161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
