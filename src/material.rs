@@ -320,25 +320,9 @@ impl Material {
             return;
         }
         
-        // Define the OpenMC sum rules for hierarchical MT numbers
-        let sum_rules: std::collections::HashMap<i32, Vec<i32>> = [
-            (3, vec![4, 5, 11, 16, 17, 22, 23, 24, 25, 27, 28, 29, 30, 32, 33, 34, 35,
-                   36, 37, 41, 42, 44, 45, 152, 153, 154, 156, 157, 158, 159, 160,
-                   161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
-                   173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 185,
-                   186, 187, 188, 189, 190, 194, 195, 196, 198, 199, 200]),
-            (4, (50..92).collect()),
-            (16, (875..892).collect()),
-            (18, vec![19, 20, 21, 38]),
-            (27, vec![18, 101]),
-            (101, vec![102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 113, 114,
-                     115, 116, 117, 155, 182, 191, 192, 193, 197]),
-            (103, (600..650).collect()),
-            (104, (650..700).collect()),
-            (105, (700..750).collect()),
-            (106, (750..800).collect()),
-            (107, (800..850).collect())
-        ].iter().cloned().collect();
+        // Use the OpenMC sum rules for hierarchical MT numbers from data.rs
+        use crate::data::SUM_RULES;
+        let sum_rules = &*SUM_RULES;
         
         // Get the length of the energy grid from any MT reaction
         let grid_length = xs_map.values().next().map_or(0, |xs| xs.len());
@@ -385,9 +369,9 @@ impl Material {
         
         // Add MTs to processing order in bottom-up dependency order
         for &mt in sum_rules.keys() {
-            add_to_processing_order(mt, &sum_rules, &mut processed_set, &mut processing_order);
+            add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order);
         }
-
+        
         // Now process in the determined order
         for mt in processing_order {
             let mt_str = mt.to_string();
