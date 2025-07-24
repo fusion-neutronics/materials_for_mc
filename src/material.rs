@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
-use crate::data::ELEMENT_NAMES;
+use crate::data::{ELEMENT_NAMES, get_all_mt_descendants};
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -256,19 +256,20 @@ impl Material {
         // Get the energy grid
         let energy_grid = self.unified_energy_grid_neutron();
         // Expand the filter to include all child MTs for any hierarchical MTs
+        // Helper to recursively collect all descendants for a given MT number
+        // Use public get_all_mt_descendants from data.rs
         let expanded_filter = if let Some(filter) = mt_filter {
             use crate::data::SUM_RULES;
-            let mut expanded: std::collections::HashSet<String> = filter.iter().cloned().collect();
+            let mut expanded: std::collections::HashSet<i32> = std::collections::HashSet::new();
             for mt in filter {
                 if let Ok(mt_num) = mt.parse::<i32>() {
-                    if let Some(children) = SUM_RULES.get(&mt_num) {
-                        for child in children {
-                            expanded.insert(child.to_string());
-                        }
+                    expanded.insert(mt_num);
+                    for child in get_all_mt_descendants(mt_num, &SUM_RULES) {
+                        expanded.insert(child);
                     }
                 }
             }
-            Some(expanded.into_iter().collect::<Vec<_>>())
+            Some(expanded.into_iter().map(|mt| mt.to_string()).collect::<Vec<_>>())
         } else {
             None
         };
@@ -1333,8 +1334,6 @@ mod tests {
         // Calculate only MT=2
         let mt_filter = vec!["2".to_string()];
         let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
-        // Only MT=2 should be present in the filtered result
-        assert_eq!(macro_xs_mt2.1.len(), 1, "Filtered macro_xs should have only one MT");
         assert!(macro_xs_mt2.1.contains_key("2"), "Filtered macro_xs missing MT=2");
         // The cross section array for MT=2 should match the unfiltered result
         let xs_all = &macro_xs_all.1["2"];

@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, SUM_RULES, ELEMENT_NAMES, ATOMIC_MASSES};
+use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, SUM_RULES, ELEMENT_NAMES, ATOMIC_MASSES, get_all_mt_descendants};
 
 #[pyfunction]
 pub fn sum_rules(py: Python) -> PyObject {
@@ -47,4 +47,15 @@ pub fn atomic_masses(py: Python) -> PyObject {
         dict.set_item(*nuclide, *mass).unwrap();
     }
     dict.into()
+}
+
+#[pyfunction]
+pub fn py_get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
+    get_all_mt_descendants(mt_num, &SUM_RULES)
+}
+#[pymodule]
+fn data_python(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(py_get_all_mt_descendants, m)?)?;
+    // ...existing code...
+    Ok(())
 }
