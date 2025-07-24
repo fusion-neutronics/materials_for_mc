@@ -51,7 +51,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
     atoms_per_cc = material.get_atoms_per_cc()
     
     # Calculate macroscopic cross sections
-    macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
     
     # Verify that macroscopic cross sections were calculated
     assert len(macro_xs) > 0, "No macroscopic cross sections were calculated"

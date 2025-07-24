@@ -248,11 +248,13 @@ impl Material {
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
         mt_filter: Option<&Vec<String>>,
-    ) -> HashMap<String, Vec<f64>> {
+    ) -> (Vec<f64>, HashMap<String, Vec<f64>>) {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
+        // Get the energy grid
+        let energy_grid = self.unified_energy_grid_neutron();
         // First get microscopic cross sections on the unified grid, passing mt_filter
         let micro_xs = self.calculate_microscopic_xs_neutron(mt_filter);
         // Create a map to hold macroscopic cross sections for each MT
@@ -292,7 +294,7 @@ impl Material {
         }
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
-        macro_xs
+        (energy_grid, macro_xs)
     }
 
     /// Calculate hierarchical MT numbers when they are missing from the original data
@@ -434,59 +436,47 @@ impl Material {
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
         // Get the macroscopic cross sections (calculate if not already done)
-        let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
+        let (energy_grid, macro_xs) = if self.macroscopic_xs_neutron.is_empty() {
             self.calculate_macroscopic_xs_neutron(None)
         } else {
-            self.macroscopic_xs_neutron.clone()
+            (self.unified_energy_grid_neutron.clone(), self.macroscopic_xs_neutron.clone())
         };
-        
         // Ensure hierarchical MT numbers are calculated (especially MT=3)
         self.ensure_hierarchical_mt_numbers();
-        
         // Get the length of the energy grid from any MT reaction
         let grid_length = macro_xs.values().next().map_or(0, |xs| xs.len());
-        
         // If there are no cross sections, return the empty HashMap
         if grid_length == 0 {
             return macro_xs;
         }
-        
         // Initialize the total cross section with zeros
         let mut total_xs = vec![0.0; grid_length];
-        
         // According to OpenMC, total (MT=1) = elastic (MT=2) + non-elastic (MT=3)
-        
         // Add MT=2 (elastic scattering)
         let mut has_mt2 = false;
-        if let Some(mt2_xs) = self.macroscopic_xs_neutron.get("2") {
+        if let Some(mt2_xs) = macro_xs.get("2") {
             for (i, &xs) in mt2_xs.iter().enumerate() {
                 total_xs[i] += xs;
             }
             has_mt2 = true;
         }
-        
         // Add MT=3 (non-elastic)
         let mut has_mt3 = false;
-        if let Some(mt3_xs) = self.macroscopic_xs_neutron.get("3") {
+        if let Some(mt3_xs) = macro_xs.get("3") {
             for (i, &xs) in mt3_xs.iter().enumerate() {
                 total_xs[i] += xs;
             }
             has_mt3 = true;
         }
-        
         // Create a new HashMap with the original data plus the total
         let mut result = macro_xs.clone();
-        
         // Only add the total if we found at least one of MT=2 or MT=3
         if has_mt2 || has_mt3 {
             result.insert(String::from("total"), total_xs);
         }
-        
         // Update the cached macroscopic cross sections
         self.macroscopic_xs_neutron = result.clone();
-        
         result
     }
 
@@ -1286,11 +1276,11 @@ mod tests {
         let mt_filter = vec!["2".to_string()];
         let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         // Only MT=2 should be present in the filtered result
-        assert_eq!(macro_xs_mt2.len(), 1, "Filtered macro_xs should have only one MT");
-        assert!(macro_xs_mt2.contains_key("2"), "Filtered macro_xs missing MT=2");
+        assert_eq!(macro_xs_mt2.1.len(), 1, "Filtered macro_xs should have only one MT");
+        assert!(macro_xs_mt2.1.contains_key("2"), "Filtered macro_xs missing MT=2");
         // The cross section array for MT=2 should match the unfiltered result
-        let xs_all = &macro_xs_all["2"];
-        let xs_filtered = &macro_xs_mt2["2"];
+        let xs_all = &macro_xs_all.1["2"];
+        let xs_filtered = &macro_xs_mt2.1["2"];
         assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match");
     }
 
@@ -1327,6 +1317,41 @@ mod tests {
         });
         assert!(result.is_err(), "Should panic if density is not set for mean_free_path_neutron");
     }
+
+    #[test]
+    fn test_mean_free_path_lithium_real_data() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_element("Li", 1.0).unwrap();
+        material.set_density("g/cm3", 0.534).unwrap(); // lithium density
+
+        // Prepare the nuclide JSON map for Li6 and Li7
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+
+        // Read in the nuclear data
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+
+        // Calculate the mean free path at 14 MeV (1.4e7 eV)
+        let mfp = material.mean_free_path_neutron(1.4e7);
+
+        assert!(mfp.is_some(), "Mean free path should be Some for real data");
+        let mfp_val = mfp.unwrap();
+        // Print the value for inspection
+        println!("Mean free path for lithium at 14 MeV: {} cm", mfp_val);
+        // Check that the value is positive
+        assert!(mfp_val > 0.0, "Mean free path should be positive");
+        let expected = 14.963768069986559;
+        let rel_tol = 1e-5;
+        assert!(
+            (mfp_val - expected).abs() / expected < rel_tol,
+            "Expected ~{:.8} cm, got {:.8} cm",
+            expected,
+            mfp_val
+        );
+    }
+
 
 } // close mod tests
 

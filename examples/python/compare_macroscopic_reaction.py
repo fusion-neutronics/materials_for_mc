@@ -12,12 +12,11 @@ openmc_macro=openmc_xs[0]
 
 mat2 = m4mc.Material()
 mat2.add_nuclide('Be9',1)
+mat2.read_nuclides_from_json({'Be9':'tests/Be9.json'})
 mat2.set_density('g/cm3',2.)
 mat2.temperature = "294"
-mat2.read_nuclides_from_json({'Be9':'tests/Be9.json'})
-mat2.calculate_macroscopic_xs_neutron(['16'])  # returns energy, cross section pairs
-my_macro = mat2.macroscopic_xs_neutron['16']
-my_energies = mat2.unified_energy_grid_neutron()
+my_energies, xs_dict = mat2.calculate_macroscopic_xs_neutron(['16'])
+my_macro = xs_dict['16']
 
 import matplotlib.pyplot as plt
 plt.plot(openmc_energies, openmc_macro, label='OpenMC', linestyle='--')
