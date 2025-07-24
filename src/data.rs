@@ -1,3 +1,20 @@
+/// Map from element symbol to sorted Vec of nuclide names (e.g. "Li" -> ["Li6", "Li7"])
+pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy::new(|| {
+    let mut map: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
+    for &nuclide in NATURAL_ABUNDANCE.keys() {
+        // Find the index where the first digit occurs
+        let idx = nuclide.find(|c: char| c.is_ascii_digit()).unwrap_or(nuclide.len());
+        let element = &nuclide[..idx]; // This is a &'static str slice
+        map.entry(element)
+            .or_insert_with(Vec::new)
+            .push(nuclide);
+    }
+    // Sort nuclides for each element
+    for nuclides in map.values_mut() {
+        nuclides.sort();
+    }
+    map
+});
 // src/data.rs
 // This module contains large static data tables for the materials library.
 // NATURAL_ABUNDANCE: canonical natural     m for all stable isotopes.
@@ -4154,5 +4171,13 @@ mod tests {
         assert!((li6 - 0.0759).abs() < 1e-4, "Li6 abundance incorrect: {}", li6);
         assert!((li7 - 0.9241).abs() < 1e-4, "Li7 abundance incorrect: {}", li7);
         assert!((sum - 1.0).abs() < 1e-3, "Li6 + Li7 should sum to 1, got {}", sum);
+    }
+
+    #[test]
+    fn test_element_nuclides_li_and_be() {
+        let li_nuclides = ELEMENT_NUCLIDES.get("Li").unwrap();
+        assert_eq!(li_nuclides, &vec!["Li6", "Li7"]);
+        let be_nuclides = ELEMENT_NUCLIDES.get("Be").unwrap();
+        assert_eq!(be_nuclides, &vec!["Be9"]);
     }
 }

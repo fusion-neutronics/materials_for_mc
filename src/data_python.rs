@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::data::NATURAL_ABUNDANCE;
+use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES};
 
 #[pyfunction]
 pub fn natural_abundance(py: Python) -> PyObject {
@@ -9,4 +9,22 @@ pub fn natural_abundance(py: Python) -> PyObject {
         dict.set_item(*k, v).unwrap();
     }
     dict.into()
+}
+
+#[pyfunction]
+pub fn element_nuclides(py: Python) -> PyObject {
+    let dict = PyDict::new(py);
+    for (element, nuclides) in ELEMENT_NUCLIDES.iter() {
+        let mut sorted_nuclides = nuclides.clone();
+        sorted_nuclides.sort();
+        dict.set_item(*element, sorted_nuclides).unwrap();
+    }
+    dict.into()
+}
+
+#[pymodule]
+fn materials_for_mc(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(natural_abundance, m)?)?;
+    m.add_function(wrap_pyfunction!(element_nuclides, m)?)?;
+    Ok(())
 }
