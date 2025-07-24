@@ -21,8 +21,8 @@ pub struct Material {
     /// Loaded nuclide data (name -> Arc<Nuclide>)
     pub nuclide_data: HashMap<String, Arc<Nuclide>>,
     /// Macroscopic cross sections for different MT numbers (neutron only for now)
-    /// Map of MT number -> cross sections
-    pub macroscopic_xs_neutron: HashMap<String, Vec<f64>>,
+    /// Map of MT number (i32) -> cross sections
+    pub macroscopic_xs_neutron: HashMap<i32, Vec<f64>>,
     /// Unified energy grid for neutrons
     pub unified_energy_grid_neutron: Vec<f64>,
 }
@@ -249,7 +249,7 @@ impl Material {
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
         mt_filter: Option<&Vec<String>>,
-    ) -> (Vec<f64>, HashMap<String, Vec<f64>>) {
+    ) -> (Vec<f64>, HashMap<i32, Vec<f64>>) {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
@@ -259,8 +259,8 @@ impl Material {
         // Expand the filter to include all child MTs for any hierarchical MTs
         // Helper to recursively collect all descendants for a given MT number
         // Use public get_all_mt_descendants from data.rs
-        let expanded_filter = if let Some(filter) = mt_filter {
-            let mut expanded: std::collections::HashSet<i32> = std::collections::HashSet::new();
+        let expanded_filter: Option<std::collections::HashSet<i32>> = if let Some(filter) = mt_filter {
+            let mut expanded = std::collections::HashSet::new();
             for mt in filter {
                 if let Ok(mt_num) = mt.parse::<i32>() {
                     expanded.insert(mt_num);
@@ -269,29 +269,45 @@ impl Material {
                     }
                 }
             }
-            Some(expanded.into_iter().map(|mt| mt.to_string()).collect::<Vec<_>>())
+            Some(expanded)
         } else {
             None
         };
-        // First get microscopic cross sections on the unified grid, passing expanded_filter
-        let micro_xs = self.calculate_microscopic_xs_neutron(expanded_filter.as_ref());
-        // Create a map to hold macroscopic cross sections for each MT
-        let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
-        // Find all unique MT numbers across all nuclides
+        // If a filter is provided, expand it to include all descendants for hierarchical MTs
+        let expanded_mt_filter: Option<Vec<String>> = if let Some(filter) = mt_filter {
+            let mut expanded = std::collections::HashSet::new();
+            for mt in filter {
+                if let Ok(mt_num) = mt.parse::<i32>() {
+                    expanded.insert(mt_num.to_string());
+                    for child in get_all_mt_descendants(mt_num) {
+                        expanded.insert(child.to_string());
+                    }
+                }
+            }
+            Some(expanded.into_iter().collect())
+        } else {
+            None
+        };
+        // Now get microscopic cross sections on the unified grid, using the expanded filter
+        let micro_xs = self.calculate_microscopic_xs_neutron(expanded_mt_filter.as_ref());
+        // Create a map to hold macroscopic cross sections for each MT (i32)
+        let mut macro_xs: HashMap<i32, Vec<f64>> = HashMap::new();
+        // Find all unique MT numbers across all nuclides (as i32)
         let mut all_mts = std::collections::HashSet::new();
         for nuclide_data in micro_xs.values() {
-            for mt in nuclide_data.keys() {
-                all_mts.insert(mt.clone());
+            for mt_str in nuclide_data.keys() {
+                if let Ok(mt) = mt_str.parse::<i32>() {
+                    if expanded_filter.is_none() || expanded_filter.as_ref().unwrap().contains(&mt) {
+                        all_mts.insert(mt);
+                    }
+                }
             }
         }
         // Get the grid length (from any MT reaction of any nuclide, all should have same length)
-        let grid_length = micro_xs.values()
-            .next()
-            .and_then(|nuclide_data| nuclide_data.values().next())
-            .map_or(0, |xs| xs.len());
+        let grid_length = micro_xs.values().next().and_then(|xs| xs.values().next()).map_or(0, |v| v.len());
         // Initialize macro_xs with zeros for each MT
-        for mt in &all_mts {
-            macro_xs.insert(mt.clone(), vec![0.0; grid_length]);
+        for &mt in &all_mts {
+            macro_xs.insert(mt, vec![0.0; grid_length]);
         }
         // Calculate macroscopic cross section for each MT
         // Get atoms per cc for all nuclides
@@ -299,11 +315,12 @@ impl Material {
         for (nuclide, _) in &self.nuclides {
             if let Some(nuclide_data) = micro_xs.get(nuclide) {
                 if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
-                    // Add contribution to macroscopic cross section for each MT
-                    for (mt, xs_values) in nuclide_data {
-                        if let Some(macro_values) = macro_xs.get_mut(&mt.to_string()) {
-                            for (i, &xs) in xs_values.iter().enumerate() {
-                                macro_values[i] += atoms_per_bcm * xs;
+                    for (mt_str, xs_values) in nuclide_data {
+                        if let Ok(mt) = mt_str.parse::<i32>() {
+                            if let Some(macro_values) = macro_xs.get_mut(&mt) {
+                                for (i, &xs) in xs_values.iter().enumerate() {
+                                    macro_values[i] += atoms_per_bcm * xs;
+                                }
                             }
                         }
                     }
@@ -318,9 +335,7 @@ impl Material {
             self.ensure_hierarchical_mt_numbers(None);
             return (energy_grid, self.macroscopic_xs_neutron.clone());
         } else if let Some(filter) = mt_filter {
-            // Only generate hierarchical MTs that are explicitly requested
             let sum_rules = &*SUM_RULES;
-            // Collect all hierarchical MTs in the filter
             let mut hierarchical_mts = Vec::new();
             for mt in filter {
                 if let Ok(mt_num) = mt.parse::<i32>() {
@@ -331,20 +346,14 @@ impl Material {
             }
             if !hierarchical_mts.is_empty() {
                 self.ensure_hierarchical_mt_numbers(Some(&hierarchical_mts));
-            }
-            for mt in filter {
-                // Always copy the parent MT from self.macroscopic_xs_neutron if present
-                if let Some(xs) = self.macroscopic_xs_neutron.get(mt) {
-                    macro_xs.insert(mt.clone(), xs.clone());
-                }
-                // If the parent is a hierarchical MT, also include all its descendants recursively
-                if let Ok(mt_num) = mt.parse::<i32>() {
-                    if sum_rules.contains_key(&mt_num) {
-                        for child in get_all_mt_descendants(mt_num) {
-                            let child_str = child.to_string();
-                            if let Some(child_xs) = self.macroscopic_xs_neutron.get(&child_str) {
-                                macro_xs.insert(child_str, child_xs.clone());
-                            }
+                // Copy only the requested MTs and their descendants from the cache
+                for &mt in &hierarchical_mts {
+                    if let Some(xs) = self.macroscopic_xs_neutron.get(&mt) {
+                        macro_xs.insert(mt, xs.clone());
+                    }
+                    for child in get_all_mt_descendants(mt) {
+                        if let Some(xs) = self.macroscopic_xs_neutron.get(&child) {
+                            macro_xs.insert(child, xs.clone());
                         }
                     }
                 }
@@ -381,10 +390,8 @@ impl Material {
         // Dependency order: process children before parents
         let mut processing_order = Vec::new();
         let mut processed_set = std::collections::HashSet::new();
-        for mt_str in xs_map.keys() {
-            if let Ok(mt) = mt_str.parse::<i32>() {
-                processed_set.insert(mt);
-            }
+        for &mt in xs_map.keys() {
+            processed_set.insert(mt);
         }
         fn add_to_processing_order(
             mt: i32,
@@ -408,8 +415,7 @@ impl Material {
             add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, &mt_to_process);
         }
         for mt in processing_order {
-            let mt_str = mt.to_string();
-            if xs_map.contains_key(&mt_str) {
+            if xs_map.contains_key(&mt) {
                 continue;
             }
             if !sum_rules.contains_key(&mt) {
@@ -418,8 +424,7 @@ impl Material {
             let mut mt_xs = vec![0.0; grid_length];
             let mut found_any_child = false;
             for &constituent_mt in &sum_rules[&mt] {
-                let constituent_mt_str = constituent_mt.to_string();
-                if let Some(xs_values) = xs_map.get(&constituent_mt_str) {
+                if let Some(xs_values) = xs_map.get(&constituent_mt) {
                     for (i, &xs) in xs_values.iter().enumerate() {
                         mt_xs[i] += xs;
                     }
@@ -427,7 +432,7 @@ impl Material {
                 }
             }
             if found_any_child {
-                xs_map.insert(mt_str, mt_xs);
+                xs_map.insert(mt, mt_xs);
             }
         }
     }
@@ -442,8 +447,8 @@ impl Material {
     /// If a total cross section already exists in the HashMap, it will
     /// automatically be updated with the new calculation.
     /// 
-    /// Returns the updated HashMap with the "total" entry added.
-    pub fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+    /// Returns the updated HashMap with the 1 entry added.
+    pub fn calculate_total_xs_neutron(&mut self) -> HashMap<i32, Vec<f64>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
@@ -465,7 +470,7 @@ impl Material {
         // According to OpenMC, total (MT=1) = elastic (MT=2) + non-elastic (MT=3)
         // Add MT=2 (elastic scattering)
         let mut has_mt2 = false;
-        if let Some(mt2_xs) = macro_xs.get("2") {
+        if let Some(mt2_xs) = macro_xs.get(&2) {
             for (i, &xs) in mt2_xs.iter().enumerate() {
                 total_xs[i] += xs;
             }
@@ -473,7 +478,7 @@ impl Material {
         }
         // Add MT=3 (non-elastic)
         let mut has_mt3 = false;
-        if let Some(mt3_xs) = macro_xs.get("3") {
+        if let Some(mt3_xs) = macro_xs.get(&3) {
             for (i, &xs) in mt3_xs.iter().enumerate() {
                 total_xs[i] += xs;
             }
@@ -483,7 +488,7 @@ impl Material {
         let mut result = macro_xs.clone();
         // Only add the total if we found at least one of MT=2 or MT=3
         if has_mt2 || has_mt3 {
-            result.insert(String::from("total"), total_xs);
+            result.insert(1, total_xs);
         }
         // Update the cached macroscopic cross sections
         self.macroscopic_xs_neutron = result.clone();
@@ -505,17 +510,15 @@ impl Material {
     /// * The mean free path in cm, or None if there's no cross section data
     pub fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
         // Ensure we have a total cross section
-        if !self.macroscopic_xs_neutron.contains_key("total") {
+        if !self.macroscopic_xs_neutron.contains_key(&1) {
             self.calculate_total_xs_neutron();
         }
-        
         // If we still don't have a total cross section, return None
-        if !self.macroscopic_xs_neutron.contains_key("total") {
+        if !self.macroscopic_xs_neutron.contains_key(&1) {
             return None;
         }
-        
         // Get the total cross section and energy grid
-        let total_xs = &self.macroscopic_xs_neutron["total"];
+        let total_xs = &self.macroscopic_xs_neutron[&1];
         
         // If we have an empty cross section array, return None
         if total_xs.is_empty() || self.unified_energy_grid_neutron.is_empty() {
@@ -714,7 +717,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         let mt_filter = vec!["3".to_string()];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
-        assert!(!macro_xs.contains_key("1"), "MT=1 should NOT be present when only MT=3 is requested");
+        assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=3 is requested");
     }
 
     #[test]
@@ -728,7 +731,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         let mt_filter = vec!["24".to_string()];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
-        assert!(!macro_xs.contains_key("1"), "MT=1 should NOT be present when only MT=24 is requested");
+        assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=24 is requested");
     }
     #[test]
     fn test_hierarchical_mt3_generated_for_li6() {
@@ -744,12 +747,12 @@ mod tests {
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         println!("DEBUG: macro_xs keys: {:?}", macro_xs.keys().collect::<Vec<_>>());
         println!("DEBUG: self.macroscopic_xs_neutron keys: {:?}", material.macroscopic_xs_neutron.keys().collect::<Vec<_>>());
-        assert!(macro_xs.contains_key("3"), "MT=3 should be generated by sum rule for Li6");
+        assert!(macro_xs.contains_key(&3), "MT=3 should be generated by sum rule for Li6");
         // Optionally check that the cross section is the sum of all descendants (recursive)
         // Allow any order of descendants: sum all present descendant cross sections
         use crate::data::SUM_RULES;
-        let mut sum = vec![0.0; macro_xs["3"].len()];
-        let immediate_children: Vec<String> = SUM_RULES.get(&3).unwrap().iter().map(|mt| mt.to_string()).collect();
+        let mut sum = vec![0.0; macro_xs[&3].len()];
+        let immediate_children: Vec<i32> = SUM_RULES.get(&3).unwrap().clone();
         println!("DEBUG: MT=3 immediate children: {:?}", immediate_children);
         for mt in &immediate_children {
             if let Some(xs) = macro_xs.get(mt) {
@@ -761,10 +764,10 @@ mod tests {
                 println!("DEBUG: Immediate child MT {} not present in macro_xs", mt);
             }
         }
-        println!("DEBUG: macro_xs[\"3\"]: {:?}", macro_xs["3"]);
+        println!("DEBUG: macro_xs[3]: {:?}", macro_xs[&3]);
         println!("DEBUG: sum of immediate children: {:?}", sum);
         let tol = 1e-10;
-        for (i, (a, b)) in macro_xs["3"].iter().zip(sum.iter()).enumerate() {
+        for (i, (a, b)) in macro_xs[&3].iter().zip(sum.iter()).enumerate() {
             if (a - b).abs() >= tol {
                 println!("DEBUG: Mismatch at index {}: MT=3={}, sum={}", i, a, b);
             }
@@ -1018,59 +1021,59 @@ mod tests {
     #[test]
     fn test_calculate_total_xs_neutron() {
         let mut material = Material::new();
-        
+
         // We don't need to actually load nuclides from JSON for this test,
         // we'll just use mock data
-        
+
         // Create some mock cross sections directly
         let mut mock_xs = HashMap::new();
-        
+
         // MT=2 (elastic scattering)
-        mock_xs.insert(String::from("2"), vec![1.0, 2.0, 3.0]);
-        
+        mock_xs.insert(2, vec![1.0, 2.0, 3.0]);
+
         // MT=4 (inelastic scattering - a component of MT=3)
-        mock_xs.insert(String::from("4"), vec![0.2, 0.4, 0.6]);
-        
+        mock_xs.insert(4, vec![0.2, 0.4, 0.6]);
+
         // MT=16 (n,2n - another component of MT=3)
-        mock_xs.insert(String::from("16"), vec![0.3, 0.6, 0.9]);
-        
+        mock_xs.insert(16, vec![0.3, 0.6, 0.9]);
+
         // MT=999 (some reaction not in the sum rules)
-        mock_xs.insert(String::from("999"), vec![0.1, 0.2, 0.3]);
-        
+        mock_xs.insert(999, vec![0.1, 0.2, 0.3]);
+
         // Set the mock cross sections directly
         material.macroscopic_xs_neutron = mock_xs.clone();
         material.unified_energy_grid_neutron = vec![1.0, 2.0, 3.0]; // Add a grid
-        
+
         // Calculate hierarchical MT numbers first (MT=3 from components)
         material.ensure_hierarchical_mt_numbers(None);
-        
+
         // Verify MT=3 was created correctly
-        assert!(material.macroscopic_xs_neutron.contains_key("3"), "MT=3 not created");
-        let mt3_xs = material.macroscopic_xs_neutron.get("3").unwrap();
+        assert!(material.macroscopic_xs_neutron.contains_key(&3), "MT=3 not created");
+        let mt3_xs = material.macroscopic_xs_neutron.get(&3).unwrap();
         assert_eq!(mt3_xs.len(), 3, "MT=3 cross section has wrong length");
         assert_eq!(mt3_xs[0], 0.5, "MT=3[0] is incorrect"); // 0.2 + 0.3
         assert_eq!(mt3_xs[1], 1.0, "MT=3[1] is incorrect"); // 0.4 + 0.6
         assert_eq!(mt3_xs[2], 1.5, "MT=3[2] is incorrect"); // 0.6 + 0.9
-        
+
         // Now calculate the total cross section
         let result = material.calculate_total_xs_neutron();
-        
+
         // Check that the total was calculated correctly
-        assert!(result.contains_key("total"), "Total cross section not found in result");
-        
+        assert!(result.contains_key(&1), "Total cross section not found in result");
+
         // Total should be the sum of MT=2 and MT=3
-        let total_xs = result.get("total").unwrap();
+        let total_xs = result.get(&1).unwrap();
         assert_eq!(total_xs.len(), 3, "Total cross section has wrong length");
         assert_eq!(total_xs[0], 1.5, "Total cross section[0] is incorrect"); // 1.0 + 0.5
         assert_eq!(total_xs[1], 3.0, "Total cross section[1] is incorrect"); // 2.0 + 1.0
         assert_eq!(total_xs[2], 4.5, "Total cross section[2] is incorrect"); // 3.0 + 1.5
-        
+
         // Verify that all cross sections are in the result
-        assert!(result.contains_key("2"), "MT=2 not found in result");
-        assert!(result.contains_key("3"), "MT=3 not found in result");
-        assert!(result.contains_key("4"), "MT=4 not found in result");
-        assert!(result.contains_key("16"), "MT=16 not found in result");
-        assert!(result.contains_key("999"), "MT=999 not found in result");
+        assert!(result.contains_key(&2), "MT=2 not found in result");
+        assert!(result.contains_key(&3), "MT=3 not found in result");
+        assert!(result.contains_key(&4), "MT=4 not found in result");
+        assert!(result.contains_key(&16), "MT=16 not found in result");
+        assert!(result.contains_key(&999), "MT=999 not found in result");
     }
 
     #[test]
@@ -1095,7 +1098,7 @@ mod tests {
         // Set total cross section (in barns * atoms/cm³, which gives cm⁻¹)
         // Intentionally using a simple pattern that's easy to verify
         let total_xs = vec![1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625];
-        material.macroscopic_xs_neutron.insert(String::from("total"), total_xs.clone());
+        material.macroscopic_xs_neutron.insert(1, total_xs.clone());
         
         // Test exact values from our mock data
         assert_eq!(material.mean_free_path_neutron(1.0), Some(1.0));
@@ -1124,7 +1127,7 @@ mod tests {
         let energy_grid = vec![1e6, 1.4e7, 1e8]; // eV
         let total_xs = vec![1.0, 0.5, 0.2]; // barns * atoms/cm³, so cm⁻¹
         material.unified_energy_grid_neutron = energy_grid.clone();
-        material.macroscopic_xs_neutron.insert("total".to_string(), total_xs.clone());
+        material.macroscopic_xs_neutron.insert(1, total_xs.clone());
         // 14 MeV = 1.4e7 eV
         let mfp = material.mean_free_path_neutron(1.4e7);
         assert!(mfp.is_some());
@@ -1362,10 +1365,10 @@ mod tests {
         // Calculate only MT=2
         let mt_filter = vec!["2".to_string()];
         let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
-        assert!(macro_xs_mt2.1.contains_key("2"), "Filtered macro_xs missing MT=2");
+        assert!(macro_xs_mt2.1.contains_key(&2), "Filtered macro_xs missing MT=2");
         // The cross section array for MT=2 should match the unfiltered result
-        let xs_all = &macro_xs_all.1["2"];
-        let xs_filtered = &macro_xs_mt2.1["2"];
+        let xs_all = &macro_xs_all.1[&2];
+        let xs_filtered = &macro_xs_mt2.1[&2];
         assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 macro_xs do not match");
     }
 

@@ -162,19 +162,23 @@ impl PyMaterial {
         mt_filter: Option<Vec<String>>,
     ) -> (Vec<f64>, HashMap<String, Vec<f64>>) {
         let mt_filter_ref = mt_filter.as_ref();
-        let (energy_grid, xs_dict) = self.internal.calculate_macroscopic_xs_neutron(mt_filter_ref);
+        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_filter_ref);
+        let xs_dict = xs_dict_i32.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
         (energy_grid, xs_dict)
     }
 
     /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
-    fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+    fn calculate_total_xs_neutron(&mut self) -> HashMap<i32, Vec<f64>> {
         self.internal.calculate_total_xs_neutron()
     }
 
     /// Get the macroscopic cross sections for neutrons
     #[getter]
     fn macroscopic_xs_neutron(&self) -> HashMap<String, Vec<f64>> {
-        self.internal.macroscopic_xs_neutron.clone()
+        self.internal.macroscopic_xs_neutron
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
     }
 
     /// Get the atoms per cubic centimeter for each nuclide in the material

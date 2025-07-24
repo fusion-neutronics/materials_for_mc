@@ -22,7 +22,7 @@ def test_calculate_total_xs_neutron():
     total_xs = material.calculate_total_xs_neutron()
     
     # Verify that the total cross section was added
-    assert "total" in total_xs, "Total cross section not found in result"
+    assert 1 in total_xs, "Total cross section not found in result"
     
     # Verify that the total is the sum of relevant MT reactions
     # Choose a few points to check
@@ -33,4 +33,4 @@ def test_calculate_total_xs_neutron():
     for mt in relevant_mts:
         if mt in macro_xs:
             # Check that values were added to the total (simplified test)
-            assert total_xs["total"][0] >= macro_xs[mt][0], f"Total XS should include {mt}"
+            assert total_xs[1][0] >= macro_xs[mt][0], f"Total XS should include {mt}"
