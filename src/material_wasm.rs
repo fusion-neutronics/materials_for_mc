@@ -12,7 +12,7 @@ pub struct WasmMaterial {
 #[derive(Serialize, Deserialize)]
 struct MacroscopicXsResult {
     energy_grid: Vec<f64>,
-    cross_sections: HashMap<String, Vec<f64>>,
+    cross_sections: HashMap<i32, Vec<f64>>,
 }
 
 #[wasm_bindgen]
