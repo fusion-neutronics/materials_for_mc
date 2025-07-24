@@ -10,6 +10,7 @@ pub fn get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
         }
     }
     let mut out = std::collections::HashSet::new();
+    out.insert(mt_num); // Always include mt_num itself
     collect(mt_num, &mut out);
     let mut v: Vec<i32> = out.into_iter().collect();
     v.sort();
