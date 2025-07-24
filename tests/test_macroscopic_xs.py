@@ -23,7 +23,7 @@ def test_macroscopic_xs_neutron():
     assert "Li7" in micro_xs, "No microscopic cross sections for Li7"
     
     # Calculate macroscopic cross sections - will use the cached grid
-    macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
     
     # Verify the macroscopic cross sections contain MT=2
     assert "2" in macro_xs, "No MT=2 in macroscopic cross sections"
