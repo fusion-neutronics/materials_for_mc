@@ -235,9 +235,10 @@ def test_macroscopic_xs_neutron_mt_filter():
     mat.read_nuclides_from_json({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     mat.set_density("g/cm3", 1.0)
     # Calculate all MTs
-    macro_xs_all = mat.calculate_macroscopic_xs_neutron()
+    energy_all, macro_xs_all = mat.calculate_macroscopic_xs_neutron()
     # Calculate only MT=2
-    macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(mt_filter=["2"])
+    energy_single, macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(mt_filter=["2"])
+    assert len(energy_single) == len(energy_all), "Energy grids should match"
     # Only MT=2 should be present in the filtered result
     assert list(macro_xs_mt2.keys()) == ["2"], "Filtered macro_xs should have only MT=2"
     # The cross section array for MT=2 should match the unfiltered result
