@@ -351,6 +351,11 @@ impl Material {
     /// 
     /// This implementation processes MT numbers in dependency order (bottom-up),
     /// ensuring that all constituents are calculated before their parents.
+    /// TODO To maximize performance for filtered requests, you could modify
+    // ensure_hierarchical_mt_numbers to only generate hierarchical MTs that
+    // are needed for the current filter (and their parents, if required),
+    // instead of all possible hierarchical MTs use this in calculate_macroscopic_xs_neutron
+    // when passing in a reaction
     pub fn ensure_hierarchical_mt_numbers(&mut self) {
         // Get a mutable reference to the macroscopic cross sections
         let xs_map = &mut self.macroscopic_xs_neutron;
