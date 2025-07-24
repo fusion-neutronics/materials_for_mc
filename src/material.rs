@@ -247,7 +247,6 @@ impl Material {
     /// If mt_filter is Some, only those MTs will be included (by string match).
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
-        unified_grid: Option<&[f64]>,
         mt_filter: Option<&Vec<String>>,
     ) -> HashMap<String, Vec<f64>> {
         // Ensure nuclides are loaded before proceeding
@@ -438,7 +437,7 @@ impl Material {
         
         // Get the macroscopic cross sections (calculate if not already done)
         let macro_xs = if self.macroscopic_xs_neutron.is_empty() {
-            self.calculate_macroscopic_xs_neutron(None, None)
+            self.calculate_macroscopic_xs_neutron(None)
         } else {
             self.macroscopic_xs_neutron.clone()
         };
@@ -1282,10 +1281,10 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         let grid = material.unified_energy_grid_neutron();
         // Calculate all MTs
-        let macro_xs_all = material.calculate_macroscopic_xs_neutron(Some(&grid), None);
+        let macro_xs_all = material.calculate_macroscopic_xs_neutron(None);
         // Calculate only MT=2
         let mt_filter = vec!["2".to_string()];
-        let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&grid), Some(&mt_filter));
+        let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         // Only MT=2 should be present in the filtered result
         assert_eq!(macro_xs_mt2.len(), 1, "Filtered macro_xs should have only one MT");
         assert!(macro_xs_mt2.contains_key("2"), "Filtered macro_xs missing MT=2");
@@ -1309,7 +1308,7 @@ mod tests {
         // Should panic when calculating macroscopic cross sections with no density
         let result = std::panic::catch_unwind(move || {
             let mut material = material;
-            material.calculate_macroscopic_xs_neutron(Some(&grid), None);
+            material.calculate_macroscopic_xs_neutron(None);
         });
         assert!(result.is_err(), "Should panic if density is not set for calculate_macroscopic_xs_neutron");
 
