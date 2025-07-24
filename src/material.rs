@@ -255,8 +255,25 @@ impl Material {
         }
         // Get the energy grid
         let energy_grid = self.unified_energy_grid_neutron();
-        // First get microscopic cross sections on the unified grid, passing mt_filter
-        let micro_xs = self.calculate_microscopic_xs_neutron(mt_filter);
+        // Expand the filter to include all child MTs for any hierarchical MTs
+        let expanded_filter = if let Some(filter) = mt_filter {
+            use crate::data::SUM_RULES;
+            let mut expanded: std::collections::HashSet<String> = filter.iter().cloned().collect();
+            for mt in filter {
+                if let Ok(mt_num) = mt.parse::<i32>() {
+                    if let Some(children) = SUM_RULES.get(&mt_num) {
+                        for child in children {
+                            expanded.insert(child.to_string());
+                        }
+                    }
+                }
+            }
+            Some(expanded.into_iter().collect::<Vec<_>>())
+        } else {
+            None
+        };
+        // First get microscopic cross sections on the unified grid, passing expanded_filter
+        let micro_xs = self.calculate_microscopic_xs_neutron(expanded_filter.as_ref());
         // Create a map to hold macroscopic cross sections for each MT
         let mut macro_xs: HashMap<String, Vec<f64>> = HashMap::new();
         // Find all unique MT numbers across all nuclides
@@ -294,11 +311,34 @@ impl Material {
         }
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
-        // Only ensure hierarchical MT numbers if calculating all MTs
+        use crate::data::SUM_RULES;
+        // If calculating all MTs, ensure all hierarchical MT numbers
         if mt_filter.is_none() {
             self.ensure_hierarchical_mt_numbers();
+            return (energy_grid, self.macroscopic_xs_neutron.clone());
+        } else if let Some(filter) = mt_filter {
+            // Always ensure hierarchical MT numbers are generated
+            self.ensure_hierarchical_mt_numbers();
+            use crate::data::SUM_RULES;
+            for mt in filter {
+                // Always copy the parent MT from self.macroscopic_xs_neutron if present
+                if let Some(xs) = self.macroscopic_xs_neutron.get(mt) {
+                    macro_xs.insert(mt.clone(), xs.clone());
+                }
+                // If the parent is a hierarchical MT, also include all its children
+                if let Ok(mt_num) = mt.parse::<i32>() {
+                    if let Some(children) = SUM_RULES.get(&mt_num) {
+                        for child in children {
+                            let child_str = child.to_string();
+                            if let Some(child_xs) = self.macroscopic_xs_neutron.get(&child_str) {
+                                macro_xs.insert(child_str, child_xs.clone());
+                            }
+                        }
+                    }
+                }
+            }
         }
-        (energy_grid, self.macroscopic_xs_neutron.clone())
+        (energy_grid, macro_xs)
     }
 
     /// Calculate hierarchical MT numbers when they are missing from the original data
@@ -375,34 +415,29 @@ impl Material {
         // Now process in the determined order
         for mt in processing_order {
             let mt_str = mt.to_string();
-            
             // Skip if this MT already exists
             if xs_map.contains_key(&mt_str) {
                 continue;
             }
-            
             // Skip if this MT is not in the sum rules
             if !sum_rules.contains_key(&mt) {
                 continue;
             }
-            
             // Initialize a vector for this MT with zeros
             let mut mt_xs = vec![0.0; grid_length];
-            let mut has_constituents = false;
-            
-            // Sum the constituent MT numbers
+            let mut found_any_child = false;
+            // Sum only the available constituent MT numbers
             for &constituent_mt in &sum_rules[&mt] {
                 let constituent_mt_str = constituent_mt.to_string();
                 if let Some(xs_values) = xs_map.get(&constituent_mt_str) {
                     for (i, &xs) in xs_values.iter().enumerate() {
                         mt_xs[i] += xs;
                     }
-                    has_constituents = true;
+                    found_any_child = true;
                 }
             }
-            
-            // Only add this MT if at least one constituent was found
-            if has_constituents {
+            // Add this MT if at least one child was found (even if not all)
+            if found_any_child {
                 xs_map.insert(mt_str, mt_xs);
             }
         }
@@ -670,6 +705,38 @@ impl Material {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_hierarchical_mt3_generated_for_li6() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 0.534).unwrap();
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        // Request only MT=3 (not present in Li6.json, but hierarchical)
+        let mt_filter = vec!["3".to_string()];
+        let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
+        println!("DEBUG: macro_xs keys: {:?}", macro_xs.keys().collect::<Vec<_>>());
+        println!("DEBUG: self.macroscopic_xs_neutron keys: {:?}", material.macroscopic_xs_neutron.keys().collect::<Vec<_>>());
+        assert!(macro_xs.contains_key("3"), "MT=3 should be generated by sum rule for Li6");
+        // Optionally check that the cross section is the sum of children
+        use crate::data::SUM_RULES;
+        let children = SUM_RULES.get(&3).unwrap();
+        let mut sum = vec![0.0; macro_xs["3"].len()];
+        for child in children {
+            let child_str = child.to_string();
+            if let Some(xs) = macro_xs.get(&child_str) {
+                for (i, v) in xs.iter().enumerate() {
+                    sum[i] += v;
+                }
+            }
+        }
+        let tol = 1e-10;
+        for (a, b) in macro_xs["3"].iter().zip(sum.iter()) {
+            assert!((a - b).abs() < tol, "MT=3 cross section should equal sum of children");
+        }
+    }
     use super::*;
 
     #[test]
