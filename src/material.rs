@@ -294,7 +294,11 @@ impl Material {
         }
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
-        (energy_grid, macro_xs)
+        // Only ensure hierarchical MT numbers if calculating all MTs
+        if mt_filter.is_none() {
+            self.ensure_hierarchical_mt_numbers();
+        }
+        (energy_grid, self.macroscopic_xs_neutron.clone())
     }
 
     /// Calculate hierarchical MT numbers when they are missing from the original data
@@ -442,8 +446,6 @@ impl Material {
         } else {
             (self.unified_energy_grid_neutron.clone(), self.macroscopic_xs_neutron.clone())
         };
-        // Ensure hierarchical MT numbers are calculated (especially MT=3)
-        self.ensure_hierarchical_mt_numbers();
         // Get the length of the energy grid from any MT reaction
         let grid_length = macro_xs.values().next().map_or(0, |xs| xs.len());
         // If there are no cross sections, return the empty HashMap
