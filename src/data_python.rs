@@ -51,7 +51,7 @@ pub fn atomic_masses(py: Python) -> PyObject {
 
 #[pyfunction]
 pub fn py_get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
-    get_all_mt_descendants(mt_num, &SUM_RULES)
+    get_all_mt_descendants(mt_num)
 }
 #[pymodule]
 fn data_python(_py: Python, m: &PyModule) -> PyResult<()> {

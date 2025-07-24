@@ -1,16 +1,16 @@
 /// Recursively collect all descendant MT numbers for a given parent MT number using sum rules, returning a sorted Vec<i32>
-pub fn get_all_mt_descendants(mt_num: i32, sum_rules: &std::collections::HashMap<i32, Vec<i32>>) -> Vec<i32> {
-    fn collect(mt_num: i32, sum_rules: &std::collections::HashMap<i32, Vec<i32>>, out: &mut std::collections::HashSet<i32>) {
-        if let Some(children) = sum_rules.get(&mt_num) {
+pub fn get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
+    fn collect(mt_num: i32, out: &mut std::collections::HashSet<i32>) {
+        if let Some(children) = crate::data::SUM_RULES.get(&mt_num) {
             for &child in children {
                 if out.insert(child) {
-                    collect(child, sum_rules, out);
+                    collect(child, out);
                 }
             }
         }
     }
     let mut out = std::collections::HashSet::new();
-    collect(mt_num, sum_rules, &mut out);
+    collect(mt_num, &mut out);
     let mut v: Vec<i32> = out.into_iter().collect();
     v.sort();
     v

@@ -264,7 +264,7 @@ impl Material {
             for mt in filter {
                 if let Ok(mt_num) = mt.parse::<i32>() {
                     expanded.insert(mt_num);
-                    for child in get_all_mt_descendants(mt_num, &SUM_RULES) {
+                    for child in get_all_mt_descendants(mt_num) {
                         expanded.insert(child);
                     }
                 }

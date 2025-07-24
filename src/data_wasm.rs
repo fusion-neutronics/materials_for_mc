@@ -39,7 +39,6 @@ pub fn atomic_masses() -> JsValue {
 
 #[wasm_bindgen]
 pub fn wasm_get_all_mt_descendants(mt_num: i32) -> js_sys::Array {
-    let sum_rules = &crate::data::SUM_RULES;
-    let v = get_all_mt_descendants(mt_num, sum_rules);
+    let v = get_all_mt_descendants(mt_num);
     v.into_iter().map(|x| wasm_bindgen::JsValue::from(js_sys::Number::from(x))).collect::<js_sys::Array>()
 }
