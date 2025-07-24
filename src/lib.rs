@@ -107,5 +107,6 @@ fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<element_python::PyElement>()?;
     m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(crate::data_python::natural_abundance, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::data_python::element_nuclides, m)?)?;
     Ok(())
 }
