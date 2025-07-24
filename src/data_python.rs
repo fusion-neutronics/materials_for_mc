@@ -22,9 +22,3 @@ pub fn element_nuclides(py: Python) -> PyObject {
     dict.into()
 }
 
-#[pymodule]
-fn materials_for_mc(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(natural_abundance, m)?)?;
-    m.add_function(wrap_pyfunction!(element_nuclides, m)?)?;
-    Ok(())
-}
