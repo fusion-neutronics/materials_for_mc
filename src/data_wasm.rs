@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen::to_value;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, SUM_RULES, ELEMENT_NAMES, ATOMIC_MASSES};
+use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, SUM_RULES, ELEMENT_NAMES, ATOMIC_MASSES, get_all_mt_descendants};
 
 #[wasm_bindgen]
 pub fn natural_abundance() -> JsValue {
@@ -40,9 +40,6 @@ pub fn atomic_masses() -> JsValue {
 #[wasm_bindgen]
 pub fn wasm_get_all_mt_descendants(mt_num: i32) -> js_sys::Array {
     let sum_rules = &crate::data::SUM_RULES;
-    let mut out = std::collections::HashSet::new();
-    get_all_mt_descendants(mt_num, sum_rules, &mut out);
-    let mut v: Vec<i32> = out.into_iter().collect();
-    v.sort();
-    v.into_iter().map(|x| js_sys::Number::from(x).into()).collect()
+    let v = get_all_mt_descendants(mt_num, sum_rules);
+    v.into_iter().map(|x| wasm_bindgen::JsValue::from(js_sys::Number::from(x))).collect::<js_sys::Array>()
 }
