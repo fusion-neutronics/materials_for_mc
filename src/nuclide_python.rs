@@ -24,7 +24,7 @@ pub struct PyNuclide {
     #[pyo3(get)]
     pub library: Option<String>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
-    pub reactions: HashMap<String, HashMap<String, Reaction>>,
+    pub reactions: HashMap<String, HashMap<i32, Reaction>>,
 }
 
 #[cfg(feature = "pyo3")]
@@ -67,23 +67,16 @@ impl PyNuclide {
         // Create a dictionary of temperature -> mt -> reaction
         for (temp, mt_map) in &self.reactions {
             let mt_dict = PyDict::new(py);
-            
             for (mt, reaction) in mt_map {
                 let reaction_dict = PyDict::new(py);
                 reaction_dict.set_item("cross_section", &reaction.cross_section)?;
                 reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
                 reaction_dict.set_item("interpolation", &reaction.interpolation)?;
-                
-                // Add energy if available
                 if !reaction.energy.is_empty() {
                     reaction_dict.set_item("energy", &reaction.energy)?;
                 }
-                
-                // Add to MT map
                 mt_dict.set_item(mt, reaction_dict)?;
             }
-            
-            // Add to temperature map
             py_dict.set_item(temp, mt_dict)?;
         }
         
@@ -96,7 +89,7 @@ impl PyNuclide {
     }
 
     #[getter]
-    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+    pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         Nuclide::from(self.clone()).reaction_mts()
     }
 
@@ -120,9 +113,9 @@ impl PyNuclide {
     }
     
     // Get the reaction energy grid for a specific reaction
-    pub fn get_reaction_energy_grid(&self, temperature: &str, mt: &str) -> Option<Vec<f64>> {
+    pub fn get_reaction_energy_grid(&self, temperature: &str, mt: i32) -> Option<Vec<f64>> {
         if let Some(temp_reactions) = self.reactions.get(temperature) {
-            if let Some(reaction) = temp_reactions.get(mt) {
+            if let Some(reaction) = temp_reactions.get(&mt) {
                 if !reaction.energy.is_empty() {
                     return Some(reaction.energy.clone());
                 }

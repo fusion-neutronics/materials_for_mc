@@ -140,11 +140,12 @@ def test_material_reaction_mts_lithium():
     mat.add_element('Li', 1.0)
     # This will load Li6 and Li7, so the MTs should be the union of both
     mts = mat.reaction_mts
-    expected = sorted(['2',
-        '102', '103', '104', '105', '16', '203', '204', '205', '207', '24', '25', '301', '444',
-        '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65',
-        '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
-        '81', '82'
+    print(mts)
+    expected = sorted([2,
+        102, 103, 104, 105, 16, 203, 204, 205, 207, 24, 25, 301, 444,
+        51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+        66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+        81, 82
     ])
     assert mts == expected, f"Material lithium MT list does not match expected. Got {mts}"
 

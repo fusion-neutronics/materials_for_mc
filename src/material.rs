@@ -201,35 +201,31 @@ impl Material {
                             // Only process the requested MTs if mt_filter is Some
                             let mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| v.iter().copied().collect());
                             let mt_iter = temp_reactions.iter().filter(|(k, _)| {
-                                let mt_num = k.parse::<i32>().ok();
-                                match (&mt_set, mt_num) {
-                                    (Some(set), Some(mt)) => set.contains(&mt),
-                                    (None, Some(_)) => true,
-                                    _ => false,
+                                match &mt_set {
+                                    Some(set) => set.contains(k),
+                                    None => true,
                                 }
                             });
-                            for (mt, reaction) in mt_iter {
-                                if let Ok(mt_num) = mt.parse::<i32>() {
-                                    let mut xs_values = Vec::with_capacity(grid.len());
-                                    let threshold_idx = reaction.threshold_idx;
-                                    let reaction_energy = if threshold_idx < energy_grid.len() {
-                                        &energy_grid[threshold_idx..]
-                                    } else {
-                                        continue;
-                                    };
-                                    if reaction.cross_section.len() != reaction_energy.len() {
-                                        continue;
-                                    }
-                                    for &grid_energy in &grid {
-                                        if grid_energy < reaction_energy[0] {
-                                            xs_values.push(0.0);
-                                        } else {
-                                            let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
-                                            xs_values.push(xs);
-                                        }
-                                    }
-                                    nuclide_xs.insert(mt_num, xs_values);
+                            for (&mt, reaction) in mt_iter {
+                                let mut xs_values = Vec::with_capacity(grid.len());
+                                let threshold_idx = reaction.threshold_idx;
+                                let reaction_energy = if threshold_idx < energy_grid.len() {
+                                    &energy_grid[threshold_idx..]
+                                } else {
+                                    continue;
+                                };
+                                if reaction.cross_section.len() != reaction_energy.len() {
+                                    continue;
                                 }
+                                for &grid_energy in &grid {
+                                    if grid_energy < reaction_energy[0] {
+                                        xs_values.push(0.0);
+                                    } else {
+                                        let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
+                                        xs_values.push(xs);
+                                    }
+                                }
+                                nuclide_xs.insert(mt, xs_values);
                             }
                         }
                     }
@@ -671,7 +667,7 @@ impl Material {
     
     /// Returns a sorted list of all unique MT numbers available in this material (across all nuclides).
     /// Ensures all nuclide JSON data is loaded.
-    pub fn reaction_mts(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    pub fn reaction_mts(&mut self) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
         // Ensure all nuclides are loaded using the global config
         self.ensure_nuclides_loaded()?;
         let mut mt_set = std::collections::HashSet::new();
@@ -682,7 +678,7 @@ impl Material {
                 }
             }
         }
-        let mut mt_vec: Vec<String> = mt_set.into_iter().collect();
+        let mut mt_vec: Vec<i32> = mt_set.into_iter().collect();
         mt_vec.sort();
         Ok(mt_vec)
     }
@@ -1219,10 +1215,12 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // This will load Li6 and Li7, so the MTs should be the union of both
-        let mts = material.reaction_mts().expect("Failed to get reaction MTs");
-        let expected = vec![
-            "102", "103", "104", "105", "16", "2", "203", "204", "205", "207", "24", "25", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82"
-        ].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let mut mts = material.reaction_mts().expect("Failed to get reaction MTs");
+        let mut expected = vec![
+            102, 103, 104, 105, 16, 2, 203, 204, 205, 207, 24, 25, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82
+        ];
+        mts.sort();
+        expected.sort();
         assert_eq!(mts, expected, "Material lithium MT list does not match expected");
     }
 
@@ -1283,8 +1281,7 @@ mod tests {
         // For each MT in the material, compare the cross sections
         for (mt, xs_mat) in &micro_xs_mat["Li6"] {
             // Only compare if MT exists in nuclide
-            let mt_str = mt.to_string();
-            if let Some(reaction) = reactions.get(&mt_str) {
+            if let Some(reaction) = reactions.get(mt) {
                 let threshold_idx = reaction.threshold_idx;
                 let nuclide_energy = if threshold_idx < energy_grid.len() {
                     &energy_grid[threshold_idx..]
