@@ -173,24 +173,23 @@ impl Material {
     /// 
     /// This method interpolates the microscopic cross sections for each nuclide
     /// onto the unified energy grid for all available MT reactions, or only for the specified MTs if provided.
-    /// If unified_energy_grid is None, it will use the cached grid or build a new one.
-    /// If mt_filter is Some, only those MTs will be included (by string match).
+    /// If mt_filter is Some, only those MTs will be included (by int match).
     /// Returns a nested HashMap: nuclide -> mt -> cross_section values
     pub fn calculate_microscopic_xs_neutron(
         &mut self,
-        mt_filter: Option<&Vec<String>>,
-    ) -> HashMap<String, HashMap<String, Vec<f64>>> {
+        mt_filter: Option<&Vec<i32>>,
+    ) -> HashMap<String, HashMap<i32, Vec<f64>>> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
         // Always use the cached grid or build it automatically
         let grid = self.unified_energy_grid_neutron();
-        let mut micro_xs: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
+        let mut micro_xs: HashMap<String, HashMap<i32, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
         let temp_with_k = format!("{}K", temperature);
         for nuclide in self.nuclides.keys() {
-            let mut nuclide_xs = HashMap::new();
+            let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 let temp_reactions = nuclide_data.reactions.get(temperature)
                     .or_else(|| nuclide_data.reactions.get(&temp_with_k));
@@ -200,33 +199,37 @@ impl Material {
                             .or_else(|| energy_map.get(&temp_with_k));
                         if let Some(energy_grid) = energy_grid {
                             // Only process the requested MTs if mt_filter is Some
-                            let mt_set: Option<std::collections::HashSet<&String>> = mt_filter.map(|v| v.iter().collect());
+                            let mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| v.iter().copied().collect());
                             let mt_iter = temp_reactions.iter().filter(|(k, _)| {
-                                match &mt_set {
-                                    Some(set) => set.contains(k),
-                                    None => true,
+                                let mt_num = k.parse::<i32>().ok();
+                                match (&mt_set, mt_num) {
+                                    (Some(set), Some(mt)) => set.contains(&mt),
+                                    (None, Some(_)) => true,
+                                    _ => false,
                                 }
                             });
                             for (mt, reaction) in mt_iter {
-                                let mut xs_values = Vec::with_capacity(grid.len());
-                                let threshold_idx = reaction.threshold_idx;
-                                let reaction_energy = if threshold_idx < energy_grid.len() {
-                                    &energy_grid[threshold_idx..]
-                                } else {
-                                    continue;
-                                };
-                                if reaction.cross_section.len() != reaction_energy.len() {
-                                    continue;
-                                }
-                                for &grid_energy in &grid {
-                                    if grid_energy < reaction_energy[0] {
-                                        xs_values.push(0.0);
+                                if let Ok(mt_num) = mt.parse::<i32>() {
+                                    let mut xs_values = Vec::with_capacity(grid.len());
+                                    let threshold_idx = reaction.threshold_idx;
+                                    let reaction_energy = if threshold_idx < energy_grid.len() {
+                                        &energy_grid[threshold_idx..]
                                     } else {
-                                        let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
-                                        xs_values.push(xs);
+                                        continue;
+                                    };
+                                    if reaction.cross_section.len() != reaction_energy.len() {
+                                        continue;
                                     }
+                                    for &grid_energy in &grid {
+                                        if grid_energy < reaction_energy[0] {
+                                            xs_values.push(0.0);
+                                        } else {
+                                            let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
+                                            xs_values.push(xs);
+                                        }
+                                    }
+                                    nuclide_xs.insert(mt_num, xs_values);
                                 }
-                                nuclide_xs.insert(mt.clone(), xs_values);
                             }
                         }
                     }
@@ -248,7 +251,7 @@ impl Material {
     /// If mt_filter is Some, only those MTs will be included (by string match).
     pub fn calculate_macroscopic_xs_neutron(
         &mut self,
-        mt_filter: Option<&Vec<String>>,
+        mt_filter: Option<&Vec<i32>>,
     ) -> (Vec<f64>, HashMap<i32, Vec<f64>>) {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
@@ -261,12 +264,10 @@ impl Material {
         // Use public get_all_mt_descendants from data.rs
         let expanded_filter: Option<std::collections::HashSet<i32>> = if let Some(filter) = mt_filter {
             let mut expanded = std::collections::HashSet::new();
-            for mt in filter {
-                if let Ok(mt_num) = mt.parse::<i32>() {
-                    expanded.insert(mt_num);
-                    for child in get_all_mt_descendants(mt_num) {
-                        expanded.insert(child);
-                    }
+            for &mt_num in filter {
+                expanded.insert(mt_num);
+                for child in get_all_mt_descendants(mt_num) {
+                    expanded.insert(child);
                 }
             }
             Some(expanded)
@@ -274,14 +275,12 @@ impl Material {
             None
         };
         // If a filter is provided, expand it to include all descendants for hierarchical MTs
-        let expanded_mt_filter: Option<Vec<String>> = if let Some(filter) = mt_filter {
+        let expanded_mt_filter: Option<Vec<i32>> = if let Some(filter) = mt_filter {
             let mut expanded = std::collections::HashSet::new();
-            for mt in filter {
-                if let Ok(mt_num) = mt.parse::<i32>() {
-                    expanded.insert(mt_num.to_string());
-                    for child in get_all_mt_descendants(mt_num) {
-                        expanded.insert(child.to_string());
-                    }
+            for &mt_num in filter {
+                expanded.insert(mt_num);
+                for child in get_all_mt_descendants(mt_num) {
+                    expanded.insert(child);
                 }
             }
             Some(expanded.into_iter().collect())
@@ -295,11 +294,9 @@ impl Material {
         // Find all unique MT numbers across all nuclides (as i32)
         let mut all_mts = std::collections::HashSet::new();
         for nuclide_data in micro_xs.values() {
-            for mt_str in nuclide_data.keys() {
-                if let Ok(mt) = mt_str.parse::<i32>() {
-                    if expanded_filter.is_none() || expanded_filter.as_ref().unwrap().contains(&mt) {
-                        all_mts.insert(mt);
-                    }
+            for &mt in nuclide_data.keys() {
+                if expanded_filter.is_none() || expanded_filter.as_ref().unwrap().contains(&mt) {
+                    all_mts.insert(mt);
                 }
             }
         }
@@ -315,12 +312,10 @@ impl Material {
         for (nuclide, _) in &self.nuclides {
             if let Some(nuclide_data) = micro_xs.get(nuclide) {
                 if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
-                    for (mt_str, xs_values) in nuclide_data {
-                        if let Ok(mt) = mt_str.parse::<i32>() {
-                            if let Some(macro_values) = macro_xs.get_mut(&mt) {
-                                for (i, &xs) in xs_values.iter().enumerate() {
-                                    macro_values[i] += atoms_per_bcm * xs;
-                                }
+                    for (&mt, xs_values) in nuclide_data {
+                        if let Some(macro_values) = macro_xs.get_mut(&mt) {
+                            for (i, &xs) in xs_values.iter().enumerate() {
+                                macro_values[i] += atoms_per_bcm * xs;
                             }
                         }
                     }
@@ -337,11 +332,9 @@ impl Material {
         } else if let Some(filter) = mt_filter {
             let sum_rules = &*SUM_RULES;
             let mut hierarchical_mts = Vec::new();
-            for mt in filter {
-                if let Ok(mt_num) = mt.parse::<i32>() {
-                    if sum_rules.contains_key(&mt_num) {
-                        hierarchical_mts.push(mt_num);
-                    }
+            for &mt_num in filter {
+                if sum_rules.contains_key(&mt_num) {
+                    hierarchical_mts.push(mt_num);
                 }
             }
             if !hierarchical_mts.is_empty() {
@@ -715,7 +708,7 @@ mod tests {
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let mt_filter = vec!["3".to_string()];
+        let mt_filter = vec![3];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=3 is requested");
     }
@@ -729,7 +722,7 @@ mod tests {
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let mt_filter = vec!["24".to_string()];
+        let mt_filter = vec![24];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=24 is requested");
     }
@@ -743,7 +736,7 @@ mod tests {
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Request only MT=3 (not present in Li6.json, but hierarchical)
-        let mt_filter = vec!["3".to_string()];
+        let mt_filter = vec![3];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         println!("DEBUG: macro_xs keys: {:?}", macro_xs.keys().collect::<Vec<_>>());
         println!("DEBUG: self.macroscopic_xs_neutron keys: {:?}", material.macroscopic_xs_neutron.keys().collect::<Vec<_>>());
@@ -1251,13 +1244,13 @@ mod tests {
         // Check that both Li6 and Li7 are present
         assert!(micro_xs.contains_key("Li6"));
         assert!(micro_xs.contains_key("Li7"));
-        // Check that for a known MT (e.g., "2"), both nuclides have cross section data
-        let mt = "2";
-        assert!(micro_xs["Li6"].contains_key(mt), "Li6 missing MT=2");
-        assert!(micro_xs["Li7"].contains_key(mt), "Li7 missing MT=2");
+        // Check that for a known MT (e.g., 2), both nuclides have cross section data
+        let mt = 2;
+        assert!(micro_xs["Li6"].contains_key(&mt), "Li6 missing MT=2");
+        assert!(micro_xs["Li7"].contains_key(&mt), "Li7 missing MT=2");
         // Check that the cross section arrays are the same length as the grid
-        assert_eq!(micro_xs["Li6"][mt].len(), grid.len());
-        assert_eq!(micro_xs["Li7"][mt].len(), grid.len());
+        assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
+        assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
     }
 
     #[test]
@@ -1290,7 +1283,8 @@ mod tests {
         // For each MT in the material, compare the cross sections
         for (mt, xs_mat) in &micro_xs_mat["Li6"] {
             // Only compare if MT exists in nuclide
-            if let Some(reaction) = reactions.get(mt) {
+            let mt_str = mt.to_string();
+            if let Some(reaction) = reactions.get(&mt_str) {
                 let threshold_idx = reaction.threshold_idx;
                 let nuclide_energy = if threshold_idx < energy_grid.len() {
                     &energy_grid[threshold_idx..]
@@ -1332,19 +1326,19 @@ mod tests {
         let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for all MTs
         let micro_xs_all = material.calculate_microscopic_xs_neutron(None);
-        // Calculate microscopic cross sections for only MT="2"
-        let mt_filter = vec!["2".to_string()];
+        // Calculate microscopic cross sections for only MT=2
+        let mt_filter = vec![2];
         let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&mt_filter));
-        // For each nuclide, only MT="2" should be present
+        // For each nuclide, only MT=2 should be present
         for nuclide in &["Li6", "Li7"] {
             assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
             let xs_map = &micro_xs_mt2[*nuclide];
             // Assert that only the requested MT is present
-            assert!(xs_map.keys().all(|k| k == "2"), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
+            assert!(xs_map.keys().all(|k| *k == 2), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
             assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
             // The cross section array for MT=2 should match the unfiltered result
-            let xs_all = &micro_xs_all[*nuclide]["2"];
-            let xs_filtered = &xs_map["2"];
+            let xs_all = &micro_xs_all[*nuclide][&2];
+            let xs_filtered = &xs_map[&2];
             assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 xs do not match for {}", nuclide);
         }
     }
@@ -1363,7 +1357,7 @@ mod tests {
         // Calculate all MTs
         let macro_xs_all = material.calculate_macroscopic_xs_neutron(None);
         // Calculate only MT=2
-        let mt_filter = vec!["2".to_string()];
+        let mt_filter = vec![2];
         let macro_xs_mt2 = material.calculate_macroscopic_xs_neutron(Some(&mt_filter));
         assert!(macro_xs_mt2.1.contains_key(&2), "Filtered macro_xs missing MT=2");
         // The cross section array for MT=2 should match the unfiltered result

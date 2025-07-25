@@ -143,24 +143,13 @@ impl PyMaterial {
     }
 
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
-    /// If mt_filter is provided, only those MTs will be included (by string match)
+    /// If mt_filter is provided, only those MTs will be included (by integer match)
     #[pyo3(signature = (mt_filter=None))]
     fn calculate_microscopic_xs_neutron(
         &mut self,
         mt_filter: Option<Vec<i32>>,
     ) -> HashMap<String, HashMap<i32, Vec<f64>>> {
-        // Convert Option<Vec<i32>> to Option<Vec<String>> for the internal Rust call
-        let mt_filter_str: Option<Vec<String>> = mt_filter.as_ref().map(|v| v.iter().map(|i| i.to_string()).collect());
-        let mt_filter_ref = mt_filter_str.as_ref();
-        let raw = self.internal.calculate_microscopic_xs_neutron(mt_filter_ref);
-        raw.into_iter()
-            .map(|(nuclide, mt_map)| {
-                let mt_map_int = mt_map.into_iter()
-                    .filter_map(|(mt, v)| mt.parse::<i32>().ok().map(|mt_int| (mt_int, v)))
-                    .collect();
-                (nuclide, mt_map_int)
-            })
-            .collect()
+        self.internal.calculate_microscopic_xs_neutron(mt_filter.as_ref())
     }
 
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
@@ -171,10 +160,7 @@ impl PyMaterial {
         &mut self,
         mt_filter: Option<Vec<i32>>,
     ) -> (Vec<f64>, HashMap<i32, Vec<f64>>) {
-        // Convert Option<Vec<i32>> to Option<Vec<String>> for the internal Rust call
-        let mt_filter_str: Option<Vec<String>> = mt_filter.as_ref().map(|v| v.iter().map(|i| i.to_string()).collect());
-        let mt_filter_ref = mt_filter_str.as_ref();
-        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_filter_ref);
+        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_filter.as_ref());
         (energy_grid, xs_dict_i32)
     }
 
