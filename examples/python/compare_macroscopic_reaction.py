@@ -15,8 +15,8 @@ mat2.add_nuclide('Li6',1)
 mat2.read_nuclides_from_json({'Li6':'tests/Li6.json'})
 mat2.set_density('g/cm3',2.)
 mat2.temperature = "294"
-my_energies, xs_dict = mat2.calculate_macroscopic_xs_neutron(['3'])
-my_macro = xs_dict['3']
+my_energies, xs_dict = mat2.calculate_macroscopic_xs_neutron([3])
+my_macro = xs_dict[3]
 
 import matplotlib.pyplot as plt
 plt.plot(openmc_energies, openmc_macro, label='OpenMC', linestyle='--')

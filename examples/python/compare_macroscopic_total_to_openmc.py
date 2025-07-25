@@ -15,10 +15,8 @@ openmc_xs=openmc_xs[0]
 mat1 = m4mc.Material()
 mat1.add_nuclide('Li6',1)
 mat1.set_density('g/cm3',20.)
-
-mat1.temperature = "294"  # Set temperature directly on the material
+mat1.temperature = "294"
 mat1.read_nuclides_from_json({'Li6':'tests/Li6.json'})
-# mat1.calculate_macroscopic_xs_neutron()
 mat1.calculate_total_xs_neutron()
 my_macro = mat1.macroscopic_xs_neutron[1]
 my_energies = mat1.unified_energy_grid_neutron()
@@ -28,9 +26,9 @@ for openmc_energy, my_energy in zip(openmc_energies, my_energies):
     # print(f'OpenMC: {openmc_energy}, My code: {my_energy}')
     assert np.isclose(openmc_energy , my_energy, rtol=1e-6, atol=1e-6)
 
-# for openmc_x, my_x in zip(openmc_xs, my_macro):
+for openmc_x, my_x in zip(openmc_xs, my_macro):
     # print(f'OpenMC: {openmc_x}, My code: {my_x}')
-    # assert np.isclose(openmc_x, my_x, rtol=1e-6, atol=1e-6)
+    assert np.isclose(openmc_x, my_x, rtol=1e-6, atol=1e-6)
 
 
 import matplotlib.pyplot as plt
