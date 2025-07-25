@@ -276,3 +276,17 @@ def test_macroscopic_xs_mt24_does_not_generate_mt1():
     mt_filter = [24]
     _, macro_xs = mat.calculate_macroscopic_xs_neutron(mt_filter)
     assert 1 not in macro_xs, "MT=1 should NOT be present when only MT=24 is requested"
+
+def test_sample_distance_to_collision_statistical():
+    mat = Material()
+    mat.add_nuclide("Li6", 1.0)
+    mat.set_density("g/cm3", 0.534)
+    mat.read_nuclides_from_json({"Li6": "tests/Li6.json"})
+    mat.temperature = "294"
+    mat.calculate_macroscopic_xs_neutron()  # Ensure xs are calculated
+    energy = 5.0e6
+    samples = []
+    for _ in range(100):
+        d = mat.sample_distance_to_collision(energy)
+        assert d is not None
+        assert d >= 0.0, f"Sampled distance should not be negative, got {d}"

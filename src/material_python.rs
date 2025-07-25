@@ -12,6 +12,16 @@ pub struct PyMaterial {
 
 #[pymethods]
 impl PyMaterial {
+    /// Python binding for sample_distance_to_collision
+    fn sample_distance_to_collision(&self, energy: f64, seed: Option<u64>) -> Option<f64> {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(12345),
+        };
+        self.internal.sample_distance_to_collision(energy, &mut rng)
+    }
     #[new]
     fn new() -> Self {
         PyMaterial {
