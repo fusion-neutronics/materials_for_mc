@@ -22,22 +22,34 @@ pub fn is_hierarchical_mt(mt: &str) -> bool {
 }
 pub static SUM_RULES: Lazy<HashMap<i32, Vec<i32>>> = Lazy::new(|| {
     HashMap::from([
-        (1, vec![2, 3]),
+        // 1: total
+        (1, vec![2, 3]), // elastic (2)
+        // 3: nonelastic
         (3, vec![4, 5, 11, 16, 17, 22, 23, 24, 25, 27, 28, 29, 30, 32, 33, 34, 35,
                36, 37, 41, 42, 44, 45, 152, 153, 154, 156, 157, 158, 159, 160,
                161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
                173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 185,
                186, 187, 188, 189, 190, 194, 195, 196, 198, 199, 200]),
+        // inelastic
         (4, (50..92).collect()),
+        // n,n2
         (16, (875..892).collect()),
+        // 18: fission
         (18, vec![19, 20, 21, 38]),
+        // 27: absorption/capture including fission
         (27, vec![18, 101]),
+        // 101: absorption/disappearance
         (101, vec![102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 113, 114,
                  115, 116, 117, 155, 182, 191, 192, 193, 197]),
+        // 103: proton production
         (103, (600..650).collect()),
+        // 104: deuteron production
         (104, (650..700).collect()),
+        // 105: tritium production
         (105, (700..750).collect()),
+        // 106: production of He3
         (106, (750..800).collect()),
+        // 107: production of He4
         (107, (800..850).collect())
     ])
 });

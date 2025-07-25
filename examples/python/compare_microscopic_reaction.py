@@ -8,10 +8,12 @@ openmc_xs=openmc_xs[0]
 
 nuc = m4mc.Nuclide()
 nuc.read_nuclide_from_json('tests/Li6.json')
-
-# Access the incident_particle attribute which is returned by the getter method
 xs = nuc.reactions['294'][2]['cross_section']
 energies = nuc.reactions['294'][2]['energy']
+
+nuc.microscopic_xs_neutron(temperature, mt)
+
+nuc.microscopic_xs_neutron[2]
 
 for openmc_x, my_x in zip(openmc_xs, xs):
     print(f'OpenMC: {openmc_x}, My code: {my_x}')
