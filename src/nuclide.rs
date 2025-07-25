@@ -32,7 +32,7 @@ pub struct Nuclide {
     pub library: Option<String>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
     #[serde(default)]
-    pub reactions: HashMap<String, HashMap<String, Reaction>>, // temperature -> mt -> Reaction
+    pub reactions: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt (i32) -> Reaction
 }
 
 impl Nuclide {
@@ -67,19 +67,17 @@ impl Nuclide {
     }
 
     /// Get a list of available MT numbers
-    pub fn reaction_mts(&self) -> Option<Vec<String>> {
+    pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         let mut mts = std::collections::HashSet::new();
-        
         for temp_reactions in self.reactions.values() {
-            for mt in temp_reactions.keys() {
-                mts.insert(mt.clone());
+            for &mt in temp_reactions.keys() {
+                mts.insert(mt);
             }
         }
-        
         if mts.is_empty() {
             None
         } else {
-            let mut mts_vec: Vec<String> = mts.into_iter().collect();
+            let mut mts_vec: Vec<i32> = mts.into_iter().collect();
             mts_vec.sort();
             Some(mts_vec)
         }
@@ -158,7 +156,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
     // Check if we have the old format with "reactions" field
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
         for (temp, mt_reactions) in reactions_obj {
-            let mut temp_reactions = HashMap::new();
+            let mut temp_reactions: HashMap<i32, Reaction> = HashMap::new();
             
             // Process all MT reactions for this temperature
             if let Some(mt_obj) = mt_reactions.as_object() {
@@ -217,7 +215,9 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                             }
                         }
                         
-                        temp_reactions.insert(mt.clone(), reaction);
+                        if let Ok(mt_int) = mt.parse::<i32>() {
+                            temp_reactions.insert(mt_int, reaction);
+                        }
                     }
                 }
             }
@@ -234,7 +234,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         if let Some(neutron_data) = ip_obj.get("neutron") {
             if let Some(reactions_obj) = neutron_data.get("reactions").and_then(|v| v.as_object()) {
                 for (temp, mt_reactions) in reactions_obj {
-                    let mut temp_reactions = HashMap::new();
+                    let mut temp_reactions: HashMap<i32, Reaction> = HashMap::new();
                     
                     // Process all MT reactions for this temperature
                     if let Some(mt_obj) = mt_reactions.as_object() {
@@ -281,7 +281,9 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                                     }
                                 }
                                 
-                                temp_reactions.insert(mt.clone(), reaction);
+                                if let Ok(mt_int) = mt.parse::<i32>() {
+                                    temp_reactions.insert(mt_int, reaction);
+                                }
                             }
                         }
                     }
@@ -380,9 +382,7 @@ mod tests {
         let path = Path::new("tests/Li6.json");
         let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
         let mts = nuclide.reaction_mts().expect("No MTs found");
-        // Example: check that some expected MTs are present (update as needed)
-        // You can update this list to match the actual MTs in your Li6.json
-        let expected = vec!["102", "103", "105", "2", "203", "204", "205", "207", "24", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81"].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let expected = vec![102, 103, 105, 2, 203, 204, 205, 207, 24, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81];
         for mt in &expected {
             assert!(mts.contains(mt), "Expected MT {} in Li6", mt);
         }
@@ -395,10 +395,12 @@ mod tests {
         // Load Li7 nuclide from test JSON
         let path = std::path::Path::new("tests/Li7.json");
         let nuclide = read_nuclide_from_json(path).expect("Failed to load Li7.json");
-        let mts = nuclide.reaction_mts().expect("No MTs found");
-        let expected = vec![
-            "102", "104", "16", "2", "203", "204", "205", "207", "24", "25", "301", "444", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82"
-        ].into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let mut mts = nuclide.reaction_mts().expect("No MTs found");
+        let mut expected = vec![
+            102, 104, 16, 2, 203, 204, 205, 207, 24, 25, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82
+        ];
+        mts.sort();
+        expected.sort();
         assert_eq!(mts, expected, "Li7 MT list does not match expected");
     }
 }

@@ -143,14 +143,13 @@ impl PyMaterial {
     }
 
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
-    /// If mt_filter is provided, only those MTs will be included (by string match)
+    /// If mt_filter is provided, only those MTs will be included (by integer match)
     #[pyo3(signature = (mt_filter=None))]
     fn calculate_microscopic_xs_neutron(
         &mut self,
-        mt_filter: Option<Vec<String>>,
-    ) -> HashMap<String, HashMap<String, Vec<f64>>> {
-        let mt_filter_ref = mt_filter.as_ref();
-        self.internal.calculate_microscopic_xs_neutron(mt_filter_ref)
+        mt_filter: Option<Vec<i32>>,
+    ) -> HashMap<String, HashMap<i32, Vec<f64>>> {
+        self.internal.calculate_microscopic_xs_neutron(mt_filter.as_ref())
     }
 
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
@@ -159,21 +158,20 @@ impl PyMaterial {
     #[pyo3(signature = (mt_filter=None))]
     fn calculate_macroscopic_xs_neutron(
         &mut self,
-        mt_filter: Option<Vec<String>>,
-    ) -> (Vec<f64>, HashMap<String, Vec<f64>>) {
-        let mt_filter_ref = mt_filter.as_ref();
-        let (energy_grid, xs_dict) = self.internal.calculate_macroscopic_xs_neutron(mt_filter_ref);
-        (energy_grid, xs_dict)
+        mt_filter: Option<Vec<i32>>,
+    ) -> (Vec<f64>, HashMap<i32, Vec<f64>>) {
+        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_filter.as_ref());
+        (energy_grid, xs_dict_i32)
     }
 
     /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
-    fn calculate_total_xs_neutron(&mut self) -> HashMap<String, Vec<f64>> {
+    fn calculate_total_xs_neutron(&mut self) -> HashMap<i32, Vec<f64>> {
         self.internal.calculate_total_xs_neutron()
     }
 
     /// Get the macroscopic cross sections for neutrons
     #[getter]
-    fn macroscopic_xs_neutron(&self) -> HashMap<String, Vec<f64>> {
+    fn macroscopic_xs_neutron(&self) -> HashMap<i32, Vec<f64>> {
         self.internal.macroscopic_xs_neutron.clone()
     }
 
@@ -207,7 +205,7 @@ impl PyMaterial {
 
     /// Get the sorted list of all unique MT numbers available in this material (across all nuclides)
     #[getter]
-    fn reaction_mts(&mut self) -> PyResult<Vec<String>> {
+    fn reaction_mts(&mut self) -> PyResult<Vec<i32>> {
         self.internal
             .reaction_mts()
             .map_err(|e| PyValueError::new_err(e.to_string()))

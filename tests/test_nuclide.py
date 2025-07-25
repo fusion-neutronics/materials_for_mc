@@ -9,16 +9,16 @@ def test_read_li6_nuclide():
     assert nuc1.mass_number == 6
     assert nuc1.neutron_number == 3
     assert nuc1.temperatures == ['294']
-    # We don't expect any specific order of MT numbers, just check they're all strings
-    assert all(isinstance(mt, str) for mt in nuc1.reaction_mts)
+    # We don't expect any specific order of MT numbers, just check they're all ints
+    assert all(isinstance(mt, int) for mt in nuc1.reaction_mts)
 
-    cs = nuc1.reactions['294']['2']['cross_section']
-    
+    cs = nuc1.reactions['294'][2]['cross_section']
+
     for entry in cs:
         assert isinstance(entry, float)
         assert isinstance(entry, float)
 
-    assert nuc1.reaction_mts == ['102', '103', '105', '2', '203', '204', '205', '207', '24', '301', '444', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81']
+        assert nuc1.reaction_mts == [2, 24, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 102, 103, 105, 203, 204, 205, 207, 301, 444]
 
 def test_read_li7_nuclide():
     nuc1 = Nuclide('Li7')
@@ -29,13 +29,13 @@ def test_read_li7_nuclide():
     assert nuc1.mass_number == 7
     assert nuc1.neutron_number == 4
     assert nuc1.temperatures == ['294']
-    # We don't expect any specific order of MT numbers, just check they're all strings
-    assert all(isinstance(mt, str) for mt in nuc1.reaction_mts)
+    # We don't expect any specific order of MT numbers, just check they're all ints
+    assert all(isinstance(mt, int) for mt in nuc1.reaction_mts)
 
-    cs = nuc1.reactions['294']['2']['cross_section']
+    cs = nuc1.reactions['294'][2]['cross_section']
     
     for entry in cs:
         assert isinstance(entry, float)
         assert isinstance(entry, float)
 
-    assert nuc1.reaction_mts == ['102', '104', '16', '2', '203', '204', '205', '207', '24', '25', '301', '444', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81', '82']
+        assert nuc1.reaction_mts == [2, 16, 24, 25, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 102, 104, 203, 204, 205, 207, 301, 444]

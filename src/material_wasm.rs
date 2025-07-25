@@ -12,7 +12,7 @@ pub struct WasmMaterial {
 #[derive(Serialize, Deserialize)]
 struct MacroscopicXsResult {
     energy_grid: Vec<f64>,
-    cross_sections: HashMap<String, Vec<f64>>,
+    cross_sections: HashMap<i32, Vec<f64>>,
 }
 
 #[wasm_bindgen]
@@ -99,7 +99,7 @@ impl WasmMaterial {
         }
         // Convert JS Array to Option<Vec<String>>
         let mt_filter_vec = mt_filter.map(|arr| {
-            arr.iter().filter_map(|v| v.as_string()).collect::<Vec<String>>()
+            arr.iter().filter_map(|v| v.as_f64().map(|num| num as i32)).collect::<Vec<i32>>()
         });
         let (energy_grid, xs) = self.inner.calculate_macroscopic_xs_neutron(mt_filter_vec.as_ref());
         let data = MacroscopicXsResult {

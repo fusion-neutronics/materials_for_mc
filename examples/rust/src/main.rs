@@ -11,7 +11,7 @@ fn main() {
     mat.set_density("g/cm3", 19.1).unwrap();
     mat.volume(Some(100.0)).unwrap();
     // mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
-    mat.calculate_macroscopic_xs_neutron(Some(&vec!["3".to_string()]));
+    mat.calculate_macroscopic_xs_neutron(Some(&vec![3]));
     // mat.calculate_microscopic_xs_neutron(None);
     // mat.calculate_macroscopic_xs_neutron(None);
 

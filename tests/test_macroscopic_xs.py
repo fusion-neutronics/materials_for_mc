@@ -17,7 +17,7 @@ def test_macroscopic_xs_neutron():
     
     # Calculate microscopic cross sections for all MT numbers using the cached grid
     micro_xs = material.calculate_microscopic_xs_neutron()
-    print(micro_xs)
+    print(micro_xs.keys())
     # Verify that we have cross sections for both nuclides
     assert "Li6" in micro_xs, "No microscopic cross sections for Li6"
     assert "Li7" in micro_xs, "No microscopic cross sections for Li7"
@@ -26,13 +26,13 @@ def test_macroscopic_xs_neutron():
     energy, macro_xs = material.calculate_macroscopic_xs_neutron()
     
     # Verify the macroscopic cross sections contain MT=2
-    assert "2" in macro_xs, "No MT=2 in macroscopic cross sections"
     
     # Verify the length of the macroscopic cross section array
-    assert len(macro_xs["2"]) == len(grid), "Macro XS length doesn't match grid length"
     
     # Verify all values are non-negative
-    assert all(xs >= 0 for xs in macro_xs["2"]), "Negative cross section values found"
+    assert 2 in macro_xs, "No MT=2 in macroscopic cross sections"
+    assert len(macro_xs[2]) == len(grid), "Macro XS length doesn't match grid length"
+    assert all(xs >= 0 for xs in macro_xs[2]), "Negative cross section values found"
     
     # Check that the macroscopic_xs_neutron property is accessible and contains data
     assert len(material.macroscopic_xs_neutron) > 0, "macroscopic_xs_neutron property is empty"
@@ -89,14 +89,18 @@ def test_macroscopic_xs_calculation_formula():
     atoms_per_cc = material.get_atoms_per_cc()
     
     # Calculate macroscopic cross sections
-    macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
     
     # Verify that macroscopic XS = atoms_per_cc * microscopic_xs * BARN_TO_CM2
     BARN_TO_CM2 = 1.0e-24
     
     # Check for MT=2 (elastic scattering) if it exists
-    if "2" in macro_xs and "Li6" in micro_xs and "2" in micro_xs["Li6"]:
-        for i in range(min(10, len(macro_xs["2"]))):  # Check first 10 points or all if less
-            expected = atoms_per_cc["Li6"] * micro_xs["Li6"]["2"][i]
-            assert macro_xs["2"][i] == pytest.approx(expected, rel=1e-6), \
+    for i in range(min(10, len(macro_xs[2]))):  # Check first 10 points or all if less
+        expected = atoms_per_cc["Li6"] * micro_xs["Li6"][2][i]
+        assert macro_xs[2][i] == pytest.approx(expected, rel=1e-6), \
+            f"Macroscopic XS calculation incorrect at index {i}"
+    if 2 in macro_xs and "Li6" in micro_xs and 2 in micro_xs["Li6"]:
+        for i in range(min(10, len(macro_xs[2]))):  # Check first 10 points or all if less
+            expected = atoms_per_cc["Li6"] * micro_xs["Li6"][2][i]
+            assert macro_xs[2][i] == pytest.approx(expected, rel=1e-6), \
                 f"Macroscopic XS calculation incorrect at index {i}"
