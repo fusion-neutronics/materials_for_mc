@@ -108,9 +108,9 @@ impl WasmNuclide {
     pub fn get_available_reactions(&self, temperature: &str) -> Result<Array, JsValue> {
         match self.inner.reactions.get(temperature) {
             Some(reactions) => {
-                let mt_numbers = reactions.keys().cloned().collect::<Vec<String>>();
+                let mt_numbers = reactions.keys().cloned().collect::<Vec<i32>>();
                 Ok(mt_numbers.into_iter()
-                    .map(|mt| JsValue::from_str(&mt))
+                    .map(|mt| JsValue::from(mt))
                     .collect::<Array>())
             },
             None => Err(JsValue::from_str(&format!("Temperature {} not found", temperature))),
