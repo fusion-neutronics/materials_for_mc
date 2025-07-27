@@ -1,36 +1,3 @@
-#[cfg(test)]
-mod expand_mt_filter_tests {
-    use super::*;
-    #[test]
-    fn test_expand_mt_filter_includes_descendants_and_self() {
-        // Example: MT=3 (should include itself and all descendants from get_all_mt_descendants)
-        let input = vec![3];
-        let expanded = Material::expand_mt_filter(&input);
-        let expected: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
-        // Should include 3 itself
-        assert!(expanded.contains(&3));
-        // Should include all descendants
-        for mt in &expected {
-            assert!(expanded.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
-        }
-        // Should not include unrelated MTs
-        assert!(!expanded.contains(&9999));
-
-        // Test with multiple MTs
-        let input2 = vec![3, 4];
-        let expanded2 = Material::expand_mt_filter(&input2);
-        let mut expected2: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
-        expected2.extend(get_all_mt_descendants(4));
-        for mt in &expected2 {
-            assert!(expanded2.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
-        }
-        assert!(expanded2.contains(&3));
-        assert!(expanded2.contains(&4));
-        assert!(!expanded2.contains(&9999));
-    }
-}
-// ...existing code...
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
@@ -1605,6 +1572,34 @@ mod tests {
 
         // Optionally, check that Li7 is sampled much more often than Li6 (since its fraction is higher)
         assert!(frac_li7 > frac_li6, "Li7 should be sampled more often than Li6");
+    }
+
+    #[test]
+    fn test_expand_mt_filter_includes_descendants_and_self() {
+        // Example: MT=3 (should include itself and all descendants from get_all_mt_descendants)
+        let input = vec![3];
+        let expanded = Material::expand_mt_filter(&input);
+        let expected: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
+        // Should include 3 itself
+        assert!(expanded.contains(&3));
+        // Should include all descendants
+        for mt in &expected {
+            assert!(expanded.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
+        }
+        // Should not include unrelated MTs
+        assert!(!expanded.contains(&9999));
+
+        // Test with multiple MTs
+        let input2 = vec![3, 4];
+        let expanded2 = Material::expand_mt_filter(&input2);
+        let mut expected2: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
+        expected2.extend(get_all_mt_descendants(4));
+        for mt in &expected2 {
+            assert!(expanded2.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
+        }
+        assert!(expanded2.contains(&3));
+        assert!(expanded2.contains(&4));
+        assert!(!expanded2.contains(&9999));
     }
 
 } // close mod tests
