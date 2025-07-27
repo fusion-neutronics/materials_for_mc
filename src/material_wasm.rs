@@ -158,6 +158,17 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
+    pub fn sample_distance_to_collision(&mut self, energy: f64) -> Option<f64> {
+        // Use a random number generator compatible with WASM
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+        use rand::Rng;
+        // For reproducibility, you may want to allow passing a seed, but here we use a random seed
+        let mut rng = StdRng::from_entropy();
+        self.inner.sample_distance_to_collision(energy, &mut rng)
+    }
+
+    #[wasm_bindgen]
     pub fn load_nuclide_data(&mut self, nuclide_name: &str, json_content: &str) -> Result<(), JsValue> {
         match crate::nuclide_wasm::set_nuclide_json_content(nuclide_name, json_content) {
             Ok(_) => Ok(()),
