@@ -5,7 +5,6 @@ use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
 use crate::data::{ELEMENT_NAMES, get_all_mt_descendants};
 use crate::data::SUM_RULES;
-use rand::Rng;
 use rand::SeedableRng;
 
 #[derive(Debug, Clone)]
@@ -1472,6 +1471,35 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_sample_distance_to_collision_li6() {
+        // Create Li6 material
+        let mut mat = Material::new();
+        mat.add_nuclide("Li6", 1.0).unwrap();
+        // Load nuclide data from JSON
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        mat.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        mat.set_density("g/cm3", 1.0).unwrap();
+        mat.set_temperature("294");
+
+        // Check that the total cross section is present and nonzero at 14 MeV
+        mat.calculate_total_xs_neutron();
+
+        // Sample 1000 distances
+        let mut sum = 0.0;
+        let n_samples = 1000;
+        use rand::rngs::StdRng;
+        for seed in 0..n_samples {
+            let mut rng = <StdRng as rand::SeedableRng>::seed_from_u64(seed as u64);
+            let dist = mat.sample_distance_to_collision(14_000_000.0, &mut rng)
+                .unwrap_or_else(|| panic!("sample_distance_to_collision returned None at 14 MeV!"));
+            sum += dist;
+        }
+        let avg = sum / n_samples as f64;
+        println!("Average distance: {}", avg);
+        assert!((avg - 6.9).abs() < 0.1, "Average {} not within 0.2 of 6.9", avg);
+    }
 
 } // close mod tests
 
