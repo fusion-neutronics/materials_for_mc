@@ -1,3 +1,4 @@
+
 use pyo3::prelude::*;
 // use pyo3::types::PyDict;
 use crate::material::Material;
@@ -225,6 +226,20 @@ impl PyMaterial {
             .reaction_mts()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
+    /// Sample which nuclide a neutron interacts with at a given energy, using per-nuclide macroscopic total xs
+    /// Returns the nuclide name as a String, or raises if not possible
+    /// If seed is provided, uses it for reproducibility
+    #[pyo3(signature = (energy, seed=None))]
+    fn sample_interacting_nuclide(&self, energy: f64, seed: Option<u64>) -> PyResult<String> {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(12345),
+        };
+        Ok(self.internal.sample_interacting_nuclide(energy, &mut rng))
+    }
+
 }
 
 

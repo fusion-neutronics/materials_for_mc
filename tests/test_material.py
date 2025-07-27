@@ -293,3 +293,44 @@ def test_sample_distance_to_collision_statistical():
         samples.append(d)
     avg = sum(samples) / len(samples)
     assert abs(avg - 6.9) < 0.1, f"Average sampled distance {avg} not within 0.1 of 6.9"
+
+# Test for sample_interacting_nuclide Python binding (equivalent to Rust test_sample_interacting_nuclide_li6_li7)
+def test_sample_interacting_nuclide_li6_li7():
+    material = Material()
+    material.add_nuclide("Li6", 0.5)
+    material.add_nuclide("Li7", 0.5)
+    material.set_density("g/cm3", 1.0)
+    material.temperature = "294"
+
+    # Load nuclide data from JSON
+    nuclide_json_map = {
+        "Li6": "tests/Li6.json",
+        "Li7": "tests/Li7.json",
+    }
+    material.read_nuclides_from_json(nuclide_json_map)
+
+    # Calculate per-nuclide macroscopic total xs
+    material.calculate_macroscopic_xs_neutron([1], True)
+
+    # Sample the interacting nuclide many times at 14 MeV
+    energy = 100_000.0
+    n_samples = 10000
+    counts = {"Li6": 0, "Li7": 0}
+    for seed in range(n_samples):
+        nuclide = material.sample_interacting_nuclide(energy, seed=seed)
+        counts[nuclide] = counts.get(nuclide, 0) + 1
+
+    count_li6 = counts.get("Li6", 0)
+    count_li7 = counts.get("Li7", 0)
+    total = count_li6 + count_li7
+    frac_li6 = count_li6 / total if total > 0 else 0.0
+    frac_li7 = count_li7 / total if total > 0 else 0.0
+
+    print(f"Li6 fraction: {frac_li6}, Li7 fraction: {frac_li7}")
+
+    # Both nuclides should be sampled
+    assert frac_li6 > 0.0 and frac_li7 > 0.0, "Both nuclides should be sampled"
+    # Fractions should sum to 1
+    assert abs(frac_li6 + frac_li7 - 1.0) < 1e-6, "Fractions should sum to 1"
+    # Li7 should be sampled more often than Li6
+    assert frac_li6 > frac_li7, "Li6 should be sampled more often than Li6"
