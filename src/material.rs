@@ -1,3 +1,34 @@
+#[cfg(test)]
+mod expand_mt_filter_tests {
+    use super::*;
+    #[test]
+    fn test_expand_mt_filter_includes_descendants_and_self() {
+        // Example: MT=3 (should include itself and all descendants from get_all_mt_descendants)
+        let input = vec![3];
+        let expanded = Material::expand_mt_filter(&input);
+        let expected: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
+        // Should include 3 itself
+        assert!(expanded.contains(&3));
+        // Should include all descendants
+        for mt in &expected {
+            assert!(expanded.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
+        }
+        // Should not include unrelated MTs
+        assert!(!expanded.contains(&9999));
+
+        // Test with multiple MTs
+        let input2 = vec![3, 4];
+        let expanded2 = Material::expand_mt_filter(&input2);
+        let mut expected2: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
+        expected2.extend(get_all_mt_descendants(4));
+        for mt in &expected2 {
+            assert!(expanded2.contains(mt), "expand_mt_filter missing descendant MT {}", mt);
+        }
+        assert!(expanded2.contains(&3));
+        assert!(expanded2.contains(&4));
+        assert!(!expanded2.contains(&9999));
+    }
+}
 // ...existing code...
 
 use std::collections::HashMap;
@@ -34,6 +65,17 @@ pub struct Material {
 }
 
 impl Material {
+    /// Helper to expand a list of MT numbers to include all descendants (for sum rules)
+    fn expand_mt_filter(mt_filter: &Vec<i32>) -> std::collections::HashSet<i32> {
+        let mut set = std::collections::HashSet::new();
+        for &mt in mt_filter {
+            set.insert(mt);
+            for child in get_all_mt_descendants(mt) {
+                set.insert(child);
+            }
+        }
+        set
+    }
     /// Sample the distance to the next collision for a neutron at the given energy.
     /// Uses the total macroscopic cross section (MT=1).
     /// Returns None if the cross section is zero or not available.
@@ -212,16 +254,7 @@ impl Material {
         let temperature = &self.temperature;
         let temp_with_k = format!("{}K", temperature);
         // Expand the filter to include all child MTs for any hierarchical MTs, as in calculate_macroscopic_xs_neutron
-        let expanded_mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| {
-            let mut set = std::collections::HashSet::new();
-            for &mt in v {
-                set.insert(mt);
-                for child in get_all_mt_descendants(mt) {
-                    set.insert(child);
-                }
-            }
-            set
-        });
+        let expanded_mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(Self::expand_mt_filter);
 
         for nuclide in self.nuclides.keys() {
             let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
@@ -346,8 +379,7 @@ impl Material {
         }
         // Get the energy grid
         let energy_grid = self.unified_energy_grid_neutron();
-        println!("[DEBUG] Energy grid: {:?}", energy_grid);
-        println!("[DEBUG] Nuclides: {:?}", self.nuclides);
+        // ...existing code...
 
         // If by_nuclide is true, ensure MT=1 is in the filter
         if by_nuclide && !mt_filter.contains(&1) {
@@ -355,13 +387,7 @@ impl Material {
         }
 
         // Expand the filter to include all child MTs for any hierarchical MTs
-        let mut expanded = std::collections::HashSet::new();
-        for &mt_num in mt_filter {
-            expanded.insert(mt_num);
-            for child in get_all_mt_descendants(mt_num) {
-                expanded.insert(child);
-            }
-        }
+        let expanded = Self::expand_mt_filter(mt_filter);
         let expanded_filter = Some(expanded.clone());
         let expanded_mt_filter: Vec<i32> = expanded.into_iter().collect();
         let micro_xs = self.calculate_microscopic_xs_neutron(Some(&expanded_mt_filter));
@@ -387,7 +413,7 @@ impl Material {
         // Calculate macroscopic cross section for each MT
         // Get atoms per cc for all nuclides
         let atoms_per_bcm_map = self.get_atoms_per_cc();
-        println!("[DEBUG] Atoms per cc: {:?}", atoms_per_bcm_map);
+        // ...existing code...
         // Optionally: collect per-nuclide macroscopic total xs (MT=1) if requested
         let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide { Some(HashMap::new()) } else { None };
 
@@ -398,16 +424,12 @@ impl Material {
             if by_nuclide_map.is_some() {
                 if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
                     if let Some(xs_values) = nuclide_data.get(&1) {
-                        println!("[DEBUG] Nuclide {} MT=1 xs_values: {:?}", nuclide, xs_values);
                         let macro_vec: Vec<f64> = xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect();
-                        println!("[DEBUG] Nuclide {} MT=1 macro_vec: {:?}", nuclide, macro_vec);
                         by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
                     } else {
-                        println!("[DEBUG] Nuclide {}: MT=1 missing in nuclide_data", nuclide);
-                        by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
+                    by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
                     }
                 } else {
-                    println!("[DEBUG] Nuclide {}: nuclide_data or atoms_per_bcm missing", nuclide);
                     by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
                 }
             }
