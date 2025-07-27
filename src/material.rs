@@ -1,3 +1,5 @@
+// ...existing code...
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
@@ -209,6 +211,18 @@ impl Material {
         let mut micro_xs: HashMap<String, HashMap<i32, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
         let temp_with_k = format!("{}K", temperature);
+        // Expand the filter to include all child MTs for any hierarchical MTs, as in calculate_macroscopic_xs_neutron
+        let expanded_mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| {
+            let mut set = std::collections::HashSet::new();
+            for &mt in v {
+                set.insert(mt);
+                for child in get_all_mt_descendants(mt) {
+                    set.insert(child);
+                }
+            }
+            set
+        });
+
         for nuclide in self.nuclides.keys() {
             let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
@@ -219,10 +233,10 @@ impl Material {
                         let energy_grid = energy_map.get(temperature)
                             .or_else(|| energy_map.get(&temp_with_k));
                         if let Some(energy_grid) = energy_grid {
-                            // Only process the requested MTs if mt_filter is Some
-                            let mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| v.iter().copied().collect());
+                            // Only process the requested MTs if mt_filter is Some (expanded)
+                            let mt_set = expanded_mt_set.as_ref();
                             let mt_iter = temp_reactions.iter().filter(|(k, _)| {
-                                match &mt_set {
+                                match mt_set {
                                     Some(set) => set.contains(k),
                                     None => true,
                                 }
@@ -252,6 +266,60 @@ impl Material {
                     }
                 }
             }
+            // Now, for any requested MTs (from expanded_mt_set) that are not present, try to generate them using sum rules
+            if let Some(mt_set) = expanded_mt_set.as_ref() {
+                let sum_rules = &*SUM_RULES;
+                // Dependency order: process children before parents
+                let mut processing_order = Vec::new();
+                let mut processed_set = std::collections::HashSet::new();
+                for &mt in nuclide_xs.keys() {
+                    processed_set.insert(mt);
+                }
+                fn add_to_processing_order(
+                    mt: i32,
+                    sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
+                    processed: &mut std::collections::HashSet<i32>,
+                    order: &mut Vec<i32>,
+                    restrict: &std::collections::HashSet<i32>,
+                ) {
+                    if processed.contains(&mt) || !restrict.contains(&mt) {
+                        return;
+                    }
+                    if let Some(constituents) = sum_rules.get(&mt) {
+                        for &constituent in constituents {
+                            add_to_processing_order(constituent, sum_rules, processed, order, restrict);
+                        }
+                    }
+                    processed.insert(mt);
+                    order.push(mt);
+                }
+                for &mt in mt_set {
+                    add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
+                }
+                // Now, for each MT in processing_order, if not present, try to sum its children
+                let grid_length = grid.len();
+                for mt in processing_order {
+                    if nuclide_xs.contains_key(&mt) {
+                        continue;
+                    }
+                    if !sum_rules.contains_key(&mt) {
+                        continue;
+                    }
+                    let mut mt_xs = vec![0.0; grid_length];
+                    let mut found_any_child = false;
+                    for &constituent_mt in &sum_rules[&mt] {
+                        if let Some(xs_values) = nuclide_xs.get(&constituent_mt) {
+                            for (i, &xs) in xs_values.iter().enumerate() {
+                                mt_xs[i] += xs;
+                            }
+                            found_any_child = true;
+                        }
+                    }
+                    if found_any_child {
+                        nuclide_xs.insert(mt, mt_xs);
+                    }
+                }
+            }
             if !nuclide_xs.is_empty() {
                 micro_xs.insert(nuclide.clone(), nuclide_xs);
             }
@@ -278,6 +346,8 @@ impl Material {
         }
         // Get the energy grid
         let energy_grid = self.unified_energy_grid_neutron();
+        println!("[DEBUG] Energy grid: {:?}", energy_grid);
+        println!("[DEBUG] Nuclides: {:?}", self.nuclides);
 
         // If by_nuclide is true, ensure MT=1 is in the filter
         if by_nuclide && !mt_filter.contains(&1) {
@@ -317,6 +387,7 @@ impl Material {
         // Calculate macroscopic cross section for each MT
         // Get atoms per cc for all nuclides
         let atoms_per_bcm_map = self.get_atoms_per_cc();
+        println!("[DEBUG] Atoms per cc: {:?}", atoms_per_bcm_map);
         // Optionally: collect per-nuclide macroscopic total xs (MT=1) if requested
         let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide { Some(HashMap::new()) } else { None };
 
@@ -325,18 +396,20 @@ impl Material {
             let nuclide_data = micro_xs.get(nuclide);
             // Always try to store per-nuclide MT=1 if by_nuclide is true
             if by_nuclide_map.is_some() {
-                let macro_vec = if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
+                if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
                     if let Some(xs_values) = nuclide_data.get(&1) {
-                        xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect()
+                        println!("[DEBUG] Nuclide {} MT=1 xs_values: {:?}", nuclide, xs_values);
+                        let macro_vec: Vec<f64> = xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect();
+                        println!("[DEBUG] Nuclide {} MT=1 macro_vec: {:?}", nuclide, macro_vec);
+                        by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
                     } else {
-                        // Fill with zeros if MT=1 is missing
-                        vec![0.0; energy_grid.len()]
+                        println!("[DEBUG] Nuclide {}: MT=1 missing in nuclide_data", nuclide);
+                        by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
                     }
                 } else {
-                    // Fill with zeros if nuclide_data or atoms_per_bcm is missing
-                    vec![0.0; energy_grid.len()]
-                };
-                by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
+                    println!("[DEBUG] Nuclide {}: nuclide_data or atoms_per_bcm missing", nuclide);
+                    by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
+                }
             }
             if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
                 for (&mt, xs_values) in nuclide_data {
@@ -655,6 +728,39 @@ impl Material {
         let mut mt_vec: Vec<i32> = mt_set.into_iter().collect();
         mt_vec.sort();
         Ok(mt_vec)
+    }
+
+    /// Sample which nuclide a neutron interacts with at a given energy, using per-nuclide macroscopic total xs
+    /// Returns the nuclide name as a String, or None if not possible
+    pub fn sample_interacting_nuclide<R: rand::Rng + ?Sized>(&self, energy: f64, rng: &mut R) -> String {
+        let by_nuclide = self.macroscopic_total_xs_by_nuclide.as_ref().expect("macroscopic_total_xs_by_nuclide is None: call calculate_macroscopic_xs_neutron with by_nuclide=true first");
+        let mut xs_by_nuclide = Vec::new();
+        let mut total = 0.0;
+        let mut debug_info = String::new();
+        for (nuclide, xs_vec) in by_nuclide.iter() {
+            if xs_vec.is_empty() || self.unified_energy_grid_neutron.is_empty() {
+                debug_info.push_str(&format!("{}: EMPTY\n", nuclide));
+                continue;
+            }
+            let xs = crate::utilities::interpolate_linear(&self.unified_energy_grid_neutron, xs_vec, energy);
+            debug_info.push_str(&format!("{}: xs = {}\n", nuclide, xs));
+            if xs > 0.0 {
+                xs_by_nuclide.push((nuclide, xs));
+                total += xs;
+            }
+        }
+        if xs_by_nuclide.is_empty() || total <= 0.0 {
+            panic!("No nuclide has nonzero macroscopic total cross section at energy {}. Details:\n{}", energy, debug_info);
+        }
+        let xi = rng.gen_range(0.0..total);
+        let mut accum = 0.0;
+        for (nuclide, xs) in xs_by_nuclide {
+            accum += xs;
+            if xi < accum {
+                return nuclide.clone();
+            }
+        }
+        panic!("Failed to sample nuclide: numerical error in sampling loop");
     }
 }
 
@@ -1423,56 +1529,61 @@ mod tests {
         assert!((avg - 6.9).abs() < 0.1, "Average {} not within 0.2 of 6.9", avg);
     }
 
-    // #[test]
-    // fn test_sample_interacting_nuclide_li6_li7() {
-    //     use rand::SeedableRng;
-    //     use rand::rngs::StdRng;
-    //     use std::collections::HashMap;
+    #[test]
+    fn test_sample_interacting_nuclide_li6_li7() {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+        use std::collections::HashMap;
 
-    //     let mut material = Material::new();
-    //     material.add_nuclide("Li6", 0.1).unwrap();
-    //     material.add_nuclide("Li7", 0.9).unwrap();
-    //     material.set_density("g/cm3", 1.0).unwrap();
-    //     material.set_temperature("294");
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 0.1).unwrap();
+        material.add_nuclide("Li7", 0.9).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
 
-    //     // Load nuclide data from JSON
-    //     let mut nuclide_json_map = HashMap::new();
-    //     nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-    //     nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
-    //     material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        // Load nuclide data from JSON
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
-    //     // Calculate total xs to ensure everything is set up
-    //     // For this test, calculate per-nuclide macroscopic total xs as well
-    //     material.calculate_macroscopic_xs_neutron(None, true);
+        // Calculate total xs to ensure everything is set up
+        // For this test, calculate per-nuclide macroscopic total xs as well
+        material.calculate_macroscopic_xs_neutron(&vec![1], true);
 
-    //     // Sample the interacting nuclide many times at 14 MeV
-    //     let energy = 14_000_000.0;
-    //     let n_samples = 10000;
-    //     let mut counts = HashMap::new();
-    //     for seed in 0..n_samples {
-    //         let mut rng = StdRng::seed_from_u64(seed as u64);
-    //         let nuclide = material.sample_interacting_nuclide(energy, &mut rng)
-    //             .expect("Should sample a nuclide");
-    //         *counts.entry(nuclide).or_insert(0) += 1;
-    //     }
+        // Check that macroscopic_total_xs_by_nuclide is present and not empty
+        let by_nuclide = material.macroscopic_total_xs_by_nuclide.as_ref();
+        assert!(by_nuclide.is_some(), "macroscopic_total_xs_by_nuclide should be Some after calculation");
+        let by_nuclide = by_nuclide.unwrap();
+        assert!(!by_nuclide.is_empty(), "macroscopic_total_xs_by_nuclide should not be empty");
 
-    //     let count_li6 = *counts.get("Li6").unwrap_or(&0) as f64;
-    //     let count_li7 = *counts.get("Li7").unwrap_or(&0) as f64;
-    //     let total = count_li6 + count_li7;
-    //     let frac_li6 = count_li6 / total;
-    //     let frac_li7 = count_li7 / total;
+        // Sample the interacting nuclide many times at 14 MeV
+        let energy = 14_000_000.0;
+        let n_samples = 10000;
+        let mut counts = HashMap::new();
+        for seed in 0..n_samples {
+            let mut rng = StdRng::seed_from_u64(seed as u64);
+            let nuclide = material.sample_interacting_nuclide(energy, &mut rng);
+            *counts.entry(nuclide).or_insert(0) += 1;
+        }
 
-    //     println!("Li6 fraction: {}, Li7 fraction: {}", frac_li6, frac_li7);
+        let count_li6 = *counts.get("Li6").unwrap_or(&0) as f64;
+        let count_li7 = *counts.get("Li7").unwrap_or(&0) as f64;
+        let total = count_li6 + count_li7;
+        let frac_li6 = count_li6 / total;
+        let frac_li7 = count_li7 / total;
 
-    //     // The sampled fractions should be close to the expected probability
-    //     // (proportional to macroscopic total xs for each nuclide at this energy)
-    //     // For a rough test, just check both are nonzero and sum to 1
-    //     assert!(frac_li6 > 0.0 && frac_li7 > 0.0, "Both nuclides should be sampled");
-    //     assert!((frac_li6 + frac_li7 - 1.0).abs() < 1e-6, "Fractions should sum to 1");
+        println!("Li6 fraction: {}, Li7 fraction: {}", frac_li6, frac_li7);
 
-    //     // Optionally, check that Li7 is sampled much more often than Li6 (since its fraction is higher)
-    //     assert!(frac_li7 > frac_li6, "Li7 should be sampled more often than Li6");
-    // }
+        // The sampled fractions should be close to the expected probability
+        // (proportional to macroscopic total xs for each nuclide at this energy)
+        // For a rough test, just check both are nonzero and sum to 1
+        assert!(frac_li6 > 0.0 && frac_li7 > 0.0, "Both nuclides should be sampled");
+        assert!((frac_li6 + frac_li7 - 1.0).abs() < 1e-6, "Fractions should sum to 1");
+
+        // Optionally, check that Li7 is sampled much more often than Li6 (since its fraction is higher)
+        assert!(frac_li7 > frac_li6, "Li7 should be sampled more often than Li6");
+    }
 
 } // close mod tests
 
