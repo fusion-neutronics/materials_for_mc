@@ -11,7 +11,7 @@ fn main() {
     mat.set_density("g/cm3", 19.1).unwrap();
     mat.volume(Some(100.0)).unwrap();
     // mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
-    mat.calculate_macroscopic_xs_neutron(Some(&vec![3]));
+    mat.calculate_macroscopic_xs_neutron(&vec![3], false);
     // mat.calculate_microscopic_xs_neutron(None);
     // mat.calculate_macroscopic_xs_neutron(None);
 
@@ -25,7 +25,7 @@ fn main() {
     // lithium_mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_macroscopic_xs_neutron(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_microscopic_xs_neutron(None);
-    lithium_mat.calculate_macroscopic_xs_neutron(None);
+    lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], true);
 
     // println!("Lithium material: {:?}", lithium_mat);
     // println!("Lithium material: {:?}", lithium_mat);
