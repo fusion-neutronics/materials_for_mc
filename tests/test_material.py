@@ -280,13 +280,16 @@ def test_macroscopic_xs_mt24_does_not_generate_mt1():
 def test_sample_distance_to_collision_statistical():
     mat = Material()
     mat.add_nuclide("Li6", 1.0)
-    mat.set_density("g/cm3", 0.534)
+    mat.set_density("g/cm3", 1.)
     mat.read_nuclides_from_json({"Li6": "tests/Li6.json"})
     mat.temperature = "294"
     mat.calculate_macroscopic_xs_neutron()  # Ensure xs are calculated
-    energy = 5.0e6
+    energy = 14e6
     samples = []
-    for _ in range(100):
-        d = mat.sample_distance_to_collision(energy)
+    for seed in range(1000):
+        d = mat.sample_distance_to_collision(energy, seed=seed)
         assert d is not None
         assert d >= 0.0, f"Sampled distance should not be negative, got {d}"
+        samples.append(d)
+    avg = sum(samples) / len(samples)
+    assert abs(avg - 6.9) < 0.1, f"Average sampled distance {avg} not within 0.1 of 6.9"
