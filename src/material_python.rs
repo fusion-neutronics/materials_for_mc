@@ -165,18 +165,23 @@ impl PyMaterial {
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
     /// If unified_energy_grid is None or not provided, it will use the cached grid or build a new one
     /// If mt_filter is provided, only those MTs will be included (by string match)
-    #[pyo3(signature = (mt_filter=None))]
+    /// If by_nuclide is True, also populate per-nuclide macroscopic total xs (MT=1)
+    /// Calculate macroscopic cross sections for neutrons on the unified energy grid
+    /// mt_filter is required and must be a Vec<i32> (no default, no Option)
+    /// by_nuclide is required and must be a bool
+    #[pyo3(signature = (mt_filter = None, by_nuclide = false))]
     fn calculate_macroscopic_xs_neutron(
         &mut self,
         mt_filter: Option<Vec<i32>>,
+        by_nuclide: bool,
     ) -> (Vec<f64>, HashMap<i32, Vec<f64>>) {
-        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_filter.as_ref());
+        let default_mt = vec![1];
+        let mt_vec: &Vec<i32> = match mt_filter.as_ref() {
+            Some(v) => v,
+            None => &default_mt,
+        };
+        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_vec, by_nuclide);
         (energy_grid, xs_dict_i32)
-    }
-
-    /// Calculate the total cross section for neutrons by summing over all relevant MT reactions
-    fn calculate_total_xs_neutron(&mut self) -> HashMap<i32, Vec<f64>> {
-        self.internal.calculate_total_xs_neutron()
     }
 
     /// Get the macroscopic cross sections for neutrons

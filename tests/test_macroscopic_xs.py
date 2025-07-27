@@ -23,7 +23,7 @@ def test_macroscopic_xs_neutron():
     assert "Li7" in micro_xs, "No microscopic cross sections for Li7"
     
     # Calculate macroscopic cross sections - will use the cached grid
-    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Verify the macroscopic cross sections contain MT=2
     
@@ -51,7 +51,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
     atoms_per_cc = material.get_atoms_per_cc()
     
     # Calculate macroscopic cross sections
-    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Verify that macroscopic cross sections were calculated
     assert len(macro_xs) > 0, "No macroscopic cross sections were calculated"
@@ -60,7 +60,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
     # If we double the density, atoms per cc should double, and so should macroscopic XS
     material.set_density("g/cm3", 2.0)
     atoms_per_cc_doubled = material.get_atoms_per_cc()
-    macro_xs_doubled = material.calculate_macroscopic_xs_neutron()
+    macro_xs_doubled = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Check that atoms per cc doubled
     for nuclide in atoms_per_cc.keys():
@@ -89,7 +89,7 @@ def test_macroscopic_xs_calculation_formula():
     atoms_per_cc = material.get_atoms_per_cc()
     
     # Calculate macroscopic cross sections
-    energy, macro_xs = material.calculate_macroscopic_xs_neutron()
+    energy, macro_xs = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Verify that macroscopic XS = atoms_per_cc * microscopic_xs * BARN_TO_CM2
     BARN_TO_CM2 = 1.0e-24
