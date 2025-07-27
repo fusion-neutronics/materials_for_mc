@@ -283,7 +283,7 @@ def test_sample_distance_to_collision_statistical():
     mat.set_density("g/cm3", 1.)
     mat.read_nuclides_from_json({"Li6": "tests/Li6.json"})
     mat.temperature = "294"
-    mat.calculate_macroscopic_xs_neutron(by_nuclide=False)  # Ensure xs are calculated
+    mat.calculate_macroscopic_xs_neutron()  # Ensure xs are calculated
     energy = 14e6
     samples = []
     for seed in range(1000):

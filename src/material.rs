@@ -276,18 +276,26 @@ impl Material {
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
+        // If mt_filter is None, treat as if mt_filter = Some(&vec1)
+        let vec1;
+        let mt_filter_ref: Option<&Vec<i32>> = if let Some(f) = mt_filter {
+            Some(f)
+        } else {
+            vec1 = vec![1];
+            Some(&vec1)
+        };
         // Get the energy grid
         let energy_grid = self.unified_energy_grid_neutron();
 
         // If mt_filter is provided and by_nuclide is true, ensure MT=1 is in the filter
-        if let Some(filter) = mt_filter {
+        if let Some(filter) = mt_filter_ref {
             if by_nuclide && !filter.contains(&1) {
                 panic!("If by_nuclide is true and mt_filter is used, mt_filter must contain 1 (total). Otherwise, per-nuclide total cross section makes no sense.");
             }
         }
 
         // Expand the filter to include all child MTs for any hierarchical MTs
-        let expanded_filter: Option<std::collections::HashSet<i32>> = if let Some(filter) = mt_filter {
+        let expanded_filter: Option<std::collections::HashSet<i32>> = if let Some(filter) = mt_filter_ref {
             let mut expanded = std::collections::HashSet::new();
             for &mt_num in filter {
                 expanded.insert(mt_num);
@@ -300,7 +308,7 @@ impl Material {
             None
         };
         // If a filter is provided, expand it to include all descendants for hierarchical MTs
-        let expanded_mt_filter: Option<Vec<i32>> = if let Some(filter) = mt_filter {
+        let expanded_mt_filter: Option<Vec<i32>> = if let Some(filter) = mt_filter_ref {
             let mut expanded = std::collections::HashSet::new();
             for &mt_num in filter {
                 expanded.insert(mt_num);
@@ -312,37 +320,8 @@ impl Material {
         } else {
             None
         };
-        // Now get microscopic cross sections on the unified grid, using the expanded filter
-        let mut micro_xs = self.calculate_microscopic_xs_neutron(expanded_mt_filter.as_ref());
+        let micro_xs = self.calculate_microscopic_xs_neutron(expanded_mt_filter.as_ref());
 
-        // If no mt_filter is provided, always ensure MT=1 (total) is present for each nuclide (using sum rules if needed)
-        if mt_filter.is_none() {
-            use crate::data::SUM_RULES;
-            for (nuclide, nuclide_data) in micro_xs.iter_mut() {
-                // If MT=1 is missing, try to generate it from sum rules (MT=2 + MT=3)
-                if !nuclide_data.contains_key(&1) {
-                    let mut total = None;
-                    if let Some(children) = SUM_RULES.get(&1) {
-                        let mut sum = vec![0.0; nuclide_data.values().next().map_or(0, |v| v.len())];
-                        let mut found_any = false;
-                        for child in children {
-                            if let Some(xs) = nuclide_data.get(child) {
-                                for (i, v) in xs.iter().enumerate() {
-                                    sum[i] += v;
-                                }
-                                found_any = true;
-                            }
-                        }
-                        if found_any {
-                            total = Some(sum);
-                        }
-                    }
-                    if let Some(total_vec) = total {
-                        nuclide_data.insert(1, total_vec);
-                    }
-                }
-            }
-        }
 
         // Create a map to hold macroscopic cross sections for each MT (i32)
         let mut macro_xs: HashMap<i32, Vec<f64>> = HashMap::new();
@@ -368,19 +347,28 @@ impl Material {
         let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide { Some(HashMap::new()) } else { None };
 
         for (nuclide, _) in &self.nuclides {
-            if let Some(nuclide_data) = micro_xs.get(nuclide) {
-                if let Some(atoms_per_bcm) = atoms_per_bcm_map.get(nuclide) {
-                    // Always try to store per-nuclide MT=1 if by_nuclide is true and MT=1 is present
-                    if by_nuclide_map.is_some() && nuclide_data.contains_key(&1) {
-                        let xs_values = &nuclide_data[&1];
-                        let macro_vec: Vec<f64> = xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect();
-                        by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
+            let atoms_per_bcm = atoms_per_bcm_map.get(nuclide);
+            let nuclide_data = micro_xs.get(nuclide);
+            // Always try to store per-nuclide MT=1 if by_nuclide is true
+            if by_nuclide_map.is_some() {
+                let macro_vec = if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
+                    if let Some(xs_values) = nuclide_data.get(&1) {
+                        xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect()
+                    } else {
+                        // Fill with zeros if MT=1 is missing
+                        vec![0.0; energy_grid.len()]
                     }
-                    for (&mt, xs_values) in nuclide_data {
-                        if let Some(macro_values) = macro_xs.get_mut(&mt) {
-                            for (i, &xs) in xs_values.iter().enumerate() {
-                                macro_values[i] += atoms_per_bcm * xs;
-                            }
+                } else {
+                    // Fill with zeros if nuclide_data or atoms_per_bcm is missing
+                    vec![0.0; energy_grid.len()]
+                };
+                by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
+            }
+            if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
+                for (&mt, xs_values) in nuclide_data {
+                    if let Some(macro_values) = macro_xs.get_mut(&mt) {
+                        for (i, &xs) in xs_values.iter().enumerate() {
+                            macro_values[i] += atoms_per_bcm * xs;
                         }
                     }
                 }
