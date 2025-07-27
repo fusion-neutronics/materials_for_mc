@@ -13,7 +13,7 @@ def test_calculate_total_xs_neutron():
     material.temperature = "294"
     
     # Calculate macroscopic cross sections
-    macro_xs = material.calculate_macroscopic_xs_neutron()
+    macro_xs = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Verify that we have some cross sections
     assert len(macro_xs) > 0, "No macroscopic cross sections were calculated"
