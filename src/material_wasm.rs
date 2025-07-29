@@ -184,3 +184,19 @@ impl WasmMaterial {
         Ok(())
     }
 }
+
+#[wasm_bindgen]
+impl WasmMaterial {
+    /// Sample which nuclide a neutron interacts with at a given energy, using per-nuclide macroscopic total xs
+    /// Returns the nuclide name as a String. If seed is provided, uses it for reproducibility.
+    #[wasm_bindgen(js_name = sampleInteractingNuclide)]
+    pub fn sample_interacting_nuclide_wasm(&self, energy: f64, seed: Option<u64>) -> String {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(12345),
+        };
+        self.inner.sample_interacting_nuclide(energy, &mut rng)
+    }
+}
