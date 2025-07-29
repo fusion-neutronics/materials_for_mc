@@ -32,6 +32,25 @@ pub struct Material {
 }
 
 impl Material {
+    /// Helper for dependency-ordered processing of MTs (children before parents)
+    fn add_to_processing_order(
+        mt: i32,
+        sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
+        processed: &mut std::collections::HashSet<i32>,
+        order: &mut Vec<i32>,
+        restrict: &std::collections::HashSet<i32>,
+    ) {
+        if processed.contains(&mt) || !restrict.contains(&mt) {
+            return;
+        }
+        if let Some(constituents) = sum_rules.get(&mt) {
+            for &constituent in constituents {
+                Self::add_to_processing_order(constituent, sum_rules, processed, order, restrict);
+            }
+        }
+        processed.insert(mt);
+        order.push(mt);
+    }
     /// Helper to expand a list of MT numbers to include all descendants (for sum rules)
     fn expand_mt_filter(mt_filter: &Vec<i32>) -> std::collections::HashSet<i32> {
         let mut set = std::collections::HashSet::new();
@@ -275,26 +294,8 @@ impl Material {
                 for &mt in nuclide_xs.keys() {
                     processed_set.insert(mt);
                 }
-                fn add_to_processing_order(
-                    mt: i32,
-                    sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
-                    processed: &mut std::collections::HashSet<i32>,
-                    order: &mut Vec<i32>,
-                    restrict: &std::collections::HashSet<i32>,
-                ) {
-                    if processed.contains(&mt) || !restrict.contains(&mt) {
-                        return;
-                    }
-                    if let Some(constituents) = sum_rules.get(&mt) {
-                        for &constituent in constituents {
-                            add_to_processing_order(constituent, sum_rules, processed, order, restrict);
-                        }
-                    }
-                    processed.insert(mt);
-                    order.push(mt);
-                }
                 for &mt in mt_set {
-                    add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
+                    Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
                 }
                 // Now, for each MT in processing_order, if not present, try to sum its children
                 let grid_length = grid.len();
@@ -475,26 +476,8 @@ impl Material {
         for &mt in xs_map.keys() {
             processed_set.insert(mt);
         }
-        fn add_to_processing_order(
-            mt: i32,
-            sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
-            processed: &mut std::collections::HashSet<i32>,
-            order: &mut Vec<i32>,
-            restrict: &std::collections::HashSet<i32>,
-        ) {
-            if processed.contains(&mt) || !restrict.contains(&mt) {
-                return;
-            }
-            if let Some(constituents) = sum_rules.get(&mt) {
-                for &constituent in constituents {
-                    add_to_processing_order(constituent, sum_rules, processed, order, restrict);
-                }
-            }
-            processed.insert(mt);
-            order.push(mt);
-        }
         for &mt in &mt_to_process {
-            add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, &mt_to_process);
+            Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, &mt_to_process);
         }
         for mt in processing_order {
             if xs_map.contains_key(&mt) {
