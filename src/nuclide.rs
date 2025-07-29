@@ -35,7 +35,97 @@ pub struct Nuclide {
     pub reactions: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt (i32) -> Reaction
 }
 
+/// Enum for top-level neutron reaction event types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampledReaction {
+    Fission(i32),
+    Absorption(i32),
+    Elastic(i32),
+    NonElastic(i32),
+    Other(i32),
+    None,
+}
+
+
 impl Nuclide {
+    /// Sample the top-level reaction type (fission, absorption, elastic, inelastic, other) at a given energy and temperature
+    pub fn sample_reaction<R: rand::Rng + ?Sized>(&self, energy: f64, temperature: &str, rng: &mut R) -> SampledReaction {
+        let temp_reactions = match self.reactions.get(temperature) {
+            Some(r) => r,
+            None => match self.reactions.values().next() {
+                Some(r) => r,
+                None => return SampledReaction::None,
+            },
+        };
+
+        // Define MTs for each event type
+        let total_mt = 1;
+        let fission_mt = 18;
+        let absorption_mt = 101;
+        let elastic_mt = 2;
+        let nonelastic_mt = 3;
+
+        // Helper to get xs for a given MT
+        let get_xs = |mt: i32| -> f64 {
+            if let Some(reaction) = temp_reactions.get(&mt) {
+                let energy_grid = if !reaction.energy.is_empty() {
+                    &reaction.energy
+                } else if let Some(energy_map) = &self.energy {
+                    match energy_map.get(temperature) {
+                        Some(grid) => grid,
+                        None => return 0.0,
+                    }
+                } else {
+                    return 0.0;
+                };
+                if reaction.cross_section.len() != energy_grid.len() {
+                    return 0.0;
+                }
+                crate::utilities::interpolate_linear(energy_grid, &reaction.cross_section, energy)
+            } else {
+                0.0
+            }
+        };
+
+        let total_xs = get_xs(total_mt);
+        if total_xs <= 0.0 {
+            return SampledReaction::None;
+        }
+
+        let xi = rng.gen_range(0.0..total_xs);
+        let mut accum = 0.0;
+
+        // Fission
+        let xs_fission = get_xs(fission_mt);
+        accum += xs_fission;
+        if xi < accum && xs_fission > 0.0 {
+            return SampledReaction::Fission(fission_mt);
+        }
+
+        // Absorption
+        let xs_absorption = get_xs(absorption_mt);
+        accum += xs_absorption;
+        if xi < accum && xs_absorption > 0.0 {
+            return SampledReaction::Absorption(absorption_mt);
+        }
+
+        // Elastic
+        let xs_elastic = get_xs(elastic_mt);
+        accum += xs_elastic;
+        if xi < accum && xs_elastic > 0.0 {
+            return SampledReaction::Elastic(elastic_mt);
+        }
+
+        // Non-elastic selection not needed as it is the only remaining option
+        // let xs_nonelastic = get_xs(nonelastic_mt);
+        // accum += xs_nonelastic;
+        // if xi < accum && xs_nonelastic > 0.0 {
+        //     return SampledReaction::NonElastic(nonelastic_mt);
+        // }
+
+        SampledReaction::NonElastic(nonelastic_mt)
+    }
+
     /// Get the energy grid for a specific temperature
     pub fn energy_grid(&self, temperature: &str) -> Option<&Vec<f64>> {
         self.energy.as_ref().and_then(|energy_map| energy_map.get(temperature))
@@ -403,4 +493,32 @@ mod tests {
         expected.sort();
         assert_eq!(mts, expected, "Li7 MT list does not match expected");
     }
+
+    #[test]
+    fn test_sample_reaction_li6_10mev() {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+        let path = std::path::Path::new("tests/Li6.json");
+        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let energy = 10.0e6; // 10 MeV
+        let temperature = "300K";
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..100 {
+            let reaction = nuclide.sample_reaction(energy, temperature, &mut rng);
+            match reaction {
+                SampledReaction::Fission(mt) => assert_eq!(mt, 18),
+                SampledReaction::Absorption(mt) => assert_eq!(mt, 101),
+                SampledReaction::Elastic(mt) => assert_eq!(mt, 2),
+                SampledReaction::NonElastic(mt) => assert_eq!(mt, 3),
+                SampledReaction::Other(mt) => panic!("Unexpected Other reaction: {}", mt),
+                SampledReaction::None => panic!("No reaction sampled at 10 MeV for Li6"),
+            }
+            seen.insert(std::mem::discriminant(&reaction));
+        }
+        // Should see at least two types (elastic and nonelastic likely, maybe absorption/fission)
+        assert!(seen.contains(&std::mem::discriminant(&SampledReaction::Elastic(2))));
+        assert!(seen.contains(&std::mem::discriminant(&SampledReaction::NonElastic(3))));
+    }
+
 }
