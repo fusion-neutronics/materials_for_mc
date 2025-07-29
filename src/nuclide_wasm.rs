@@ -10,7 +10,7 @@ use std::sync::Mutex;
 static NUCLIDE_JSON_CONTENT: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Global cache for WASM nuclides to avoid reloading
-static WASM_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static WASM_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Mutex<Nuclide>>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Set the JSON content for a nuclide - this is used in WASM environment
 pub fn set_nuclide_json_content(name: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +23,7 @@ pub fn set_nuclide_json_content(name: &str, content: &str) -> Result<(), Box<dyn
 pub fn get_or_load_nuclide_wasm(
     nuclide_name: &str, 
     _json_path_map: &HashMap<String, String>
-) -> Result<Arc<Nuclide>, Box<dyn std::error::Error>> {
+) -> Result<Arc<Mutex<Nuclide>>, Box<dyn std::error::Error>> {
     // Try to get from cache first
     {
         let cache = WASM_NUCLIDE_CACHE.lock().unwrap();
@@ -57,7 +57,7 @@ pub fn get_or_load_nuclide_wasm(
 
 #[wasm_bindgen]
 pub struct WasmNuclide {
-    inner: Arc<Nuclide>,
+    inner: Arc<Mutex<Nuclide>>,
 }
 
 #[wasm_bindgen]

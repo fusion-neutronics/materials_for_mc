@@ -1,3 +1,4 @@
+use crate::nuclide::Nuclide;
 use crate::material::Material;
 use std::collections::HashMap;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
@@ -9,8 +10,8 @@ use std::sync::Arc;
 pub struct Materials {
     /// Storage for materials in a vector
     materials: Vec<Material>,
-    /// Loaded nuclide data (name -> Arc<Nuclide>)
-    pub nuclide_data: HashMap<String, Arc<Nuclide>>,
+    /// Loaded nuclide data (name -> Arc<Mutex<Nuclide>>)
+    pub nuclide_data: HashMap<String, std::sync::Arc<std::sync::Mutex<Nuclide>>>,
 }
 
 impl Materials {

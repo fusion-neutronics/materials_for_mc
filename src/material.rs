@@ -1,3 +1,4 @@
+use crate::nuclide::Nuclide;
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
@@ -19,8 +20,8 @@ pub struct Material {
     pub volume: Option<f64>,
     /// Temperature of the material in K
     pub temperature: String,
-    /// Loaded nuclide data (name -> Arc<Nuclide>)
-    pub nuclide_data: HashMap<String, Arc<Nuclide>>,
+    /// Loaded nuclide data (name -> Arc<Mutex<Nuclide>>)
+    pub nuclide_data: HashMap<String, std::sync::Arc<std::sync::Mutex<Nuclide>>>,
     /// Macroscopic cross sections for different MT numbers (neutron only for now)
     /// Map of MT number (i32) -> cross sections
     pub macroscopic_xs_neutron: HashMap<i32, Vec<f64>>,
@@ -243,86 +244,15 @@ impl Material {
         let expanded_mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(Self::expand_mt_filter);
 
         for nuclide in self.nuclides.keys() {
-            let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
-                let temp_reactions = nuclide_data.reactions.get(temperature)
-                    .or_else(|| nuclide_data.reactions.get(&temp_with_k));
-                if let Some(temp_reactions) = temp_reactions {
-                    if let Some(energy_map) = &nuclide_data.energy {
-                        let energy_grid = energy_map.get(temperature)
-                            .or_else(|| energy_map.get(&temp_with_k));
-                        if let Some(energy_grid) = energy_grid {
-                            // Only process the requested MTs if mt_filter is Some (expanded)
-                            let mt_set = expanded_mt_set.as_ref();
-                            let mt_iter = temp_reactions.iter().filter(|(k, _)| {
-                                match mt_set {
-                                    Some(set) => set.contains(k),
-                                    None => true,
-                                }
-                            });
-                            for (&mt, reaction) in mt_iter {
-                                let mut xs_values = Vec::with_capacity(grid.len());
-                                let threshold_idx = reaction.threshold_idx;
-                                let reaction_energy = if threshold_idx < energy_grid.len() {
-                                    &energy_grid[threshold_idx..]
-                                } else {
-                                    continue;
-                                };
-                                if reaction.cross_section.len() != reaction_energy.len() {
-                                    continue;
-                                }
-                                for &grid_energy in &grid {
-                                    if grid_energy < reaction_energy[0] {
-                                        xs_values.push(0.0);
-                                    } else {
-                                        let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
-                                        xs_values.push(xs);
-                                    }
-                                }
-                                nuclide_xs.insert(mt, xs_values);
-                            }
-                        }
-                    }
+                let nuclide_xs = nuclide_data.calculate_microscopic_xs_neutron(
+                    temperature,
+                    &grid,
+                    expanded_mt_set.as_ref()
+                );
+                if !nuclide_xs.is_empty() {
+                    micro_xs.insert(nuclide.clone(), nuclide_xs);
                 }
-            }
-            // Now, for any requested MTs (from expanded_mt_set) that are not present, try to generate them using sum rules
-            if let Some(mt_set) = expanded_mt_set.as_ref() {
-                let sum_rules = &*SUM_RULES;
-                // Dependency order: process children before parents
-                let mut processing_order = Vec::new();
-                let mut processed_set = std::collections::HashSet::new();
-                for &mt in nuclide_xs.keys() {
-                    processed_set.insert(mt);
-                }
-                for &mt in mt_set {
-                    Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
-                }
-                // Now, for each MT in processing_order, if not present, try to sum its children
-                let grid_length = grid.len();
-                for mt in processing_order {
-                    if nuclide_xs.contains_key(&mt) {
-                        continue;
-                    }
-                    if !sum_rules.contains_key(&mt) {
-                        continue;
-                    }
-                    let mut mt_xs = vec![0.0; grid_length];
-                    let mut found_any_child = false;
-                    for &constituent_mt in &sum_rules[&mt] {
-                        if let Some(xs_values) = nuclide_xs.get(&constituent_mt) {
-                            for (i, &xs) in xs_values.iter().enumerate() {
-                                mt_xs[i] += xs;
-                            }
-                            found_any_child = true;
-                        }
-                    }
-                    if found_any_child {
-                        nuclide_xs.insert(mt, mt_xs);
-                    }
-                }
-            }
-            if !nuclide_xs.is_empty() {
-                micro_xs.insert(nuclide.clone(), nuclide_xs);
             }
         }
         micro_xs

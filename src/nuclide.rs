@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // Global cache for nuclides to avoid reloading
-static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Mutex<Nuclide>>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
@@ -48,14 +48,133 @@ pub enum SampledReaction {
 
 
 impl Nuclide {
+    /// Calculate microscopic cross sections for a set of MTs (including sum rules) on a given energy grid and temperature.
+    /// Returns a map of MT -> cross section vector (length = energy_grid.len()).
+    pub fn calculate_microscopic_xs_neutron(
+        &mut self,
+        temperature: &str,
+        energy_grid: &[f64],
+        mt_filter: Option<&std::collections::HashSet<i32>>,
+    ) -> std::collections::HashMap<i32, Vec<f64>> {
+        use crate::data::SUM_RULES;
+        let mut xs_map: std::collections::HashMap<i32, Vec<f64>> = std::collections::HashMap::new();
+        // Try temperature as given, then with 'K' appended, then any available
+        let temp_reactions = self.reactions.get(temperature)
+            .or_else(|| self.reactions.get(&format!("{}K", temperature)))
+            .or_else(|| self.reactions.values().next());
+        let energy_map = self.energy.as_ref();
+        let energy_grid_nuclide = energy_map.and_then(|emap| emap.get(temperature))
+            .or_else(|| energy_map.and_then(|emap| emap.get(&format!("{}K", temperature))))
+            .or_else(|| energy_map.and_then(|emap| emap.values().next()));
+        if let Some(temp_reactions) = temp_reactions {
+            // Always include MT=1 and its children if any MTs are present
+            let mut mt_set_owned;
+            let mt_set = if let Some(set) = mt_filter {
+                set
+            } else {
+                // If no filter, include all present MTs plus MT=1 and its sum rule children
+                mt_set_owned = temp_reactions.keys().copied().collect::<std::collections::HashSet<_>>();
+                mt_set_owned.insert(1);
+                if let Some(children) = SUM_RULES.get(&1) {
+                    for &child in children {
+                        mt_set_owned.insert(child);
+                    }
+                }
+                &mt_set_owned
+            };
+            let mt_iter = temp_reactions.iter().filter(|(k, _)| mt_set.contains(k));
+            for (&mt, reaction) in mt_iter {
+                let mut xs_values = Vec::with_capacity(energy_grid.len());
+                let reaction_energy = if !reaction.energy.is_empty() {
+                    &reaction.energy
+                } else if let Some(grid) = energy_grid_nuclide {
+                    if reaction.threshold_idx < grid.len() {
+                        &grid[reaction.threshold_idx..]
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                };
+                if reaction.cross_section.len() != reaction_energy.len() {
+                    continue;
+                }
+                for &grid_energy in energy_grid {
+                    if grid_energy < reaction_energy[0] {
+                        xs_values.push(0.0);
+                    } else {
+                        let xs = crate::utilities::interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
+                        xs_values.push(xs);
+                    }
+                }
+                xs_map.insert(mt, xs_values);
+            }
+            // Now, for any requested MTs (from mt_set) that are not present, try to generate them using sum rules
+            // Dependency order: process children before parents
+            let mut processing_order = Vec::new();
+            let mut processed_set = std::collections::HashSet::new();
+            for &mt in xs_map.keys() {
+                processed_set.insert(mt);
+            }
+            for &mt in mt_set {
+                fn add_to_processing_order(
+                    mt: i32,
+                    sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
+                    processed: &mut std::collections::HashSet<i32>,
+                    order: &mut Vec<i32>,
+                    restrict: &std::collections::HashSet<i32>,
+                ) {
+                    if processed.contains(&mt) || !restrict.contains(&mt) {
+                        return;
+                    }
+                    if let Some(constituents) = sum_rules.get(&mt) {
+                        for &constituent in constituents {
+                            add_to_processing_order(constituent, sum_rules, processed, order, restrict);
+                        }
+                    }
+                    processed.insert(mt);
+                    order.push(mt);
+                }
+                add_to_processing_order(mt, &SUM_RULES, &mut processed_set, &mut processing_order, mt_set);
+            }
+            let grid_length = energy_grid.len();
+            for mt in processing_order {
+                if xs_map.contains_key(&mt) {
+                    continue;
+                }
+                if !SUM_RULES.contains_key(&mt) {
+                    continue;
+                }
+                let mut mt_xs = vec![0.0; grid_length];
+                let mut found_any_child = false;
+                for &constituent_mt in &SUM_RULES[&mt] {
+                    if let Some(xs_values) = xs_map.get(&constituent_mt) {
+                        for (i, &xs) in xs_values.iter().enumerate() {
+                            mt_xs[i] += xs;
+                        }
+                        found_any_child = true;
+                    }
+                }
+                if found_any_child {
+                    xs_map.insert(mt, mt_xs);
+                }
+            }
+        }
+        xs_map
+    }
     /// Sample the top-level reaction type (fission, absorption, elastic, inelastic, other) at a given energy and temperature
     pub fn sample_reaction<R: rand::Rng + ?Sized>(&self, energy: f64, temperature: &str, rng: &mut R) -> SampledReaction {
-        let temp_reactions = match self.reactions.get(temperature) {
-            Some(r) => r,
-            None => match self.reactions.values().next() {
-                Some(r) => r,
-                None => return SampledReaction::None,
-            },
+        // Try temperature as given, then with 'K' appended, then any available
+        let temp_reactions = if let Some(r) = self.reactions.get(temperature) {
+            r
+        } else if let Some(r) = self.reactions.get(&format!("{}K", temperature)) {
+            r
+        } else if let Some((temp, r)) = self.reactions.iter().next() {
+            println!("[sample_reaction] Requested temperature '{}' not found. Using available temperature '{}'.", temperature, temp);
+            r
+        } else {
+            println!("[sample_reaction] No reaction data available for any temperature.");
+            return SampledReaction::None;
         };
 
         // Define MTs for each event type
@@ -436,7 +555,7 @@ pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn
 pub fn get_or_load_nuclide(
     nuclide_name: &str, 
     json_path_map: &HashMap<String, String>
-) -> Result<Arc<Nuclide>, Box<dyn std::error::Error>> {
+) -> Result<Arc<Mutex<Nuclide>>, Box<dyn std::error::Error>> {
     // Try to get from cache first
     {
         let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
@@ -450,7 +569,7 @@ pub fn get_or_load_nuclide(
         .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
     
     let nuclide = read_nuclide_from_json(path)?;
-    let arc_nuclide = Arc::new(nuclide);
+    let arc_nuclide = Arc::new(Mutex::new(nuclide));
     
     // Store in cache
     {
@@ -501,9 +620,18 @@ mod tests {
         let path = std::path::Path::new("tests/Li6.json");
         let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
         let energy = 10.0e6; // 10 MeV
-        let temperature = "300K";
+        let temperature = "294";
         let mut rng = StdRng::seed_from_u64(42);
         let mut seen = std::collections::HashSet::new();
+        // Ensure sum rule cross sections (e.g., MT=1) are constructed before sampling
+        let mut mt_set = std::collections::HashSet::new();
+        mt_set.insert(1);
+        let energy_grid = nuclide.energy.as_ref().unwrap().get("294").unwrap().clone();
+        let mut nuc = nuclide.calculate_microscopic_xs_neutron(
+            "294",
+            &energy_grid,
+            Some(&mt_set),
+        );
         for _ in 0..100 {
             let reaction = nuclide.sample_reaction(energy, temperature, &mut rng);
             match reaction {
