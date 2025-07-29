@@ -1585,6 +1585,30 @@ mod tests {
         assert!(!expanded2.contains(&9999));
     }
 
+    #[test]
+    fn test_expand_mt_filter() {
+        // Case 1: Single MT, no descendants
+        let mt_filter = vec![51];
+        let expanded = Material::expand_mt_filter(&mt_filter);
+        // Should include 51 and its descendants (if any)
+        assert!(expanded.contains(&51), "Expanded set should contain the original MT");
+        // Case 2: Multiple MTs, with descendants
+        let mt_filter = vec![3, 4];
+        let expanded = Material::expand_mt_filter(&mt_filter);
+        assert!(expanded.contains(&3), "Expanded set should contain MT 3");
+        assert!(expanded.contains(&4), "Expanded set should contain MT 4");
+        // All descendants of 3 and 4 should be included
+        for mt in crate::data::get_all_mt_descendants(3) {
+            assert!(expanded.contains(&mt), "Expanded set should contain descendant {} of MT 3", mt);
+        }
+        for mt in crate::data::get_all_mt_descendants(4) {
+            assert!(expanded.contains(&mt), "Expanded set should contain descendant {} of MT 4", mt);
+        }
+        // Case 3: Empty input
+        let mt_filter: Vec<i32> = vec![];
+        let expanded = Material::expand_mt_filter(&mt_filter);
+        assert!(expanded.is_empty(), "Expanded set should be empty for empty input");
+    }
 } // close mod tests
 
 
