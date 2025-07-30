@@ -214,14 +214,11 @@ impl Material {
         let mut processing_order = Vec::new();
         let mut processed_set = std::collections::HashSet::new();
 
-        let temp_with_k = format!("{}K", temperature);
-        let temp_reactions_opt = nuclide_data.reactions.get(temperature)
-            .or_else(|| nuclide_data.reactions.get(&temp_with_k));
+        let temp_reactions_opt = nuclide_data.reactions.get(temperature);
         let energy_map_opt = nuclide_data.energy.as_ref();
 
         if let (Some(temp_reactions), Some(energy_map)) = (temp_reactions_opt, energy_map_opt) {
-            let energy_grid_opt = energy_map.get(temperature)
-                .or_else(|| energy_map.get(&temp_with_k));
+            let energy_grid_opt = energy_map.get(temperature);
 
             if let Some(energy_grid) = energy_grid_opt {
                 // 1. Gather explicit reactions and mark them as processed.
@@ -353,13 +350,10 @@ impl Material {
             for nuclide_name in self.nuclides.keys() {
                 if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
                     let mut explicit_reactions = HashMap::new();
-                    let temp_with_k = format!("{}K", temperature);
-                    let temp_reactions_opt = nuclide_data.reactions.get(temperature)
-                        .or_else(|| nuclide_data.reactions.get(&temp_with_k));
-                    
+                    let temp_reactions_opt = nuclide_data.reactions.get(temperature);
                     if let Some(temp_reactions) = temp_reactions_opt {
                         if let Some(energy_map) = &nuclide_data.energy {
-                            if let Some(energy_grid) = energy_map.get(temperature).or_else(|| energy_map.get(&temp_with_k)) {
+                            if let Some(energy_grid) = energy_map.get(temperature) {
                                 for (&mt, reaction) in temp_reactions {
                                     let threshold_idx = reaction.threshold_idx;
                                     if threshold_idx < energy_grid.len() {
@@ -1368,14 +1362,11 @@ mod tests {
         // Get the nuclide directly
         let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
         let temperature = &material.temperature;
-        let temp_with_k = format!("{}K", temperature);
         // Get reactions and energy grid for nuclide
         let reactions = nuclide.reactions.get(temperature)
-            .or_else(|| nuclide.reactions.get(&temp_with_k))
             .expect("No reactions for Li6");
         let energy_map = nuclide.energy.as_ref().expect("No energy map for Li6");
         let energy_grid = energy_map.get(temperature)
-            .or_else(|| energy_map.get(&temp_with_k))
             .expect("No energy grid for Li6");
         // For each MT in the material, compare the cross sections
         for (mt, xs_mat) in micro_xs_mat["Li6"].iter() {

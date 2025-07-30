@@ -88,14 +88,11 @@ impl Nuclide {
         let mut processing_order = Vec::new();
         let mut processed_set = std::collections::HashSet::new();
 
-        let temp_with_k = format!("{}K", temperature);
-        let temp_reactions_opt = self.reactions.get(temperature)
-            .or_else(|| self.reactions.get(&temp_with_k));
+        let temp_reactions_opt = self.reactions.get(temperature);
         let energy_map_opt = self.energy.as_ref();
 
         if let (Some(temp_reactions), Some(energy_map)) = (temp_reactions_opt, energy_map_opt) {
-            let energy_grid_opt = energy_map.get(temperature)
-                .or_else(|| energy_map.get(&temp_with_k));
+            let energy_grid_opt = energy_map.get(temperature);
 
             if let Some(energy_grid) = energy_grid_opt {
                 // 1. Gather explicit reactions and mark them as processed.
