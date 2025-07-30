@@ -220,6 +220,120 @@ impl Material {
         all_energies
     }
 
+    /// For a single nuclide, gathers reaction data for MTs explicitly present in the data
+    /// and also determines the list of hierarchical MTs that need to be calculated from sum rules.
+    ///
+    /// # Arguments
+    /// * `nuclide_data` - The loaded data for the nuclide.
+    /// * `temperature` - The material temperature as a string.
+    /// * `mt_set` - The set of all MTs (including descendants) that are requested.
+    ///
+    /// # Returns
+    /// A tuple containing:
+    /// - A map of explicit MT numbers to their raw (energy grid, cross section) data.
+    /// - A dependency-ordered vector of hierarchical MTs to be calculated later.
+    fn gather_explicit_and_hierarchical_mts(
+        nuclide_data: &Arc<Nuclide>,
+        temperature: &str,
+        mt_set: &std::collections::HashSet<i32>,
+    ) -> (HashMap<i32, (Vec<f64>, Vec<f64>)>, Vec<i32>) {
+        let mut explicit_reactions: HashMap<i32, (Vec<f64>, Vec<f64>)> = HashMap::new();
+        let mut processing_order = Vec::new();
+        let mut processed_set = std::collections::HashSet::new();
+
+        let temp_with_k = format!("{}K", temperature);
+        let temp_reactions_opt = nuclide_data.reactions.get(temperature)
+            .or_else(|| nuclide_data.reactions.get(&temp_with_k));
+        let energy_map_opt = nuclide_data.energy.as_ref();
+
+        if let (Some(temp_reactions), Some(energy_map)) = (temp_reactions_opt, energy_map_opt) {
+            let energy_grid_opt = energy_map.get(temperature)
+                .or_else(|| energy_map.get(&temp_with_k));
+
+            if let Some(energy_grid) = energy_grid_opt {
+                // 1. Gather explicit reactions and mark them as processed.
+                for (&mt, reaction) in temp_reactions.iter() {
+                    if mt_set.contains(&mt) {
+                        let threshold_idx = reaction.threshold_idx;
+                        if threshold_idx < energy_grid.len() {
+                            let reaction_energy = energy_grid[threshold_idx..].to_vec();
+                            if reaction.cross_section.len() == reaction_energy.len() {
+                                explicit_reactions.insert(mt, (reaction_energy, reaction.cross_section.clone()));
+                                processed_set.insert(mt);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Determine the processing order for all requested MTs that need to be calculated.
+        let sum_rules = &*SUM_RULES;
+        for &mt in mt_set {
+            Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
+        }
+
+        (explicit_reactions, processing_order)
+    }
+
+    /// Interpolates explicit reactions onto a unified grid and then calculates hierarchical
+    /// reactions by summing the interpolated cross sections.
+    ///
+    /// # Arguments
+    /// * `unified_grid` - The target energy grid for interpolation.
+    /// * `explicit_reactions` - Raw data for reactions that exist in the nuclide files.
+    /// * `hierarchical_mts_to_process` - Dependency-ordered list of MTs to calculate via sum rules.
+    ///
+    /// # Returns
+    /// A map of all requested MT numbers to their cross section vectors on the unified grid.
+    fn interpolate_and_sum_reactions(
+        unified_grid: &Vec<f64>,
+        explicit_reactions: HashMap<i32, (Vec<f64>, Vec<f64>)>,
+        hierarchical_mts_to_process: Vec<i32>,
+    ) -> HashMap<i32, Vec<f64>> {
+        let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
+        let grid_len = unified_grid.len();
+
+        // 1. Interpolate all explicit reactions onto the unified grid.
+        for (mt, (reaction_energy, reaction_cross_section)) in explicit_reactions {
+            let mut xs_values = Vec::with_capacity(grid_len);
+            if reaction_energy.is_empty() {
+                 xs_values.extend(std::iter::repeat(0.0).take(grid_len));
+            } else {
+                for &grid_energy in unified_grid {
+                    if grid_energy < reaction_energy[0] {
+                        xs_values.push(0.0);
+                    } else {
+                        let xs = interpolate_linear(&reaction_energy, &reaction_cross_section, grid_energy);
+                        xs_values.push(xs);
+                    }
+                }
+            }
+            nuclide_xs.insert(mt, xs_values);
+        }
+
+        // 2. Calculate hierarchical reactions by summing interpolated children.
+        let sum_rules = &*SUM_RULES;
+        for mt in hierarchical_mts_to_process {
+            if let Some(constituents) = sum_rules.get(&mt) {
+                let mut mt_xs = vec![0.0; grid_len];
+                let mut found_any_child = false;
+                for &constituent_mt in constituents {
+                    if let Some(xs_values) = nuclide_xs.get(&constituent_mt) {
+                        for (i, &xs) in xs_values.iter().enumerate() {
+                            mt_xs[i] += xs;
+                        }
+                        found_any_child = true;
+                    }
+                }
+                if found_any_child {
+                    nuclide_xs.insert(mt, mt_xs);
+                }
+            }
+        }
+        nuclide_xs
+    }
+
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
     /// 
     /// This method interpolates the microscopic cross sections for each nuclide
@@ -234,95 +348,68 @@ impl Material {
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        // Always use the cached grid or build it automatically
+        
         let grid = self.unified_energy_grid_neutron();
         let mut micro_xs: HashMap<String, HashMap<i32, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
-        let temp_with_k = format!("{}K", temperature);
-        // Expand the filter to include all child MTs for any hierarchical MTs, as in calculate_macroscopic_xs_neutron
-        let expanded_mt_set: Option<std::collections::HashSet<i32>> = mt_filter.map(Self::expand_mt_filter);
 
-        for nuclide in self.nuclides.keys() {
-            let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
-            if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
-                let temp_reactions = nuclide_data.reactions.get(temperature)
-                    .or_else(|| nuclide_data.reactions.get(&temp_with_k));
-                if let Some(temp_reactions) = temp_reactions {
-                    if let Some(energy_map) = &nuclide_data.energy {
-                        let energy_grid = energy_map.get(temperature)
-                            .or_else(|| energy_map.get(&temp_with_k));
-                        if let Some(energy_grid) = energy_grid {
-                            // Only process the requested MTs if mt_filter is Some (expanded)
-                            let mt_set = expanded_mt_set.as_ref();
-                            let mt_iter = temp_reactions.iter().filter(|(k, _)| {
-                                match mt_set {
-                                    Some(set) => set.contains(k),
-                                    None => true,
-                                }
-                            });
-                            for (&mt, reaction) in mt_iter {
-                                let mut xs_values = Vec::with_capacity(grid.len());
-                                let threshold_idx = reaction.threshold_idx;
-                                let reaction_energy = if threshold_idx < energy_grid.len() {
-                                    &energy_grid[threshold_idx..]
-                                } else {
-                                    continue;
-                                };
-                                if reaction.cross_section.len() != reaction_energy.len() {
-                                    continue;
-                                }
-                                for &grid_energy in &grid {
-                                    if grid_energy < reaction_energy[0] {
-                                        xs_values.push(0.0);
-                                    } else {
-                                        let xs = interpolate_linear(reaction_energy, &reaction.cross_section, grid_energy);
-                                        xs_values.push(xs);
+        // The logic branches depending on whether a filter is provided,
+        // as sum rules are only applied when a specific filter is present.
+        if let Some(filter) = mt_filter {
+            let expanded_mt_set = Self::expand_mt_filter(filter);
+            for nuclide_name in self.nuclides.keys() {
+                if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
+                    // 1. Gather raw data for existing reactions and identify hierarchical ones to build.
+                    let (explicit, hierarchical) = Self::gather_explicit_and_hierarchical_mts(
+                        nuclide_data,
+                        temperature,
+                        &expanded_mt_set,
+                    );
+                    // 2. Interpolate the explicit reactions and sum them to create the hierarchical ones.
+                    let nuclide_xs = Self::interpolate_and_sum_reactions(
+                        &grid,
+                        explicit,
+                        hierarchical,
+                    );
+                    if !nuclide_xs.is_empty() {
+                        micro_xs.insert(nuclide_name.clone(), nuclide_xs);
+                    }
+                }
+            }
+        } else {
+            // No filter: just interpolate all available reactions, without using sum rules.
+            for nuclide_name in self.nuclides.keys() {
+                if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
+                    let mut explicit_reactions = HashMap::new();
+                    let temp_with_k = format!("{}K", temperature);
+                    let temp_reactions_opt = nuclide_data.reactions.get(temperature)
+                        .or_else(|| nuclide_data.reactions.get(&temp_with_k));
+                    
+                    if let Some(temp_reactions) = temp_reactions_opt {
+                        if let Some(energy_map) = &nuclide_data.energy {
+                            if let Some(energy_grid) = energy_map.get(temperature).or_else(|| energy_map.get(&temp_with_k)) {
+                                for (&mt, reaction) in temp_reactions {
+                                    let threshold_idx = reaction.threshold_idx;
+                                    if threshold_idx < energy_grid.len() {
+                                        let reaction_energy = &energy_grid[threshold_idx..];
+                                        if reaction.cross_section.len() == reaction_energy.len() {
+                                            explicit_reactions.insert(mt, (reaction_energy.to_vec(), reaction.cross_section.clone()));
+                                        }
                                     }
                                 }
-                                nuclide_xs.insert(mt, xs_values);
                             }
                         }
                     }
-                }
-            }
-            // Now, for any requested MTs (from expanded_mt_set) that are not present, try to generate them using sum rules
-            if let Some(mt_set) = expanded_mt_set.as_ref() {
-                let sum_rules = &*SUM_RULES;
-                // Dependency order: process children before parents
-                let mut processing_order = Vec::new();
-                let mut processed_set = std::collections::HashSet::new();
-                for &mt in nuclide_xs.keys() {
-                    processed_set.insert(mt);
-                }
-                for &mt in mt_set {
-                    Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
-                }
-                // Now, for each MT in processing_order, if not present, try to sum its children
-                let grid_length = grid.len();
-                for mt in processing_order {
-                    if nuclide_xs.contains_key(&mt) {
-                        continue;
-                    }
-                    if !sum_rules.contains_key(&mt) {
-                        continue;
-                    }
-                    let mut mt_xs = vec![0.0; grid_length];
-                    let mut found_any_child = false;
-                    for &constituent_mt in &sum_rules[&mt] {
-                        if let Some(xs_values) = nuclide_xs.get(&constituent_mt) {
-                            for (i, &xs) in xs_values.iter().enumerate() {
-                                mt_xs[i] += xs;
-                            }
-                            found_any_child = true;
-                        }
-                    }
-                    if found_any_child {
-                        nuclide_xs.insert(mt, mt_xs);
+                    // Interpolate the gathered reactions; no hierarchical MTs to process.
+                    let nuclide_xs = Self::interpolate_and_sum_reactions(
+                        &grid,
+                        explicit_reactions,
+                        Vec::new(),
+                    );
+                    if !nuclide_xs.is_empty() {
+                        micro_xs.insert(nuclide_name.clone(), nuclide_xs);
                     }
                 }
-            }
-            if !nuclide_xs.is_empty() {
-                micro_xs.insert(nuclide.clone(), nuclide_xs);
             }
         }
         micro_xs
@@ -735,7 +822,7 @@ impl Material {
         panic!("Failed to sample nuclide: numerical error in sampling loop");
     }
 }
-
+//... (The rest of the file, including tests, remains unchanged)
 #[cfg(test)]
     #[test]
     fn test_sample_distance_to_collision() {
@@ -1319,9 +1406,9 @@ mod tests {
             .or_else(|| energy_map.get(&temp_with_k))
             .expect("No energy grid for Li6");
         // For each MT in the material, compare the cross sections
-        for (mt, xs_mat) in &micro_xs_mat["Li6"] {
+        for (mt, xs_mat) in micro_xs_mat["Li6"].iter() {
             // Only compare if MT exists in nuclide
-            if let Some(reaction) = reactions.get(mt) {
+            if let Some(reaction) = reactions.get(&mt) {
                 let threshold_idx = reaction.threshold_idx;
                 let nuclide_energy = if threshold_idx < energy_grid.len() {
                     &energy_grid[threshold_idx..]
@@ -1390,7 +1477,7 @@ mod tests {
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let grid = material.unified_energy_grid_neutron();
+        let _grid = material.unified_energy_grid_neutron();
         // Calculate all MTs
         let macro_xs_all = material.calculate_macroscopic_xs_neutron(&vec![1], false);
         // Calculate only MT=2
@@ -1610,5 +1697,3 @@ mod tests {
         assert!(expanded.is_empty(), "Expanded set should be empty for empty input");
     }
 } // close mod tests
-
-
