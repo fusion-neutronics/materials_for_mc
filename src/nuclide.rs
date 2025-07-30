@@ -1,13 +1,3 @@
-    #[test]
-    fn test_fissionable_false_for_be9_and_fe58() {
-        let path_be9 = std::path::Path::new("tests/Be9.json");
-        let nuclide_be9 = read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
-        assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
-
-        let path_fe58 = std::path::Path::new("tests/Fe58.json");
-        let nuclide_fe58 = read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
-        assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
-    }
 // Struct representing a nuclide, matching the JSON file structure
 // Update the fields as needed to match all JSON entries
 use once_cell::sync::Lazy;
@@ -479,5 +469,16 @@ mod tests {
         mts.sort();
         expected.sort();
         assert_eq!(mts, expected, "Li7 MT list does not match expected");
+    }
+
+    #[test]
+    fn test_fissionable_false_for_be9_and_fe58() {
+        let path_be9 = std::path::Path::new("tests/Be9.json");
+        let nuclide_be9 = read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
+
+        let path_fe58 = std::path::Path::new("tests/Fe58.json");
+        let nuclide_fe58 = read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
+        assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
     }
 }

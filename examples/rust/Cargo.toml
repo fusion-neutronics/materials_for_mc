@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 materials_for_mc = { path = "../../" }
+rand = "0.8"
