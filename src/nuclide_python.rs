@@ -25,6 +25,7 @@ pub struct PyNuclide {
     pub library: Option<String>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
     pub reactions: HashMap<String, HashMap<i32, Reaction>>,
+    #[pyo3(get)]
     pub fissionable: bool,
 }
 
