@@ -1,3 +1,14 @@
+def test_be9_not_fissionable():
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    assert hasattr(nuc, 'fissionable'), "Nuclide should have a 'fissionable' attribute"
+    assert nuc.fissionable is False, "Be9 should not be fissionable"
+
+def test_fe58_not_fissionable():
+    nuc = Nuclide('Fe58')
+    nuc.read_nuclide_from_json('tests/Fe58.json')
+    assert hasattr(nuc, 'fissionable'), "Nuclide should have a 'fissionable' attribute"
+    assert nuc.fissionable is False, "Fe58 should not be fissionable"
 from materials_for_mc import Nuclide
 
 def test_read_li6_nuclide():

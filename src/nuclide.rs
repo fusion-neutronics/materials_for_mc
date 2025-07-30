@@ -34,6 +34,7 @@ pub struct Nuclide {
     pub energy: Option<HashMap<String, Vec<f64>>>,
     #[serde(default)]
     pub reactions: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt (i32) -> Reaction
+    pub fissionable: bool,
 }
 
 impl Nuclide {
@@ -150,7 +151,19 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         library: None,
         energy: None,
         reactions: HashMap::new(),
+        fissionable: false,
     };
+    // After reactions are loaded, check for fissionable MTs
+    // Fissionable if any of 18, 19, 20, 21, 38 are present in any temperature
+    let fission_mt_list = [18, 19, 20, 21, 38];
+    'outer: for temp_reactions in nuclide.reactions.values() {
+        for mt in temp_reactions.keys() {
+            if fission_mt_list.contains(mt) {
+                nuclide.fissionable = true;
+                break 'outer;
+            }
+        }
+    }
 
     // Parse basic metadata
     if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
@@ -456,5 +469,16 @@ mod tests {
         mts.sort();
         expected.sort();
         assert_eq!(mts, expected, "Li7 MT list does not match expected");
+    }
+
+    #[test]
+    fn test_fissionable_false_for_be9_and_fe58() {
+        let path_be9 = std::path::Path::new("tests/Be9.json");
+        let nuclide_be9 = read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
+
+        let path_fe58 = std::path::Path::new("tests/Fe58.json");
+        let nuclide_fe58 = read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
+        assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
     }
 }

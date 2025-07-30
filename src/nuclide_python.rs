@@ -25,6 +25,8 @@ pub struct PyNuclide {
     pub library: Option<String>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
     pub reactions: HashMap<String, HashMap<i32, Reaction>>,
+    #[pyo3(get)]
+    pub fissionable: bool,
 }
 
 #[cfg(feature = "pyo3")]
@@ -42,6 +44,7 @@ impl PyNuclide {
             library: None,
             energy: None,
             reactions: HashMap::new(),
+            fissionable: false,
         }
     }
 
@@ -138,6 +141,7 @@ impl From<Nuclide> for PyNuclide {
             library: n.library,
             energy: n.energy,
             reactions: n.reactions,
+            fissionable: n.fissionable,
         }
     }
 }
@@ -154,6 +158,7 @@ impl From<PyNuclide> for Nuclide {
             library: py.library,
             energy: py.energy,
             reactions: py.reactions,
+            fissionable: py.fissionable,
         }
     }
 }

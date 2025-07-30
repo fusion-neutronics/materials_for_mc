@@ -1,5 +1,6 @@
 use materials_for_mc::{Material, Config};
-
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 fn main() {
 
@@ -37,6 +38,16 @@ fn main() {
     lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], true);
 
 
+    let mut rng = StdRng::seed_from_u64(123456);
+    let energy = 1.0e3; // 1 MeV
+    // Sample nuclide
+    let sampled_nuclide_name = lithium_mat.sample_interacting_nuclide(energy, &mut rng);
+    println!("Sampled nuclide: {}", sampled_nuclide_name);
+    if let Some(nuclide) = lithium_mat.nuclide_data.get(&sampled_nuclide_name) {
+        println!("fissionable: {}", nuclide.fissionable);
+    } else {
+        println!("Nuclide struct not found for {}", sampled_nuclide_name);
+    }
 
     // Print the per-nuclide macroscopic total cross sections for lithium_mat
     // println!("lithium_mat.macroscopic_total_xs_by_nuclide: {:#?}", lithium_mat.macroscopic_total_xs_by_nuclide);
