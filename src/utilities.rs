@@ -1,3 +1,4 @@
+use crate::data::get_all_mt_descendants;
 /// Utility functions for materials_for_mc
 
 /// Linear interpolation on a linear scale
@@ -62,4 +63,36 @@ pub fn interpolate_log_log(x: &[f64], y: &[f64], x_new: f64) -> f64 {
     
     let log_y_new = log_y1 + (log_x_new - log_x1) * (log_y2 - log_y1) / (log_x2 - log_x1);
     log_y_new.exp()
+}
+
+/// Helper for dependency-ordered processing of MTs (children before parents)
+pub fn add_to_processing_order(
+    mt: i32,
+    sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
+    processed: &mut std::collections::HashSet<i32>,
+    order: &mut Vec<i32>,
+    restrict: &std::collections::HashSet<i32>,
+) {
+    if processed.contains(&mt) || !restrict.contains(&mt) {
+        return;
+    }
+    if let Some(constituents) = sum_rules.get(&mt) {
+        for &constituent in constituents {
+            add_to_processing_order(constituent, sum_rules, processed, order, restrict);
+        }
+    }
+    processed.insert(mt);
+    order.push(mt);
+}
+
+/// Helper to expand a list of MT numbers to include all descendants (for sum rules)
+pub fn expand_mt_filter(mt_filter: &Vec<i32>) -> std::collections::HashSet<i32> {
+    let mut set = std::collections::HashSet::new();
+    for &mt in mt_filter {
+        set.insert(mt);
+        for child in get_all_mt_descendants(mt) {
+            set.insert(child);
+        }
+    }
+    set
 }

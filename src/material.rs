@@ -5,6 +5,8 @@ use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
 use crate::data::{ELEMENT_NAMES, get_all_mt_descendants};
 use crate::data::SUM_RULES;
+use crate::utilities::expand_mt_filter;
+use crate::utilities::add_to_processing_order;
 use rand::SeedableRng;
 
 #[derive(Debug, Clone)]
@@ -32,36 +34,7 @@ pub struct Material {
 }
 
 impl Material {
-    /// Helper for dependency-ordered processing of MTs (children before parents)
-    fn add_to_processing_order(
-        mt: i32,
-        sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
-        processed: &mut std::collections::HashSet<i32>,
-        order: &mut Vec<i32>,
-        restrict: &std::collections::HashSet<i32>,
-    ) {
-        if processed.contains(&mt) || !restrict.contains(&mt) {
-            return;
-        }
-        if let Some(constituents) = sum_rules.get(&mt) {
-            for &constituent in constituents {
-                Self::add_to_processing_order(constituent, sum_rules, processed, order, restrict);
-            }
-        }
-        processed.insert(mt);
-        order.push(mt);
-    }
-    /// Helper to expand a list of MT numbers to include all descendants (for sum rules)
-    fn expand_mt_filter(mt_filter: &Vec<i32>) -> std::collections::HashSet<i32> {
-        let mut set = std::collections::HashSet::new();
-        for &mt in mt_filter {
-            set.insert(mt);
-            for child in get_all_mt_descendants(mt) {
-                set.insert(child);
-            }
-        }
-        set
-    }
+
     /// Sample the distance to the next collision for a neutron at the given energy.
     /// Uses the total macroscopic cross section (MT=1).
     /// Returns None if the cross section is zero or not available.
@@ -270,7 +243,7 @@ impl Material {
         // 2. Determine the processing order for all requested MTs that need to be calculated.
         let sum_rules = &*SUM_RULES;
         for &mt in mt_set {
-            Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
+            add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
         }
 
         (explicit_reactions, processing_order)
@@ -356,12 +329,11 @@ impl Material {
         // The logic branches depending on whether a filter is provided,
         // as sum rules are only applied when a specific filter is present.
         if let Some(filter) = mt_filter {
-            let expanded_mt_set = Self::expand_mt_filter(filter);
+            let expanded_mt_set = expand_mt_filter(filter);
             for nuclide_name in self.nuclides.keys() {
                 if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
                     // 1. Gather raw data for existing reactions and identify hierarchical ones to build.
-                    let (explicit, hierarchical) = Self::gather_explicit_and_hierarchical_mts(
-                        nuclide_data,
+                    let (explicit, hierarchical) = nuclide_data.gather_explicit_and_hierarchical_mts(
                         temperature,
                         &expanded_mt_set,
                     );
@@ -442,7 +414,7 @@ impl Material {
         }
 
         // Expand the filter to include all child MTs for any hierarchical MTs
-        let expanded = Self::expand_mt_filter(mt_filter);
+        let expanded = expand_mt_filter(mt_filter);
         let expanded_filter = Some(expanded.clone());
         let expanded_mt_filter: Vec<i32> = expanded.into_iter().collect();
         let micro_xs = self.calculate_microscopic_xs_neutron(Some(&expanded_mt_filter));
@@ -564,7 +536,7 @@ impl Material {
             processed_set.insert(mt);
         }
         for &mt in &mt_to_process {
-            Self::add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, &mt_to_process);
+            add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, &mt_to_process);
         }
         for mt in processing_order {
             if xs_map.contains_key(&mt) {
@@ -1648,7 +1620,7 @@ mod tests {
     fn test_expand_mt_filter_includes_descendants_and_self() {
         // Example: MT=3 (should include itself and all descendants from get_all_mt_descendants)
         let input = vec![3];
-        let expanded = Material::expand_mt_filter(&input);
+        let expanded = expand_mt_filter(&input);
         let expected: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
         // Should include 3 itself
         assert!(expanded.contains(&3));
@@ -1661,7 +1633,7 @@ mod tests {
 
         // Test with multiple MTs
         let input2 = vec![3, 4];
-        let expanded2 = Material::expand_mt_filter(&input2);
+        let expanded2 = expand_mt_filter(&input2);
         let mut expected2: std::collections::HashSet<i32> = get_all_mt_descendants(3).into_iter().collect();
         expected2.extend(get_all_mt_descendants(4));
         for mt in &expected2 {
@@ -1676,12 +1648,12 @@ mod tests {
     fn test_expand_mt_filter() {
         // Case 1: Single MT, no descendants
         let mt_filter = vec![51];
-        let expanded = Material::expand_mt_filter(&mt_filter);
+        let expanded = expand_mt_filter(&mt_filter);
         // Should include 51 and its descendants (if any)
         assert!(expanded.contains(&51), "Expanded set should contain the original MT");
         // Case 2: Multiple MTs, with descendants
         let mt_filter = vec![3, 4];
-        let expanded = Material::expand_mt_filter(&mt_filter);
+        let expanded = expand_mt_filter(&mt_filter);
         assert!(expanded.contains(&3), "Expanded set should contain MT 3");
         assert!(expanded.contains(&4), "Expanded set should contain MT 4");
         // All descendants of 3 and 4 should be included
@@ -1693,7 +1665,7 @@ mod tests {
         }
         // Case 3: Empty input
         let mt_filter: Vec<i32> = vec![];
-        let expanded = Material::expand_mt_filter(&mt_filter);
+        let expanded = expand_mt_filter(&mt_filter);
         assert!(expanded.is_empty(), "Expanded set should be empty for empty input");
     }
 } // close mod tests
