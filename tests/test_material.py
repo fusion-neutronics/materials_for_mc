@@ -182,7 +182,6 @@ def test_material_vs_nuclide_microscopic_xs_li6():
     nuclide.read_nuclide_from_json('tests/Li6.json')
     # Get the temperature string used by the material
     temperature = mat.temperature
-    temp_with_k = f"{temperature}K"
     # Get reactions and energy grid for nuclide
     reactions = nuclide.reactions
     assert reactions is not None, "No reactions for Li6"
