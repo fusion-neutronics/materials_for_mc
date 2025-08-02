@@ -5,12 +5,13 @@ use crate::nuclide::Reaction;
 
 #[wasm_bindgen]
 pub struct WasmReaction {
-    inner: Reaction,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ReactionData {
-    threshold_idx: usize,
+            inner: Reaction {
+                cross_section: Vec::new(),
+                threshold_idx: 0,
+                interpolation: Vec::new(),
+                energy: Vec::new(),
+                mt_number: 0,
+            },
     cross_section: Vec<f64>,
     interpolation: Vec<i32>,
     energy: Vec<f64>,
