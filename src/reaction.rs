@@ -8,6 +8,7 @@ pub struct Reaction {
     pub interpolation: Vec<i32>,
     #[serde(skip, default)]
     pub energy: Vec<f64>,  // Reaction-specific energy grid
+    pub mt_number: i32,  // The MT number for this reaction
 }
 
 /// Populates the energy grid for all reactions in a nuclide

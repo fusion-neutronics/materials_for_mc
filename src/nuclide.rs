@@ -20,6 +20,7 @@ pub struct Reaction {
     pub interpolation: Vec<i32>,
     #[serde(skip, default)]
     pub energy: Vec<f64>,  // Reaction-specific energy grid
+    pub mt_number: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -234,6 +235,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                             threshold_idx: 0,
                             interpolation: Vec::new(),
                             energy: Vec::new(),
+                            mt_number: 0, // Add this line
                         };
                         
                         // Get cross section (might be named "xs" in old format)
@@ -283,6 +285,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                         }
                         
                         if let Ok(mt_int) = mt.parse::<i32>() {
+                            reaction.mt_number = mt_int;
                             temp_reactions.insert(mt_int, reaction);
                         }
                     }
@@ -295,71 +298,6 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
             }
         }
     } 
-    // Check if we have the newer format with "incident_particle" field
-    else if let Some(ip_obj) = json_value.get("incident_particle").and_then(|v| v.as_object()) {
-        // We'll just handle "neutron" for now, as that's the most common
-        if let Some(neutron_data) = ip_obj.get("neutron") {
-            if let Some(reactions_obj) = neutron_data.get("reactions").and_then(|v| v.as_object()) {
-                for (temp, mt_reactions) in reactions_obj {
-                    let mut temp_reactions: HashMap<i32, Reaction> = HashMap::new();
-                    
-                    // Process all MT reactions for this temperature
-                    if let Some(mt_obj) = mt_reactions.as_object() {
-                        for (mt, reaction_data) in mt_obj {
-                            if let Some(reaction_obj) = reaction_data.as_object() {
-                                let mut reaction = Reaction {
-                                    cross_section: Vec::new(),
-                                    threshold_idx: 0,
-                                    interpolation: Vec::new(),
-                                    energy: Vec::new(),
-                                };
-                                
-                                // Get cross section
-                                if let Some(xs) = reaction_obj.get("cross_section") {
-                                    if let Some(xs_arr) = xs.as_array() {
-                                        reaction.cross_section = xs_arr
-                                            .iter()
-                                            .filter_map(|v| v.as_f64())
-                                            .collect();
-                                    }
-                                }
-                                
-                                // Get threshold_idx
-                                if let Some(idx) = reaction_obj.get("threshold_idx").and_then(|v| v.as_u64()) {
-                                    reaction.threshold_idx = idx as usize;
-                                }
-                                
-                                // Get interpolation
-                                if let Some(interp) = reaction_obj.get("interpolation") {
-                                    if let Some(interp_arr) = interp.as_array() {
-                                        reaction.interpolation = interp_arr
-                                            .iter()
-                                            .filter_map(|v| v.as_i64().map(|i| i as i32))
-                                            .collect();
-                                    }
-                                }
-                                
-                                // Calculate energy grid from threshold_idx and main energy grid
-                                if let Some(energy_grids) = &nuclide.energy {
-                                    if let Some(energy_grid) = energy_grids.get(temp) {
-                                        if reaction.threshold_idx < energy_grid.len() {
-                                            reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
-                                        }
-                                    }
-                                }
-                                
-                                if let Ok(mt_int) = mt.parse::<i32>() {
-                                    temp_reactions.insert(mt_int, reaction);
-                                }
-                            }
-                        }
-                    }
-                    
-                    nuclide.reactions.insert(temp.clone(), temp_reactions);
-                }
-            }
-        }
-    }
     
     // If we have no energy map but have reactions, try to create an energy map
     if nuclide.energy.is_none() && !nuclide.reactions.is_empty() {
@@ -480,5 +418,26 @@ mod tests {
         let path_fe58 = std::path::Path::new("tests/Fe58.json");
         let nuclide_fe58 = read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
         assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
+    }
+
+    #[test]
+    fn test_li6_reactions_contain_specific_mts() {
+        // Load Li6 nuclide from test JSON
+        let path = std::path::Path::new("tests/Li6.json");
+        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+
+        // Check that required MTs are present and mt_number is not 0
+        let required = [2, 24, 51, 444];
+        for mt in &required {
+            let mut found = false;
+            for temp_reactions in nuclide.reactions.values() {
+                if let Some(reaction) = temp_reactions.get(mt) {
+                    assert_ne!(reaction.mt_number, 0, "Reaction MT number for MT {} is 0", mt);
+                    found = true;
+                    break;
+                }
+            }
+            assert!(found, "MT {} not found in any temperature reactions", mt);
+        }
     }
 }

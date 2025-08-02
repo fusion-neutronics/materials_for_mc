@@ -26,6 +26,7 @@ impl WasmReaction {
                 cross_section: Vec::new(),
                 interpolation: Vec::new(),
                 energy: Vec::new(),
+                mt_number: 0, // Default MT number
             },
         }
     }
