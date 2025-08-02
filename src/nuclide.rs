@@ -1,5 +1,4 @@
-// Struct representing a nuclide, matching the JSON file structure
-// Update the fields as needed to match all JSON entries
+// Module-level imports
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -8,7 +7,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use crate::utilities::add_to_processing_order;
+use crate::utilities::{add_to_processing_order, interpolate_linear};
+use crate::data::SUM_RULES;
 
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -21,6 +21,66 @@ pub struct Reaction {
     #[serde(skip, default)]
     pub energy: Vec<f64>,  // Reaction-specific energy grid
     pub mt_number: i32,
+}
+// ...existing code...
+impl Nuclide {
+    /// Interpolates explicit reactions onto a unified grid and then calculates hierarchical
+    /// reactions by summing the interpolated cross sections.
+    ///
+    /// # Arguments
+    /// * `unified_grid` - The target energy grid for interpolation.
+    /// * `explicit_reactions` - Raw data for reactions that exist in the nuclide files.
+    /// * `hierarchical_mts_to_process` - Dependency-ordered list of MTs to calculate via sum rules.
+    ///
+    /// # Returns
+    /// A map of all requested MT numbers to their cross section vectors on the unified grid.
+    pub fn interpolate_and_sum_reactions(
+        unified_grid: &Vec<f64>,
+        explicit_reactions: std::collections::HashMap<i32, (Vec<f64>, Vec<f64>)>,
+        hierarchical_mts_to_process: Vec<i32>,
+    ) -> std::collections::HashMap<i32, Vec<f64>> {
+        use crate::utilities::interpolate_linear;
+        use crate::data::SUM_RULES;
+        let mut nuclide_xs: std::collections::HashMap<i32, Vec<f64>> = std::collections::HashMap::new();
+        let grid_len = unified_grid.len();
+
+        for (mt, (reaction_energy, reaction_cross_section)) in explicit_reactions {
+            let mut xs_values = Vec::with_capacity(grid_len);
+            if reaction_energy.is_empty() {
+                 xs_values.extend(std::iter::repeat(0.0).take(grid_len));
+            } else {
+                for &grid_energy in unified_grid {
+                    if grid_energy < reaction_energy[0] {
+                        xs_values.push(0.0);
+                    } else {
+                        let xs = interpolate_linear(&reaction_energy, &reaction_cross_section, grid_energy);
+                        xs_values.push(xs);
+                    }
+                }
+            }
+            nuclide_xs.insert(mt, xs_values);
+        }
+
+        for mt in hierarchical_mts_to_process {
+            if let Some(constituents) = SUM_RULES.get(&mt) {
+                let mut mt_xs = vec![0.0; grid_len];
+                let mut found_any_child = false;
+                for &constituent_mt in constituents {
+                    if let Some(xs_values) = nuclide_xs.get(&constituent_mt) {
+                        for (i, &xs) in xs_values.iter().enumerate() {
+                            mt_xs[i] += xs;
+                        }
+                        found_any_child = true;
+                    }
+                }
+                if found_any_child {
+                    nuclide_xs.insert(mt, mt_xs);
+                }
+            }
+        }
+        nuclide_xs
+    }
+// ...existing code...
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

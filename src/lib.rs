@@ -9,6 +9,7 @@ mod element;
 
 pub use material::Material;
 pub use materials::Materials;
+pub use nuclide::Nuclide;
 pub use utilities::{interpolate_linear, interpolate_log_log};
 pub use config::Config;
 pub use reaction::Reaction;

@@ -51,6 +51,10 @@ cargo run
 The package can be compiled to WebAssembly for use in web browsers:
 
 ```bash
+sudo apt-get update
+sudo apt-get install build-essential
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sudo apt-get install curl
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --target web --features wasm
 cp -r pkg examples/wasm/
