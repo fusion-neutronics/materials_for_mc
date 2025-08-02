@@ -35,14 +35,36 @@ impl Nuclide {
     /// # Returns
     /// A map of all requested MT numbers to their cross section vectors on the unified grid.
     pub fn interpolate_and_sum_reactions(
+        &self,
         unified_grid: &Vec<f64>,
-        explicit_reactions: std::collections::HashMap<i32, (Vec<f64>, Vec<f64>)>,
+        temperature: &str,
         hierarchical_mts_to_process: Vec<i32>,
     ) -> std::collections::HashMap<i32, Vec<f64>> {
-        use crate::utilities::interpolate_linear;
-        use crate::data::SUM_RULES;
         let mut nuclide_xs: std::collections::HashMap<i32, Vec<f64>> = std::collections::HashMap::new();
         let grid_len = unified_grid.len();
+
+        // Build explicit_reactions from self.reactions and self.energy
+        let explicit_reactions = if let (Some(temp_reactions), Some(energy_map)) = (self.reactions.get(temperature), self.energy.as_ref()) {
+            if let Some(energy_grid) = energy_map.get(temperature) {
+                temp_reactions.iter().map(|(&mt, reaction)| {
+                    let threshold_idx = reaction.threshold_idx;
+                    if threshold_idx < energy_grid.len() {
+                        let reaction_energy = energy_grid[threshold_idx..].to_vec();
+                        if reaction.cross_section.len() == reaction_energy.len() {
+                            Some((mt, (reaction_energy, reaction.cross_section.clone())))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }).flatten().collect::<std::collections::HashMap<i32, (Vec<f64>, Vec<f64>)>>()
+            } else {
+                std::collections::HashMap::new()
+            }
+        } else {
+            std::collections::HashMap::new()
+        };
 
         for (mt, (reaction_energy, reaction_cross_section)) in explicit_reactions {
             let mut xs_values = Vec::with_capacity(grid_len);

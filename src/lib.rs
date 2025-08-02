@@ -43,8 +43,6 @@ pub use materials_python::*;
 #[cfg(feature = "pyo3")]
 pub use nuclide_python::*;
 #[cfg(feature = "pyo3")]
-pub use nuclide_python::PyNuclide as Nuclide;
-#[cfg(feature = "pyo3")]
 pub use config_python::*;
 #[cfg(feature = "pyo3")]
 pub use element_python::*;
