@@ -9,6 +9,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use crate::utilities::add_to_processing_order;
+use crate::reaction::Reaction;
 
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -39,6 +40,67 @@ pub struct Nuclide {
 }
 
 impl Nuclide {
+    /// Sample the top-level reaction type (fission, absorption, elastic, inelastic, other) at a given energy and temperature
+    pub fn sample_reaction<R: rand::Rng + ?Sized>(&self, energy: f64, temperature: &str, rng: &mut R) -> Option<&Reaction> {
+        // Try temperature as given, then with 'K' appended, then any available
+        let temp_reactions = if let Some(r) = self.reactions.get(temperature) {
+            r
+        } else if let Some(r) = self.reactions.get(&format!("{}K", temperature)) {
+            r
+        } else if let Some((temp, r)) = self.reactions.iter().next() {
+            println!("[sample_reaction] Requested temperature '{}' not found. Using available temperature '{}'.", temperature, temp);
+            r
+        } else {
+            println!("[sample_reaction] No reaction data available for any temperature.");
+            return None;
+        };
+
+        // Define MTs for each event type
+        let total_mt = 1;
+        let fission_mt = 18;
+        let absorption_mt = 101;
+        let elastic_mt = 2;
+        let nonelastic_mt = 3;
+
+        // Helper to get xs for a given MT using Reaction::cross_section_at
+        let get_xs = |mt: i32| -> f64 {
+            temp_reactions.get(&mt)
+                .and_then(|reaction| reaction.cross_section_at(energy))
+                .unwrap_or(0.0)
+        };
+
+        let total_xs = get_xs(total_mt);
+        if total_xs <= 0.0 {
+            return None;
+        }
+
+        let xi = rng.gen_range(0.0..total_xs);
+        let mut accum = 0.0;
+
+        // Absorption
+        let xs_absorption = get_xs(absorption_mt);
+        accum += xs_absorption;
+        if xi < accum && xs_absorption > 0.0 {
+            return temp_reactions.get(&absorption_mt);
+        }
+
+        // Elastic
+        let xs_elastic = get_xs(elastic_mt);
+        accum += xs_elastic;
+        if xi < accum && xs_elastic > 0.0 {
+            return temp_reactions.get(&elastic_mt);
+        }
+
+        // Fission (only if nuclide is fissionable, checked last)
+        let xs_fission = if self.fissionable { get_xs(fission_mt) } else { 0.0 };
+        accum += xs_fission;
+        if xi < accum && xs_fission > 0.0 {
+            return temp_reactions.get(&fission_mt);
+        }
+
+        // Non-elastic selection as fallback
+        temp_reactions.get(&nonelastic_mt)
+    }
     /// Get the energy grid for a specific temperature
     pub fn energy_grid(&self, temperature: &str) -> Option<&Vec<f64>> {
         self.energy.as_ref().and_then(|energy_map| energy_map.get(temperature))
@@ -377,6 +439,26 @@ pub fn get_or_load_nuclide(
 }
 
 #[cfg(test)]
+    #[test]
+    fn test_sample_reaction_li6() {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+        let path = std::path::Path::new("tests/Li6.json");
+        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let temperature = "294";
+        let energy = 1.0;
+        let mut rng = StdRng::seed_from_u64(42);
+
+        // Try sampling multiple times to check we get a valid Reaction
+        for _ in 0..10 {
+            let reaction = nuclide.sample_reaction(energy, temperature, &mut rng);
+            assert!(reaction.is_some(), "sample_reaction returned None");
+            let reaction = reaction.unwrap();
+            // Check that the sampled reaction has a valid MT number and cross section
+            assert!(reaction.mt_number > 0, "Sampled reaction has invalid MT number");
+            assert!(!reaction.cross_section.is_empty(), "Sampled reaction has empty cross section");
+        }
+    }
 mod tests {
     use super::*;
     use std::path::Path;
