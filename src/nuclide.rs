@@ -137,11 +137,100 @@ impl Nuclide {
             Some(mts_vec)
         }
     }
+
+    /// Sample the top-level reaction type (fission, absorption, elastic, inelastic, other) at a given energy and temperature
+    pub fn sample_reaction<R: rand::Rng + ?Sized>(&self, energy: f64, temperature: &str, rng: &mut R) -> SampledReaction {
+        // Try temperature as given, then with 'K' appended, then any available
+        let temp_reactions = if let Some(r) = self.reactions.get(temperature) {
+            r
+        } else if let Some(r) = self.reactions.get(&format!("{}K", temperature)) {
+            r
+        } else if let Some((temp, r)) = self.reactions.iter().next() {
+            println!("[sample_reaction] Requested temperature '{}' not found. Using available temperature '{}'.", temperature, temp);
+            r
+        } else {
+            println!("[sample_reaction] No reaction data available for any temperature.");
+            return SampledReaction::None;
+        };
+
+        // Define MTs for each event type
+        let total_mt = 1;
+        let fission_mt = 18;
+        let absorption_mt = 101;
+        let elastic_mt = 2;
+        let nonelastic_mt = 3;
+
+        // Helper to get xs for a given MT
+        let get_xs = |mt: i32| -> f64 {
+            if let Some(reaction) = temp_reactions.get(&mt) {
+                let energy_grid = if !reaction.energy.is_empty() {
+                    &reaction.energy
+                } else if let Some(energy_map) = &self.energy {
+                    match energy_map.get(temperature) {
+                        Some(grid) => grid,
+                        None => return 0.0,
+                    }
+                } else {
+                    return 0.0;
+                };
+                if reaction.cross_section.len() != energy_grid.len() {
+                    return 0.0;
+                }
+                crate::utilities::interpolate_linear(energy_grid, &reaction.cross_section, energy)
+            } else {
+                0.0
+            }
+        };
+
+        let total_xs = get_xs(total_mt);
+        if total_xs <= 0.0 {
+            return SampledReaction::None;
+        }
+
+        let xi = rng.gen_range(0.0..total_xs);
+        let mut accum = 0.0;
+
+        // Absorption
+        let xs_absorption = get_xs(absorption_mt);
+        accum += xs_absorption;
+        if xi < accum && xs_absorption > 0.0 {
+            return SampledReaction::Absorption(absorption_mt);
+        }
+
+        // Elastic
+        let xs_elastic = get_xs(elastic_mt);
+        accum += xs_elastic;
+        if xi < accum && xs_elastic > 0.0 {
+            return SampledReaction::Elastic(elastic_mt);
+        }
+
+        // Fission (only if nuclide is fissionable, checked last)
+        let xs_fission = if self.fissionable { get_xs(fission_mt) } else { 0.0 };
+        accum += xs_fission;
+        if xi < accum && xs_fission > 0.0 {
+            return SampledReaction::Fission(fission_mt);
+        }
+
+        // Non-elastic selection not needed as it is the only remaining option
+        // let xs_nonelastic = get_xs(nonelastic_mt);
+        // accum += xs_nonelastic;
+        // if xi < accum && xs_nonelastic > 0.0 {
+        //     return SampledReaction::NonElastic(nonelastic_mt);
+        // }
+
+        SampledReaction::NonElastic(nonelastic_mt)
+    }
 }
+
 
 // Parse a nuclide from a JSON value
 fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let mut nuclide = Nuclide {
+    let mut nuclide = Nuclide {        // Fission (only if nuclide is fissionable)
+        let xs_fission = if self.fissionable { get_xs(fission_mt) } else { 0.0 };
+        accum += xs_fission;
+        if self.fissionable && xi < accum && xs_fission > 0.0 {
+            return SampledReaction::Fission(fission_mt);
+        }
         name: None,
         element: None,
         atomic_symbol: None,
