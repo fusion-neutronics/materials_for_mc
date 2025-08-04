@@ -1,4 +1,4 @@
-use crate::data::get_all_mt_descendants;
+// ...existing code...
 /// Utility functions for materials_for_mc
 
 /// Linear interpolation on a linear scale
@@ -83,16 +83,4 @@ pub fn add_to_processing_order(
     }
     processed.insert(mt);
     order.push(mt);
-}
-
-/// Helper to expand a list of MT numbers to include all descendants (for sum rules)
-pub fn expand_mt_filter(mt_filter: &Vec<i32>) -> std::collections::HashSet<i32> {
-    let mut set = std::collections::HashSet::new();
-    for &mt in mt_filter {
-        set.insert(mt);
-        for child in get_all_mt_descendants(mt) {
-            set.insert(child);
-        }
-    }
-    set
 }
