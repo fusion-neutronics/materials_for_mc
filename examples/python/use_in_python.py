@@ -13,9 +13,4 @@ print(mat1)
 nuc = m4mc.Nuclide('Li6')
 nuc.read_nuclide_from_json('tests/Li6.json')
 nuc.reaction_mts
-assert nuc.reaction_mts == [2, 24, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 102, 103, 105, 203, 204, 205, 207, 301, 444]
-
-
-nuc = m4mc.Nuclide('Li6')
-nuc.read_nuclide_from_json('tests/Li6.json')
-nuc.reaction_mts
+assert nuc.reaction_mts == [1, 2, 3, 4, 5, 24, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 101, 102, 103, 105, 203, 204, 205, 206, 207, 301, 444]

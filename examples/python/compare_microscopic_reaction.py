@@ -2,6 +2,8 @@ import openmc
 import materials_for_mc as m4mc
 import math
 
+openmc.config['cross_sections'] = '/home/jon/nuclear_data/cross_sections.xml'
+
 openmc_energies, openmc_xs = openmc.calculate_cexs('Li6', [2], temperature=294)
 openmc_xs=openmc_xs[0]
 
@@ -23,14 +25,17 @@ for openmc_energy, energy in zip(openmc_energies, energies):
     assert math.isclose(openmc_energy , energy, rel_tol=1e-6, abs_tol=1e-6)
 
 
-import matplotlib.pyplot as plt
-plt.plot(openmc_energies, openmc_xs, label='OpenMC', linestyle='--')
-plt.plot(energies, xs, label='My code', linestyle='-.')  
-plt.xlabel('Energy (eV)')
-plt.ylabel('Cross Section (barns)')
-plt.title('Li6 Neutron Cross Section Comparison')
-plt.legend()
-plt.xscale('log')
-plt.yscale('log')
-plt.grid(True)
-plt.show()
+import plotly.graph_objects as go
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=openmc_energies, y=openmc_xs, mode='lines', name='OpenMC', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=energies, y=xs, mode='lines', name='My code', line=dict(dash='dot')))
+fig.update_layout(
+    title='Li6 Neutron Cross Section Comparison',
+    xaxis_title='Energy (eV)',
+    yaxis_title='Cross Section (barns)',
+    legend=dict(x=0.01, y=0.99),
+    xaxis_type='log',
+    yaxis_type='log',
+    template='plotly_white'
+)
+fig.write_html('compare_microscopic_reaction.html')
