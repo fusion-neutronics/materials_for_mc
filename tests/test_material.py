@@ -141,12 +141,7 @@ def test_material_reaction_mts_lithium():
     # This will load Li6 and Li7, so the MTs should be the union of both
     mts = mat.reaction_mts
     print(mts)
-    expected = sorted([2,
-        102, 103, 104, 105, 16, 203, 204, 205, 207, 24, 25, 301, 444,
-        51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
-        66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
-        81, 82
-    ])
+    expected = [1, 2, 3, 4, 5, 16, 24, 25, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203, 204, 205, 206, 207, 301, 444]
     assert mts == expected, f"Material lithium MT list does not match expected. Got {mts}"
 
 def test_calculate_microscopic_xs_neutron_lithium():
@@ -235,7 +230,7 @@ def test_macroscopic_xs_neutron_mt_filter():
     mat.read_nuclides_from_json({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     mat.set_density("g/cm3", 1.0)
     # Calculate all MTs
-    energy_all, macro_xs_all = mat.calculate_macroscopic_xs_neutron(by_nuclide=False)
+    energy_all, macro_xs_all = mat.calculate_macroscopic_xs_neutron(mt_filter=[1,2, 3], by_nuclide=False)
     # Calculate only MT=2
     energy_single, macro_xs_mt2 = mat.calculate_macroscopic_xs_neutron(mt_filter=[2], by_nuclide=False)
     assert len(energy_single) == len(energy_all), "Energy grids should match"

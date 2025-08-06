@@ -18,14 +18,17 @@ mat2.temperature = "294"
 my_energies, xs_dict = mat2.calculate_macroscopic_xs_neutron([3])
 my_macro = xs_dict[3]
 
-import matplotlib.pyplot as plt
-plt.plot(openmc_energies, openmc_macro, label='OpenMC', linestyle='--')
-plt.plot(my_energies,my_macro, label='My code', linestyle='-.')
-plt.xlabel('Energy (eV)')
-plt.ylabel('Cross Section (barns)')
-plt.title('Li6 Neutron Macroscopic Cross Section Comparison')
-plt.legend()
-plt.xscale('log')
-plt.yscale('log')
-plt.grid(True)
-plt.show()
+import plotly.graph_objects as go
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=openmc_energies, y=openmc_macro, mode='lines', name='OpenMC', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=my_energies, y=my_macro, mode='lines', name='My code', line=dict(dash='dot')))
+fig.update_layout(
+    title='Li6 Neutron Macroscopic Cross Section Comparison',
+    xaxis_title='Energy (eV)',
+    yaxis_title='Cross Section (barns)',
+    legend=dict(x=0.01, y=0.99),
+    xaxis_type='log',
+    yaxis_type='log',
+    template='plotly_white'
+)
+fig.write_html('compare_macroscopic_reaction.html')

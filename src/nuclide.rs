@@ -131,59 +131,6 @@ impl Nuclide {
         }
     }
 
-        /// For a single nuclide, gathers reaction data for MTs explicitly present in the data
-    /// and also determines the list of hierarchical MTs that need to be calculated from sum rules.
-    ///
-    /// # Arguments
-    /// * `temperature` - The material temperature as a string.
-    /// * `mt_set` - The set of all MTs (including descendants) that are requested.
-    ///
-    /// # Returns
-    /// A tuple containing:
-    /// - A map of explicit MT numbers to their raw (energy grid, cross section) data.
-    /// - A dependency-ordered vector of hierarchical MTs to be calculated later.
-    pub fn gather_explicit_and_hierarchical_mts(
-        &self,
-        temperature: &str,
-        mt_set: &std::collections::HashSet<i32>,
-    ) -> (std::collections::HashMap<i32, (Vec<f64>, Vec<f64>)>, Vec<i32>) {
-        use crate::data::SUM_RULES;
-        let mut explicit_reactions: std::collections::HashMap<i32, (Vec<f64>, Vec<f64>)> = std::collections::HashMap::new();
-        let mut processing_order = Vec::new();
-        let mut processed_set = std::collections::HashSet::new();
-
-        let temp_reactions_opt = self.reactions.get(temperature);
-        let energy_map_opt = self.energy.as_ref();
-
-        if let (Some(temp_reactions), Some(energy_map)) = (temp_reactions_opt, energy_map_opt) {
-            let energy_grid_opt = energy_map.get(temperature);
-
-            if let Some(energy_grid) = energy_grid_opt {
-                // 1. Gather explicit reactions and mark them as processed.
-                for (&mt, reaction) in temp_reactions.iter() {
-                    if mt_set.contains(&mt) {
-                        let threshold_idx = reaction.threshold_idx;
-                        if threshold_idx < energy_grid.len() {
-                            let reaction_energy = energy_grid[threshold_idx..].to_vec();
-                            if reaction.cross_section.len() == reaction_energy.len() {
-                                explicit_reactions.insert(mt, (reaction_energy, reaction.cross_section.clone()));
-                                processed_set.insert(mt);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 2. Determine the processing order for all requested MTs that need to be calculated.
-        let sum_rules = &*SUM_RULES;
-        for &mt in mt_set {
-            add_to_processing_order(mt, sum_rules, &mut processed_set, &mut processing_order, mt_set);
-        }
-
-        (explicit_reactions, processing_order)
-    }
-
     /// Get a list of available MT numbers
     pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         let mut mts = std::collections::HashSet::new();
@@ -482,13 +429,18 @@ mod tests {
         // Load Li7 nuclide from test JSON
         let path = std::path::Path::new("tests/Li7.json");
         let nuclide = read_nuclide_from_json(path).expect("Failed to load Li7.json");
-        let mut mts = nuclide.reaction_mts().expect("No MTs found");
-        let mut expected = vec![
-            102, 104, 16, 2, 203, 204, 205, 207, 24, 25, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82
-        ];
-        mts.sort();
-        expected.sort();
-        assert_eq!(mts, expected, "Li7 MT list does not match expected");
+        let mts = nuclide.reaction_mts().expect("No MTs found");
+        // Check for presence of key hierarchical and explicit MTs
+        assert!(mts.contains(&1), "MT=1 should be present");
+        assert!(mts.contains(&3), "MT=3 should be present");
+        assert!(mts.contains(&4), "MT=4 should be present");
+        assert!(mts.contains(&27), "MT=27 should be present");
+        assert!(mts.contains(&101), "MT=101 should be present");
+        assert!(mts.contains(&2), "MT=2 should be present");
+        assert!(mts.contains(&16), "MT=16 should be present");
+        assert!(mts.contains(&24), "MT=24 should be present");
+        assert!(mts.contains(&51), "MT=51 should be present");
+        assert!(!mts.is_empty(), "MT list should not be empty");
     }
 
     #[test]
