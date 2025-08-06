@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use js_sys::{Array, JSON};
 use serde::{Serialize, Deserialize};
-use crate::nuclide::Reaction;
+use crate::reaction::Reaction;
 
 #[wasm_bindgen]
 pub struct WasmReaction {
