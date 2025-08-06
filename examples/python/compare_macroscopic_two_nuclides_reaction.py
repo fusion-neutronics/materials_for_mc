@@ -19,18 +19,21 @@ mat1.set_density('g/cm3',20.)
 
 mat1.temperature = "294"  # Set temperature directly on the material
 
-mat1.calculate_macroscopic_xs_neutron()  # returns energy, cross section pairs
+mat1.calculate_macroscopic_xs_neutron(mt_filter=[2])  # returns energy, cross section pairs
 my_macro = mat1.macroscopic_xs_neutron[2]
 # Get the unified energy grid}')
 
-import matplotlib.pyplot as plt
-plt.plot(openmc_energies, openmc_xs, label='OpenMC', linestyle='--')
-plt.plot(mat1.unified_energy_grid_neutron(),my_macro, label='My code', linestyle='-.')
-plt.xlabel('Energy (eV)')
-plt.ylabel('Cross Section (barns)')
-plt.title('Li6 Neutron Macroscopic Cross Section Comparison')
-plt.legend()
-plt.xscale('log')
-plt.yscale('log')
-plt.grid(True)
-plt.show()
+import plotly.graph_objects as go
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=openmc_energies, y=openmc_xs, mode='lines', name='OpenMC', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=mat1.unified_energy_grid_neutron(), y=my_macro, mode='lines', name='My code', line=dict(dash='dot')))
+fig.update_layout(
+    title='Li6 Neutron Macroscopic Cross Section Comparison',
+    xaxis_title='Energy (eV)',
+    yaxis_title='Cross Section (barns)',
+    legend=dict(x=0.01, y=0.99),
+    xaxis_type='log',
+    yaxis_type='log',
+    template='plotly_white'
+)
+fig.write_html('compare_macroscopic_two_nuclides_reaction.html')
