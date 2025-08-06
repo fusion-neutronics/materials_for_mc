@@ -14,15 +14,6 @@ use crate::reaction::Reaction;
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Reaction {
-    pub cross_section: Vec<f64>,
-    pub threshold_idx: usize,
-    pub interpolation: Vec<i32>,
-    #[serde(skip, default)]
-    pub energy: Vec<f64>,  // Reaction-specific energy grid
-    pub mt_number: i32,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
