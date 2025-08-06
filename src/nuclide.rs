@@ -376,30 +376,56 @@ pub fn get_or_load_nuclide(
     Ok(arc_nuclide)
 }
 
-#[cfg(test)]
-    #[test]
-    fn test_sample_reaction_li6() {
-        use rand::rngs::StdRng;
-        use rand::SeedableRng;
-        let path = std::path::Path::new("tests/Li6.json");
-        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
-        let temperature = "294";
-        let energy = 1.0;
-        let mut rng = StdRng::seed_from_u64(42);
-
-        // Try sampling multiple times to check we get a valid Reaction
-        for _ in 0..10 {
-            let reaction = nuclide.sample_reaction(energy, temperature, &mut rng);
-            assert!(reaction.is_some(), "sample_reaction returned None");
-            let reaction = reaction.unwrap();
-            // Check that the sampled reaction has a valid MT number and cross section
-            assert!(reaction.mt_number > 0, "Sampled reaction has invalid MT number");
-            assert!(!reaction.cross_section.is_empty(), "Sampled reaction has empty cross section");
-        }
-    }
 mod tests {
     use super::*;
     use std::path::Path;
+
+#[cfg(test)]
+#[test]
+fn test_sample_reaction_li6() {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let path = std::path::Path::new("tests/Li6.json");
+    let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+    let temperature = "294";
+
+    // Vary energy from 1.0 to 15e6 (10 steps)
+    let energies = (0..10).map(|i| 1.0 + i as f64 * (15e6 - 1e6) / 9.0);
+
+    for energy in energies {
+        let mut rng1 = StdRng::seed_from_u64(42);
+        let mut rng2 = StdRng::seed_from_u64(42);
+        let mut rng3 = StdRng::seed_from_u64(43); // Different seed
+
+        let reaction1 = nuclide.sample_reaction(energy, temperature, &mut rng1);
+        let reaction2 = nuclide.sample_reaction(energy, temperature, &mut rng2);
+        let reaction3 = nuclide.sample_reaction(energy, temperature, &mut rng3);
+
+        // Ensure reactions were sampled successfully
+        assert!(reaction1.is_some(), "sample_reaction returned None at energy {}", energy);
+        assert!(reaction2.is_some(), "Repeat sample with same seed returned None at energy {}", energy);
+        assert!(reaction3.is_some(), "Sample with different seed returned None at energy {}", energy);
+
+        let reaction1 = reaction1.unwrap();
+        let reaction2 = reaction2.unwrap();
+        let reaction3 = reaction3.unwrap();
+
+        // Ensure same-seed reactions are the same (determinism)
+        assert_eq!(reaction1.mt_number, reaction2.mt_number, "Different MT for same seed at energy {}", energy);
+        assert_eq!(reaction1.cross_section, reaction2.cross_section, "Different cross_section for same seed at energy {}", energy);
+
+        // Print info about the third reaction (with different seed)
+        println!(
+            "Energy: {:e}, MT (seed 42): {}, MT (seed 43): {}",
+            energy, reaction1.mt_number, reaction3.mt_number
+        );
+
+        // Ensure basic validity
+        assert!(reaction1.mt_number > 0, "Sampled reaction has invalid MT number at energy {}", energy);
+        assert!(!reaction1.cross_section.is_empty(), "Sampled reaction has empty cross section at energy {}", energy);
+    }
+}
+
 
     #[test]
     fn test_reaction_mts_li6() {
