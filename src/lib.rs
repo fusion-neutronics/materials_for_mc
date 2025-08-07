@@ -63,15 +63,15 @@ pub use data_python::*;
 
 // WASM Modules
 #[cfg(feature = "wasm")]
-mod material_wasm;
+pub mod material_wasm;
 #[cfg(feature = "wasm")]
-mod config_wasm;
+pub mod config_wasm;
 #[cfg(feature = "wasm")]
-mod nuclide_wasm;
+pub mod nuclide_wasm;
 #[cfg(feature = "wasm")]
-mod reaction_wasm;
+pub mod reaction_wasm;
 #[cfg(feature = "wasm")]
-mod element_wasm;
+pub mod element_wasm;
 
 // WASM setup
 #[cfg(feature = "wasm")]

@@ -25,3 +25,5 @@ jobs:
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
           wasm-pack build --target web --features wasm
+          cargo test --features wasm-test
+          RUST_BACKTRACE=full wasm-pack test --headless --firefox --features wasm-test          

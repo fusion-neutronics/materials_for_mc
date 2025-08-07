@@ -25,6 +25,9 @@ rand = "0.8"
 serde-wasm-bindgen = { version = "0.6", optional = true }
 getrandom = { version = "0.2", features = ["js"] }
 
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 # Optional: for building wheels
 [package.metadata.maturin]
 python-source = "python"
@@ -41,3 +44,4 @@ wasm = [
     "dep:console_error_panic_hook",
     "dep:serde-wasm-bindgen"
 ]
+wasm-test = ["wasm"]
