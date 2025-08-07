@@ -2,7 +2,8 @@
 use pyo3::prelude::*;
 #[cfg(feature = "pyo3")]
 use pyo3::types::PyDict;
-use crate::nuclide::{Nuclide, Reaction};
+use crate::nuclide::Nuclide;
+use crate::reaction::Reaction;
 use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]

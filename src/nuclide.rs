@@ -9,19 +9,11 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use crate::utilities::add_to_processing_order;
+use crate::reaction::Reaction;
 
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Reaction {
-    pub cross_section: Vec<f64>,
-    pub threshold_idx: usize,
-    pub interpolation: Vec<i32>,
-    #[serde(skip, default)]
-    pub energy: Vec<f64>,  // Reaction-specific energy grid
-    pub mt_number: i32,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
@@ -39,6 +31,67 @@ pub struct Nuclide {
 }
 
 impl Nuclide {
+    /// Sample the top-level reaction type (fission, absorption, elastic, inelastic, other) at a given energy and temperature
+    pub fn sample_reaction<R: rand::Rng + ?Sized>(&self, energy: f64, temperature: &str, rng: &mut R) -> Option<&Reaction> {
+        // Try temperature as given, then with 'K' appended, then any available
+        let temp_reactions = if let Some(r) = self.reactions.get(temperature) {
+            r
+        } else if let Some(r) = self.reactions.get(&format!("{}K", temperature)) {
+            r
+        } else if let Some((temp, r)) = self.reactions.iter().next() {
+            println!("[sample_reaction] Requested temperature '{}' not found. Using available temperature '{}'.", temperature, temp);
+            r
+        } else {
+            println!("[sample_reaction] No reaction data available for any temperature.");
+            return None;
+        };
+
+        // Define MTs for each event type
+        let total_mt = 1;
+        let fission_mt = 18;
+        let absorption_mt = 101;
+        let elastic_mt = 2;
+        let nonelastic_mt = 3;
+
+        // Helper to get xs for a given MT using Reaction::cross_section_at
+        let get_xs = |mt: i32| -> f64 {
+            temp_reactions.get(&mt)
+                .and_then(|reaction| reaction.cross_section_at(energy))
+                .unwrap_or(0.0)
+        };
+
+        let total_xs = get_xs(total_mt);
+        if total_xs <= 0.0 {
+            return None;
+        }
+
+        let xi = rng.gen_range(0.0..total_xs);
+        let mut accum = 0.0;
+
+        // Absorption
+        let xs_absorption = get_xs(absorption_mt);
+        accum += xs_absorption;
+        if xi < accum && xs_absorption > 0.0 {
+            return temp_reactions.get(&absorption_mt);
+        }
+
+        // Elastic
+        let xs_elastic = get_xs(elastic_mt);
+        accum += xs_elastic;
+        if xi < accum && xs_elastic > 0.0 {
+            return temp_reactions.get(&elastic_mt);
+        }
+
+        // Fission (only if nuclide is fissionable, checked last)
+        let xs_fission = if self.fissionable { get_xs(fission_mt) } else { 0.0 };
+        accum += xs_fission;
+        if xi < accum && xs_fission > 0.0 {
+            return temp_reactions.get(&fission_mt);
+        }
+
+        // Non-elastic selection as fallback
+        temp_reactions.get(&nonelastic_mt)
+    }
     /// Get the energy grid for a specific temperature
     pub fn energy_grid(&self, temperature: &str) -> Option<&Vec<f64>> {
         self.energy.as_ref().and_then(|energy_map| energy_map.get(temperature))
@@ -323,10 +376,56 @@ pub fn get_or_load_nuclide(
     Ok(arc_nuclide)
 }
 
-#[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
+
+#[cfg(test)]
+#[test]
+fn test_sample_reaction_li6() {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let path = std::path::Path::new("tests/Li6.json");
+    let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+    let temperature = "294";
+
+    // Vary energy from 1.0 to 15e6 (10 steps)
+    let energies = (0..10).map(|i| 1.0 + i as f64 * (15e6 - 1e6) / 9.0);
+
+    for energy in energies {
+        let mut rng1 = StdRng::seed_from_u64(42);
+        let mut rng2 = StdRng::seed_from_u64(42);
+        let mut rng3 = StdRng::seed_from_u64(43); // Different seed
+
+        let reaction1 = nuclide.sample_reaction(energy, temperature, &mut rng1);
+        let reaction2 = nuclide.sample_reaction(energy, temperature, &mut rng2);
+        let reaction3 = nuclide.sample_reaction(energy, temperature, &mut rng3);
+
+        // Ensure reactions were sampled successfully
+        assert!(reaction1.is_some(), "sample_reaction returned None at energy {}", energy);
+        assert!(reaction2.is_some(), "Repeat sample with same seed returned None at energy {}", energy);
+        assert!(reaction3.is_some(), "Sample with different seed returned None at energy {}", energy);
+
+        let reaction1 = reaction1.unwrap();
+        let reaction2 = reaction2.unwrap();
+        let reaction3 = reaction3.unwrap();
+
+        // Ensure same-seed reactions are the same (determinism)
+        assert_eq!(reaction1.mt_number, reaction2.mt_number, "Different MT for same seed at energy {}", energy);
+        assert_eq!(reaction1.cross_section, reaction2.cross_section, "Different cross_section for same seed at energy {}", energy);
+
+        // Print info about the third reaction (with different seed)
+        println!(
+            "Energy: {:e}, MT (seed 42): {}, MT (seed 43): {}",
+            energy, reaction1.mt_number, reaction3.mt_number
+        );
+
+        // Ensure basic validity
+        assert!(reaction1.mt_number > 0, "Sampled reaction has invalid MT number at energy {}", energy);
+        assert!(!reaction1.cross_section.is_empty(), "Sampled reaction has empty cross section at energy {}", energy);
+    }
+}
+
 
     #[test]
     fn test_reaction_mts_li6() {
