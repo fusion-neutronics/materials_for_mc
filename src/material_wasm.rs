@@ -24,6 +24,11 @@ impl WasmMaterial {
         }
     }
 
+    /// Debug helper for tests: returns a string representation of nuclide_data
+    pub fn debug_nuclide_data(&self) -> String {
+        format!("{:?}", self.inner.nuclide_data)
+    }
+
     #[wasm_bindgen]
     pub fn add_nuclide(&mut self, nuclide: &str, fraction: f64) -> Result<(), JsValue> {
         self.inner.add_nuclide(nuclide, fraction)
@@ -116,9 +121,19 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn reaction_mts(&mut self) -> Result<Array, JsValue> {
-        // Ensure nuclides are loaded and get the sorted MT list
-        let mts = self.inner.reaction_mts()
-            .map_err(|e| JsValue::from_str(&format!("Failed to get MT numbers: {}", e)))?;
+        // Ensure nuclides are loaded using WASM in-memory JSON first (do NOT rely on file paths)
+        if let Err(e) = self.ensure_nuclides_loaded() {
+            return Err(JsValue::from_str(&format!("Failed to load nuclides (WASM): {}", e)));
+        }
+        // Collect MTs directly from already loaded nuclide_data to avoid invoking Material::reaction_mts (which re-loads)
+        let mut mt_set = std::collections::HashSet::new();
+        for nuclide in self.inner.nuclide_data.values() {
+            if let Some(mts) = nuclide.reaction_mts() {
+                for mt in mts { mt_set.insert(mt); }
+            }
+        }
+        let mut mts: Vec<i32> = mt_set.into_iter().collect();
+        mts.sort();
         Ok(mts.into_iter().map(JsValue::from).collect::<Array>())
     }
 
