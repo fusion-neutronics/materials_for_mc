@@ -120,6 +120,14 @@ impl Material {
         Ok(())
     }
 
+    /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.
+    /// If the nuclide already exists it will be overwritten.
+    pub fn load_nuclide_from_json_str(&mut self, nuclide_name: &str, json_content: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let nuclide = crate::nuclide::read_nuclide_from_json_str(json_content)?;
+        self.nuclide_data.insert(nuclide_name.to_string(), Arc::new(nuclide));
+        Ok(())
+    }
+
     /// Ensure all nuclides are loaded, using the global configuration if needed
     fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let nuclide_names: Vec<String> = self.nuclides.keys()
