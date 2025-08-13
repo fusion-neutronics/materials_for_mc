@@ -116,10 +116,11 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn reaction_mts(&mut self) -> Result<Array, JsValue> {
-        // Ensure nuclides are loaded and get the sorted MT list
-        let mts = self.inner.reaction_mts()
-            .map_err(|e| JsValue::from_str(&format!("Failed to get MT numbers: {}", e)))?;
-        Ok(mts.into_iter().map(JsValue::from).collect::<Array>())
+        // Use core implementation now that in-memory nuclides are directly inserted
+        match self.inner.reaction_mts() {
+            Ok(mts) => Ok(mts.into_iter().map(JsValue::from).collect::<Array>()),
+            Err(e) => Err(JsValue::from_str(&format!("Failed to get MT numbers: {}", e)))
+        }
     }
 
     #[wasm_bindgen]
@@ -140,10 +141,8 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn load_nuclide_data(&mut self, nuclide_name: &str, json_content: &str) -> Result<(), JsValue> {
-        match crate::nuclide_wasm::set_nuclide_json_content(nuclide_name, json_content) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(JsValue::from_str(&format!("Failed to load nuclide data: {:?}", e))),
-        }
+        self.inner.load_nuclide_from_json_str(nuclide_name, json_content)
+            .map_err(|e| JsValue::from_str(&format!("Failed to load nuclide data: {}", e)))
     }
     
     #[wasm_bindgen]
@@ -152,37 +151,9 @@ impl WasmMaterial {
     }
 }
 
-// Override the ensure_nuclides_loaded method to use WASM-specific functions
+// Remove custom ensure_nuclides_loaded override since core handles file based loading; keep thin wrapper for WASM inserted data
 impl WasmMaterial {
-    // Override ensure_nuclides_loaded to use WASM-specific version
-    pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let nuclide_names: Vec<String> = self.inner.nuclides.keys()
-            .filter(|name| !self.inner.nuclide_data.contains_key(*name))
-            .cloned()
-            .collect();
-        
-        if nuclide_names.is_empty() {
-            return Ok(());
-        }
-        
-        // Get the global configuration
-        let config = crate::config::CONFIG.lock().unwrap();
-        
-        // Load any missing nuclides using the WASM-specific function
-        for nuclide_name in nuclide_names {
-            match crate::nuclide_wasm::get_or_load_nuclide_wasm(&nuclide_name, &config.cross_sections) {
-                Ok(nuclide) => {
-                    self.inner.nuclide_data.insert(nuclide_name.clone(), nuclide);
-                },
-                Err(_) => {
-                    // In WASM, provide a more specific error message
-                    return Err(format!("Failed to load nuclide '{}' in WASM environment. Make sure you've loaded the nuclide data first using WasmConfig.set_nuclide_data() or WasmMaterial.load_nuclide_data()", nuclide_name).into());
-                }
-            }
-        }
-        
-        Ok(())
-    }
+    pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 }
 
 #[wasm_bindgen]

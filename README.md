@@ -50,6 +50,11 @@ cargo run
 
 The package can be compiled to WebAssembly for use in web browsers:
 
+to test the wasm bindings
+```bash
+wasm-pack test --headless --firefox
+```
+
 ```bash
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --target web --features wasm
@@ -74,3 +79,14 @@ Tests are present for both the core Rust code and the Python wrapper
 cargo test
 pytest
 ```
+
+### WebAssembly (WASM) Testing
+
+To run tests for the WASM bindings, you must enable the optional `wasm-test` feature and use a browser (e.g., Firefox):
+
+```bash
+cargo test --features wasm-test
+wasm-pack test --headless --firefox --features wasm-test
+```
+
+This ensures that WASM-specific tests and dependencies are only included when needed.
