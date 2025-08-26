@@ -9,7 +9,7 @@ def test_read_li6_nuclide_new_format():
     assert nuc1.mass_number == 6
     
     # Check that the incident particle is correctly loaded
-    assert nuc1.temperatures == ['294']
+    assert nuc1.available_temperatures == ['294']
     
     # Check reaction MT numbers are available
     assert 2 in nuc1.reaction_mts
@@ -53,7 +53,7 @@ def test_read_li7_nuclide_new_format():
     assert nuc1.mass_number == 7
     
     # Check that the incident particle is correctly loaded
-    assert nuc1.temperatures == ['294']
+    assert nuc1.available_temperatures == ['294']
     
     # Test that energy grid exists
     assert nuc1.energy is not None

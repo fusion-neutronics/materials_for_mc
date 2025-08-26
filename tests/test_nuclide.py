@@ -19,7 +19,7 @@ def test_read_li6_nuclide():
     assert nuc1.atomic_number == 3
     assert nuc1.mass_number == 6
     assert nuc1.neutron_number == 3
-    assert nuc1.temperatures == ['294']
+    assert nuc1.available_temperatures == ['294']
     # We don't expect any specific order of MT numbers, just check they're all ints
     assert all(isinstance(mt, int) for mt in nuc1.reaction_mts)
 
@@ -40,7 +40,7 @@ def test_read_li7_nuclide():
     assert nuc1.atomic_number == 3
     assert nuc1.mass_number == 7
     assert nuc1.neutron_number == 4
-    assert nuc1.temperatures == ['294']
+    assert nuc1.available_temperatures == ['294']
     # We don't expect any specific order of MT numbers, just check they're all ints
     assert all(isinstance(mt, int) for mt in nuc1.reaction_mts)
 

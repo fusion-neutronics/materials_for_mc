@@ -98,10 +98,12 @@ impl WasmNuclide {
     
     #[wasm_bindgen]
     pub fn get_available_temperatures(&self) -> Array {
-        let temps = self.inner.reactions.keys().cloned().collect::<Vec<String>>();
-        temps.into_iter()
-            .map(|t| JsValue::from_str(&t))
-            .collect::<Array>()
+        let temps = if !self.inner.available_temperatures.is_empty() {
+            self.inner.available_temperatures.clone()
+        } else {
+            self.inner.reactions.keys().cloned().collect::<Vec<String>>()
+        };
+        temps.into_iter().map(|t| JsValue::from_str(&t)).collect::<Array>()
     }
     
     #[wasm_bindgen]
