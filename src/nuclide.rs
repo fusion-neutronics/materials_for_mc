@@ -8,7 +8,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use crate::utilities::add_to_processing_order;
 use crate::reaction::Reaction;
 
 // Global cache for nuclides to avoid reloading
@@ -154,17 +153,6 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         reactions: HashMap::new(),
         fissionable: false,
     };
-    // After reactions are loaded, check for fissionable MTs
-    // Fissionable if any of 18, 19, 20, 21, 38 are present in any temperature
-    let fission_mt_list = [18, 19, 20, 21, 38];
-    'outer: for temp_reactions in nuclide.reactions.values() {
-        for mt in temp_reactions.keys() {
-            if fission_mt_list.contains(mt) {
-                nuclide.fissionable = true;
-                break 'outer;
-            }
-        }
-    }
 
     // Parse basic metadata
     if let Some(name) = json_value.get("name").and_then(|v| v.as_str()) {
@@ -233,7 +221,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                         let mut reaction = Reaction {
                             cross_section: Vec::new(),
                             threshold_idx: 0,
-                            interpolation: Vec::new(),
+                            interpolation: Vec
                             energy: Vec::new(),
                             mt_number: 0, // Add this line
                         };
@@ -315,10 +303,22 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
             nuclide.energy = Some(energy_grids);
         }
     }
-    
+
+    // Fallback: derive name if still None (e.g., from atomic_symbol + mass_number)
+    if nuclide.name.is_none() {
+        if let (Some(symbol), Some(mass)) = (&nuclide.atomic_symbol, nuclide.mass_number) {
+            nuclide.name = Some(format!("{}{}", symbol, mass));
+        }
+    }
+
+    // Determine fissionable status now that reactions are loaded
+    let fission_mt_list = [18, 19, 20, 21, 38];
+    if nuclide.reactions.values().any(|temp_reactions| temp_reactions.keys().any(|mt| fission_mt_list.contains(mt))) {
+        nuclide.fissionable = true;
+    }
+
     println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
     println!("Found {} temperature(s) with reaction data", nuclide.reactions.len());
-    
     Ok(nuclide)
 }
 
@@ -377,61 +377,86 @@ pub fn get_or_load_nuclide(
 }
 
 mod tests {
-    use super::*;
-    use std::path::Path;
-
-#[cfg(test)]
-#[test]
-fn test_sample_reaction_li6() {
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-    let path = std::path::Path::new("tests/Li6.json");
-    let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
-    let temperature = "294";
-
-    // Vary energy from 1.0 to 15e6 (10 steps)
-    let energies = (0..10).map(|i| 1.0 + i as f64 * (15e6 - 1e6) / 9.0);
-
-    for energy in energies {
-        let mut rng1 = StdRng::seed_from_u64(42);
-        let mut rng2 = StdRng::seed_from_u64(42);
-        let mut rng3 = StdRng::seed_from_u64(43); // Different seed
-
-        let reaction1 = nuclide.sample_reaction(energy, temperature, &mut rng1);
-        let reaction2 = nuclide.sample_reaction(energy, temperature, &mut rng2);
-        let reaction3 = nuclide.sample_reaction(energy, temperature, &mut rng3);
-
-        // Ensure reactions were sampled successfully
-        assert!(reaction1.is_some(), "sample_reaction returned None at energy {}", energy);
-        assert!(reaction2.is_some(), "Repeat sample with same seed returned None at energy {}", energy);
-        assert!(reaction3.is_some(), "Sample with different seed returned None at energy {}", energy);
-
-        let reaction1 = reaction1.unwrap();
-        let reaction2 = reaction2.unwrap();
-        let reaction3 = reaction3.unwrap();
-
-        // Ensure same-seed reactions are the same (determinism)
-        assert_eq!(reaction1.mt_number, reaction2.mt_number, "Different MT for same seed at energy {}", energy);
-        assert_eq!(reaction1.cross_section, reaction2.cross_section, "Different cross_section for same seed at energy {}", energy);
-
-        // Print info about the third reaction (with different seed)
-        println!(
-            "Energy: {:e}, MT (seed 42): {}, MT (seed 43): {}",
-            energy, reaction1.mt_number, reaction3.mt_number
-        );
-
-        // Ensure basic validity
-        assert!(reaction1.mt_number > 0, "Sampled reaction has invalid MT number at energy {}", energy);
-        assert!(!reaction1.cross_section.is_empty(), "Sampled reaction has empty cross section at energy {}", energy);
+    #[test]
+    fn test_get_or_load_nuclide_uses_cache() {
+        use std::collections::HashMap;
+        let li6_path = std::path::Path::new("tests/Li6.json");
+        assert!(li6_path.exists(), "tests/Li6.json missing");
+        {
+            let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+            cache.clear();
+            assert!(cache.is_empty());
+        }
+        let raw = super::read_nuclide_from_json(li6_path).expect("Direct read failed");
+        assert_eq!(raw.name.as_deref(), Some("Li6"));
+        {
+            let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+            assert!(cache.is_empty(), "Cache should still be empty after direct read");
+        }
+        let mut json_map = HashMap::new();
+        json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        let first = super::get_or_load_nuclide("Li6", &json_map).expect("Initial cached load failed");
+        {
+            let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+            assert_eq!(cache.len(), 1, "Cache should contain one entry after first cached load");
+        }
+        let second = super::get_or_load_nuclide("Li6", &json_map).expect("Second cached load failed");
+        assert!(std::sync::Arc::ptr_eq(&first, &second), "Expected identical Arc pointer from cache on second load");
+        assert_eq!(first.name.as_deref(), raw.name.as_deref(), "Names differ between raw and cached");
     }
-}
+
+    #[cfg(test)]
+    #[test]
+    fn test_sample_reaction_li6() {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+        let path = std::path::Path::new("tests/Li6.json");
+        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let temperature = "294";
+
+        // Vary energy from 1.0 to 15e6 (10 steps)
+        let energies = (0..10).map(|i| 1.0 + i as f64 * (15e6 - 1e6) / 9.0);
+
+        for energy in energies {
+            let mut rng1 = StdRng::seed_from_u64(42);
+            let mut rng2 = StdRng::seed_from_u64(42);
+            let mut rng3 = StdRng::seed_from_u64(43); // Different seed
+
+            let reaction1 = nuclide.sample_reaction(energy, temperature, &mut rng1);
+            let reaction2 = nuclide.sample_reaction(energy, temperature, &mut rng2);
+            let reaction3 = nuclide.sample_reaction(energy, temperature, &mut rng3);
+
+            // Ensure reactions were sampled successfully
+            assert!(reaction1.is_some(), "sample_reaction returned None at energy {}", energy);
+            assert!(reaction2.is_some(), "Repeat sample with same seed returned None at energy {}", energy);
+            assert!(reaction3.is_some(), "Sample with different seed returned None at energy {}", energy);
+
+            let reaction1 = reaction1.unwrap();
+            let reaction2 = reaction2.unwrap();
+            let reaction3 = reaction3.unwrap();
+
+            // Ensure same-seed reactions are the same (determinism)
+            assert_eq!(reaction1.mt_number, reaction2.mt_number, "Different MT for same seed at energy {}", energy);
+            assert_eq!(reaction1.cross_section, reaction2.cross_section, "Different cross_section for same seed at energy {}", energy);
+
+            // Print info about the third reaction (with different seed)
+            println!(
+                "Energy: {:e}, MT (seed 42): {}, MT (seed 43): {}",
+                energy, reaction1.mt_number, reaction3.mt_number
+            );
+
+            // Ensure basic validity
+            assert!(reaction1.mt_number > 0, "Sampled reaction has invalid MT number at energy {}", energy);
+            assert!(!reaction1.cross_section.is_empty(), "Sampled reaction has empty cross section at energy {}", energy);
+        }
+    }
 
 
     #[test]
     fn test_reaction_mts_li6() {
         // Load Li6 nuclide from test JSON
-        let path = Path::new("tests/Li6.json");
-        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let path = std::path::Path::new("tests/Li6.json");
+        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
         let mts = nuclide.reaction_mts().expect("No MTs found");
         let expected = vec![102, 103, 105, 2, 203, 204, 205, 207, 24, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81];
         for mt in &expected {
@@ -445,7 +470,7 @@ fn test_sample_reaction_li6() {
     fn test_reaction_mts_li7() {
         // Load Li7 nuclide from test JSON
         let path = std::path::Path::new("tests/Li7.json");
-        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li7.json");
+        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li7.json");
         let mts = nuclide.reaction_mts().expect("No MTs found");
         // Check for presence of key hierarchical and explicit MTs
         assert!(mts.contains(&1), "MT=1 should be present");
@@ -463,11 +488,11 @@ fn test_sample_reaction_li6() {
     #[test]
     fn test_fissionable_false_for_be9_and_fe58() {
         let path_be9 = std::path::Path::new("tests/Be9.json");
-        let nuclide_be9 = read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
         assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
 
         let path_fe58 = std::path::Path::new("tests/Fe58.json");
-        let nuclide_fe58 = read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
+        let nuclide_fe58 = super::read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
         assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
     }
 
@@ -475,7 +500,7 @@ fn test_sample_reaction_li6() {
     fn test_li6_reactions_contain_specific_mts() {
         // Load Li6 nuclide from test JSON
         let path = std::path::Path::new("tests/Li6.json");
-        let nuclide = read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
 
         // Check that required MTs are present and mt_number is not 0
         let required = [2, 24, 51, 444];
