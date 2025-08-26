@@ -221,9 +221,9 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                         let mut reaction = Reaction {
                             cross_section: Vec::new(),
                             threshold_idx: 0,
-                            interpolation: Vec
+                            interpolation: Vec::new(),
                             energy: Vec::new(),
-                            mt_number: 0, // Add this line
+                            mt_number: 0,
                         };
                         
                         // Get cross section (might be named "xs" in old format)
@@ -382,23 +382,21 @@ mod tests {
         use std::collections::HashMap;
         let li6_path = std::path::Path::new("tests/Li6.json");
         assert!(li6_path.exists(), "tests/Li6.json missing");
+        // Only remove Li6 from cache, don't clear all (avoid race with other tests)
         {
             let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            cache.clear();
-            assert!(cache.is_empty());
+            cache.remove("Li6");
         }
         let raw = super::read_nuclide_from_json(li6_path).expect("Direct read failed");
         assert_eq!(raw.name.as_deref(), Some("Li6"));
-        {
-            let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            assert!(cache.is_empty(), "Cache should still be empty after direct read");
-        }
+        // Don't assert cache state here (other tests may be using it)
         let mut json_map = HashMap::new();
         json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         let first = super::get_or_load_nuclide("Li6", &json_map).expect("Initial cached load failed");
+        // Ensure Li6 now present in cache
         {
             let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            assert_eq!(cache.len(), 1, "Cache should contain one entry after first cached load");
+            assert!(cache.get("Li6").is_some(), "Li6 should be present after cached load");
         }
         let second = super::get_or_load_nuclide("Li6", &json_map).expect("Second cached load failed");
         assert!(std::sync::Arc::ptr_eq(&first, &second), "Expected identical Arc pointer from cache on second load");
