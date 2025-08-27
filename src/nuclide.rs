@@ -574,8 +574,77 @@ mod tests {
     fn test_available_temperatures_be9() {
         let path_be9 = std::path::Path::new("tests/Be9.json");
         let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
-        assert_eq!(nuclide_be9.available_temperatures, vec!["294".to_string()], "available_temperatures should be ['294']");
+        assert_eq!(
+            nuclide_be9.available_temperatures,
+            vec!["294".to_string(), "300".to_string()],
+            "available_temperatures should be ['294','300']"
+        );
         let temps_method = nuclide_be9.temperatures().expect("temperatures() returned None");
-        assert_eq!(temps_method, vec!["294".to_string()], "temperatures() should return ['294']");
+        assert_eq!(
+            temps_method,
+            vec!["294".to_string(), "300".to_string()],
+            "temperatures() should return ['294','300']"
+        );
+    }
+
+    #[test]
+    fn test_be9_mt_numbers_per_temperature() {
+        let path_be9 = std::path::Path::new("tests/Be9.json");
+        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+
+        // Expected full MT list at 294 K (extended set including higher MTs)
+        let mut expected_294: Vec<i32> = vec![
+            1,2,3,16,27,101,102,103,104,105,107,203,204,205,207,301,444,
+            875,876,877,878,879,880,881,882,883,884,885,886,887,888,889,890
+        ];
+        expected_294.sort();
+
+        // Expected reduced MT list at 300 K
+        let mut expected_300: Vec<i32> = vec![
+            1,2,3,16,27,101,102,103,104,105,107,203,204,205,207,301
+        ];
+        expected_300.sort();
+
+        // Helper closure to extract and sort MT list for a temperature
+        let get_sorted_mts = |temp: &str| -> Vec<i32> {
+            let mut mts: Vec<i32> = nuclide_be9
+                .reactions
+                .get(temp)
+                .expect("Temperature not found in reactions")
+                .keys()
+                .cloned()
+                .collect();
+            mts.sort();
+            mts
+        };
+
+        let mts_294 = get_sorted_mts("294");
+        let mts_300 = get_sorted_mts("300");
+
+        assert_eq!(mts_294, expected_294, "Be9 294K MT list mismatch. Got {:?}", mts_294);
+        assert_eq!(mts_300, expected_300, "Be9 300K MT list mismatch. Got {:?}", mts_300);
+
+        // Ensure there are no overlapping unexpected MTs unique to 300 K
+        for mt in &mts_300 {
+            assert!(expected_294.contains(mt), "MT {} at 300K not present in 294K expected list (unexpected new MT)", mt);
+        }
+    }
+
+    #[test]
+    fn test_available_temperatures_fe56_includes_294() {
+        let path_fe56 = std::path::Path::new("tests/Fe56.json");
+        let nuclide_fe56 = super::read_nuclide_from_json(path_fe56).expect("Failed to load Fe56.json");
+        assert!(
+            nuclide_fe56
+                .available_temperatures
+                .iter()
+                .any(|t| t == "294"),
+            "Fe56 available_temperatures should contain '294'"
+        );
+        let temps_method = nuclide_fe56.temperatures().expect("temperatures() returned None");
+        assert!(
+            temps_method.iter().any(|t| t == "294"),
+            "Fe56 temperatures() should contain '294'"
+        );
     }
 }
