@@ -1,6 +1,6 @@
 use crate::material::Material;
 use std::collections::HashMap;
-use crate::nuclide::{Nuclide, get_or_load_nuclide};
+use crate::nuclide::{Nuclide, get_or_load_nuclide, get_or_load_nuclide_with_temps};
 use crate::config::CONFIG;
 use std::sync::Arc;
 
@@ -104,6 +104,35 @@ impl Materials {
         Ok(())
     }
 
+    /// Eagerly load nuclides with the union of temperatures requested by any material.
+    /// Each material's current temperature field drives its requested temperature.
+    pub fn read_nuclides_with_union_temperatures(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
+        use std::collections::{HashMap as StdHashMap, HashSet};
+        // Map nuclide -> set of requested temperatures
+        let mut requests: StdHashMap<String, HashSet<String>> = StdHashMap::new();
+        for mat in &self.materials {
+            for nuclide in mat.nuclides.keys() {
+                let entry = requests.entry(nuclide.clone()).or_insert_with(HashSet::new);
+                entry.insert(mat.temperature.clone());
+            }
+        }
+        // Load each with union temps
+        for (nuclide_name, temps) in &requests {
+            let arc = get_or_load_nuclide_with_temps(nuclide_name, nuclide_json_map, temps)?;
+            self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
+        }
+        // Distribute arcs to materials
+        for mat in &mut self.materials {
+            mat.nuclide_data.clear();
+            for nuclide_name in mat.nuclides.keys() {
+                if let Some(shared_arc) = self.nuclide_data.get::<str>(nuclide_name) {
+                    mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
     pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Collect all unique nuclide names from all materials that aren't already loaded
@@ -153,6 +182,7 @@ impl Default for Materials {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_new_materials() {
@@ -240,5 +270,50 @@ mod tests {
         for i in 1..arcs.len() {
             assert!(Arc::ptr_eq(&arcs[0], &arcs[i]), "Nuclide Arc is not shared!");
         }
+    }
+
+    #[test]
+    fn test_union_temperature_loading_subset_then_union() {
+        // Prepare map for Be9 which has 294 and 300 temps
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        // First materials collection requesting only 294
+        let mut mats = Materials::new();
+        let mut m1 = crate::material::Material::new();
+        m1.add_nuclide("Be9", 1.0).unwrap();
+        m1.set_temperature("294");
+        mats.append(m1);
+        mats.read_nuclides_with_union_temperatures(&nuclide_json_map).unwrap();
+        let arc1 = mats.nuclide_data.get("Be9").unwrap();
+    // With only one material requesting 294K, eager union over requests should load only 294 initially
+    assert_eq!(arc1.loaded_temperatures, vec!["294".to_string()], "Should load only the requested temperature (294) on first union load");
+        // Add second material needing 300
+        let mut m2 = crate::material::Material::new();
+        m2.add_nuclide("Be9", 1.0).unwrap();
+        m2.set_temperature("300");
+        mats.append(m2);
+        // Reload with union (should reuse existing or reload). After this, loaded_temperatures must contain 300.
+        mats.read_nuclides_with_union_temperatures(&nuclide_json_map).unwrap();
+        let arc2 = mats.nuclide_data.get("Be9").unwrap();
+        assert!(arc2.loaded_temperatures.iter().any(|t| t == "300"));
+        // Pointer may have changed due to reload strategy; ensure at least temps present.
+    }
+
+    #[test]
+    fn test_union_temperature_loading_both_at_once() {
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        let mut mats = Materials::new();
+        let mut m1 = crate::material::Material::new();
+        m1.add_nuclide("Be9", 0.5).unwrap();
+        m1.set_temperature("294");
+        let mut m2 = crate::material::Material::new();
+        m2.add_nuclide("Be9", 0.5).unwrap();
+        m2.set_temperature("300");
+        mats.append(m1);
+        mats.append(m2);
+        mats.read_nuclides_with_union_temperatures(&nuclide_json_map).unwrap();
+        let arc = mats.nuclide_data.get("Be9").unwrap();
+        assert_eq!(arc.loaded_temperatures, vec!["294".to_string(), "300".to_string()], "Union load with both temps requested simultaneously should load both temps");
     }
 }
