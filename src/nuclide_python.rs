@@ -28,6 +28,8 @@ pub struct PyNuclide {
     pub reactions: HashMap<String, HashMap<i32, Reaction>>,
     #[pyo3(get)]
     pub fissionable: bool,
+    #[pyo3(get)]
+    pub available_temperatures: Vec<String>,
 }
 
 #[cfg(feature = "pyo3")]
@@ -46,6 +48,7 @@ impl PyNuclide {
             energy: None,
             reactions: HashMap::new(),
             fissionable: false,
+            available_temperatures: Vec::new(),
         }
     }
 
@@ -61,6 +64,7 @@ impl PyNuclide {
         self.library = nuclide.library;
         self.energy = nuclide.energy;
         self.reactions = nuclide.reactions;
+    self.available_temperatures = nuclide.available_temperatures;
         Ok(())
     }
 
@@ -85,11 +89,6 @@ impl PyNuclide {
         }
         
         Ok(py_dict.into())
-    }
-
-    #[getter]
-    pub fn temperatures(&self) -> Option<Vec<String>> {
-        Nuclide::from(self.clone()).temperatures()
     }
 
     #[getter]
@@ -143,6 +142,7 @@ impl From<Nuclide> for PyNuclide {
             energy: n.energy,
             reactions: n.reactions,
             fissionable: n.fissionable,
+            available_temperatures: n.available_temperatures,
         }
     }
 }
@@ -160,6 +160,7 @@ impl From<PyNuclide> for Nuclide {
             energy: py.energy,
             reactions: py.reactions,
             fissionable: py.fissionable,
+            available_temperatures: py.available_temperatures,
         }
     }
 }

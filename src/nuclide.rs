@@ -27,6 +27,8 @@ pub struct Nuclide {
     #[serde(default)]
     pub reactions: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt (i32) -> Reaction
     pub fissionable: bool,
+    #[serde(skip, default)]
+    pub available_temperatures: Vec<String>, // All temps listed in the JSON (even if not loaded)
 }
 
 impl Nuclide {
@@ -152,6 +154,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         energy: None,
         reactions: HashMap::new(),
         fissionable: false,
+        available_temperatures: Vec::new(),
     };
 
     // Parse basic metadata
@@ -190,28 +193,13 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         nuclide.library = Some(lib.to_string());
     }
     
-    // Handle energy grids for each temperature
-    let mut energy_map = HashMap::new();
-    
-    // Check if we have the modern format with "energy" field
-    if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
-        for (temp, energy_arr) in energy_obj {
-            if let Some(energy_values) = energy_arr.as_array() {
-                let energy_vec: Vec<f64> = energy_values
-                    .iter()
-                    .filter_map(|v| v.as_f64())
-                    .collect();
-                energy_map.insert(temp.clone(), energy_vec);
-            }
-        }
-        nuclide.energy = Some(energy_map);
-    }
+    // We will process energy after collecting available temps
     
     // Process reactions - check multiple formats
     
-    // Check if we have the old format with "reactions" field
+    // Check if we have the format with "reactions" field
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
-        for (temp, mt_reactions) in reactions_obj {
+    for (temp, mt_reactions) in reactions_obj {
             let mut temp_reactions: HashMap<i32, Reaction> = HashMap::new();
             
             // Process all MT reactions for this temperature
@@ -286,6 +274,56 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
             }
         }
     } 
+
+    // Process energy (after reactions so we know which temps to keep)
+    if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
+        let mut energy_map = HashMap::new();
+    for (temp, energy_arr) in energy_obj {
+            if let Some(energy_values) = energy_arr.as_array() {
+                let energy_vec: Vec<f64> = energy_values
+                    .iter()
+                    .filter_map(|v| v.as_f64())
+                    .collect();
+                energy_map.insert(temp.clone(), energy_vec);
+            }
+        }
+        if !energy_map.is_empty() {
+            nuclide.energy = Some(energy_map);
+        }
+    }
+
+    // Validate temperature sets: if both reactions and energy present, they must match exactly.
+    if let Some(energy_map) = &nuclide.energy {
+        use std::collections::HashSet;
+        let reaction_temps: HashSet<String> = nuclide.reactions.keys().cloned().collect();
+        let energy_temps: HashSet<String> = energy_map.keys().cloned().collect();
+
+        if reaction_temps.is_empty() && !energy_temps.is_empty() {
+            return Err(format!("Energy grid has temperatures {:?} but no reactions were loaded.", energy_temps).into());
+        }
+        if !reaction_temps.is_empty() && energy_temps.is_empty() {
+            return Err(format!("Reactions have temperatures {:?} but no energy grids were loaded.", reaction_temps).into());
+        }
+
+        if reaction_temps != energy_temps {
+            let only_in_reactions: Vec<String> = reaction_temps.difference(&energy_temps).cloned().collect();
+            let only_in_energy: Vec<String> = energy_temps.difference(&reaction_temps).cloned().collect();
+            return Err(format!(
+                "Mismatched temperature sets. Only in reactions: {:?}. Only in energy: {:?}.",
+                only_in_reactions, only_in_energy
+            ).into());
+        }
+
+        let mut temps: Vec<String> = reaction_temps.into_iter().collect();
+        temps.sort();
+        nuclide.available_temperatures = temps;
+    } else if !nuclide.reactions.is_empty() {
+        // Reactions present but no energy map created (legacy / missing). Treat as error per requirement.
+        let temps: Vec<String> = nuclide.reactions.keys().cloned().collect();
+        return Err(format!("Reactions contain temperatures {:?} but no top-level energy map present.", temps).into());
+    } else {
+        nuclide.available_temperatures.clear();
+    }
     
     // If we have no energy map but have reactions, try to create an energy map
     if nuclide.energy.is_none() && !nuclide.reactions.is_empty() {
@@ -304,6 +342,23 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         }
     }
 
+    // At this point we should have both reactions and (possibly) an energy map.
+    // Populate per-reaction energy grids if they are still empty so that
+    // cross_section_at() works correctly for sampling.
+    if let Some(energy_map) = &nuclide.energy {
+        for (temp, temp_reactions) in nuclide.reactions.iter_mut() {
+            if let Some(energy_grid) = energy_map.get(temp) {
+                for reaction in temp_reactions.values_mut() {
+                    if reaction.energy.is_empty() {
+                        if reaction.threshold_idx < energy_grid.len() {
+                            reaction.energy = energy_grid[reaction.threshold_idx..].to_vec();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Fallback: derive name if still None (e.g., from atomic_symbol + mass_number)
     if nuclide.name.is_none() {
         if let (Some(symbol), Some(mass)) = (&nuclide.atomic_symbol, nuclide.mass_number) {
@@ -318,7 +373,7 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
     }
 
     println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    println!("Found {} temperature(s) with reaction data", nuclide.reactions.len());
+    println!("Found {} temperature(s) with matching energy + reactions", nuclide.available_temperatures.len());
     Ok(nuclide)
 }
 
@@ -513,5 +568,14 @@ mod tests {
             }
             assert!(found, "MT {} not found in any temperature reactions", mt);
         }
+    }
+
+    #[test]
+    fn test_available_temperatures_be9() {
+        let path_be9 = std::path::Path::new("tests/Be9.json");
+        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        assert_eq!(nuclide_be9.available_temperatures, vec!["294".to_string()], "available_temperatures should be ['294']");
+        let temps_method = nuclide_be9.temperatures().expect("temperatures() returned None");
+        assert_eq!(temps_method, vec!["294".to_string()], "temperatures() should return ['294']");
     }
 }
