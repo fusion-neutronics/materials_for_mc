@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::nuclide::{Nuclide, get_or_load_nuclide_with_temps};
+use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
 use crate::data::ELEMENT_NAMES;
@@ -116,7 +116,7 @@ impl Material {
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
         for nuclide_name in nuclide_names {
-            let nuclide = get_or_load_nuclide_with_temps(&nuclide_name, nuclide_json_map, &temp_set)?;
+            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
         
@@ -150,7 +150,7 @@ impl Material {
             use std::collections::HashSet;
             let mut temps = HashSet::new();
             temps.insert(self.temperature.clone());
-            match get_or_load_nuclide_with_temps(&nuclide_name, &config.cross_sections, &temps) {
+            match get_or_load_nuclide(&nuclide_name, &config.cross_sections, Some(&temps)) {
                 Ok(nuclide) => {
                     self.nuclide_data.insert(nuclide_name.clone(), nuclide);
                 },
@@ -1195,7 +1195,7 @@ mod tests {
         // Calculate microscopic cross sections for the material
         let micro_xs_mat = material.calculate_microscopic_xs_neutron(None);
         // Get the nuclide directly
-        let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
+    let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map, None).expect("Failed to load Li6");
         let temperature = &material.temperature;
         // Get reactions and energy grid for nuclide
         let reactions = nuclide.reactions.get(temperature)

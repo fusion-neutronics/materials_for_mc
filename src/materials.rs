@@ -1,6 +1,6 @@
 use crate::material::Material;
 use std::collections::HashMap;
-use crate::nuclide::{Nuclide, get_or_load_nuclide_with_temps};
+use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use std::sync::Arc;
 
@@ -89,7 +89,7 @@ impl Materials {
         }
         // Load each with union temps
         for (nuclide_name, temps) in &requests {
-            let arc = get_or_load_nuclide_with_temps(nuclide_name, nuclide_json_map, temps)?;
+            let arc = get_or_load_nuclide(nuclide_name, nuclide_json_map, Some(temps))?;
             self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
         }
         // Distribute arcs to materials
@@ -124,10 +124,8 @@ impl Materials {
         let config = CONFIG.lock().unwrap();
         
         // Load each missing nuclide
-        use std::collections::HashSet;
         for nuclide_name in &needed {
-            let empty: HashSet<String> = HashSet::new();
-            let nuclide = get_or_load_nuclide_with_temps(nuclide_name, &config.cross_sections, &empty)?;
+            let nuclide = get_or_load_nuclide(nuclide_name, &config.cross_sections, None)?;
             self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&nuclide));
         }
         
