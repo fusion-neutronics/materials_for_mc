@@ -30,6 +30,10 @@ pub struct PyNuclide {
     pub fissionable: bool,
     #[pyo3(get)]
     pub available_temperatures: Vec<String>,
+    #[pyo3(get)]
+    pub loaded_temperatures: Vec<String>,
+    #[pyo3(get)]
+    pub data_path: Option<String>,
 }
 
 #[cfg(feature = "pyo3")]
@@ -49,6 +53,8 @@ impl PyNuclide {
             reactions: HashMap::new(),
             fissionable: false,
             available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
         }
     }
 
@@ -65,6 +71,8 @@ impl PyNuclide {
         self.energy = nuclide.energy;
         self.reactions = nuclide.reactions;
     self.available_temperatures = nuclide.available_temperatures;
+    self.loaded_temperatures = nuclide.loaded_temperatures;
+    self.data_path = nuclide.data_path;
         Ok(())
     }
 
@@ -143,6 +151,8 @@ impl From<Nuclide> for PyNuclide {
             reactions: n.reactions,
             fissionable: n.fissionable,
             available_temperatures: n.available_temperatures,
+            loaded_temperatures: n.loaded_temperatures,
+            data_path: n.data_path,
         }
     }
 }
@@ -161,6 +171,8 @@ impl From<PyNuclide> for Nuclide {
             reactions: py.reactions,
             fissionable: py.fissionable,
             available_temperatures: py.available_temperatures,
+            loaded_temperatures: py.loaded_temperatures,
+            data_path: py.data_path,
         }
     }
 }
