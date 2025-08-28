@@ -76,8 +76,8 @@ impl Materials {
         self.materials.iter_mut()
     }
 
-    /// Read (and cache) all nuclides needed by materials, loading only the union of requested temperatures per nuclide.
-    pub fn read_nuclides(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
+    /// Read (and cache) all nuclides needed by materials from JSON paths, loading only the union of requested temperatures per nuclide.
+    pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         use std::collections::{HashMap as StdHashMap, HashSet};
         // Map nuclide -> set of requested temperatures
         let mut requests: StdHashMap<String, HashSet<String>> = StdHashMap::new();
@@ -228,7 +228,7 @@ mod tests {
             materials.append(mat);
         }
         // Load nuclide data (should only load once and share Arc<Nuclide>)
-    materials.read_nuclides(&nuclide_json_map).unwrap();
+    materials.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Collect all Arc pointers for Li6 from each material
         let mut arcs: Vec<Arc<Nuclide>> = Vec::new();
@@ -255,7 +255,7 @@ mod tests {
         m1.add_nuclide("Be9", 1.0).unwrap();
         m1.set_temperature("294");
         mats.append(m1);
-    mats.read_nuclides(&nuclide_json_map).unwrap();
+    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc1 = mats.nuclide_data.get("Be9").unwrap();
     // With only one material requesting 294K, eager union over requests should load only 294 initially
     assert_eq!(arc1.loaded_temperatures, vec!["294".to_string()], "Should load only the requested temperature (294) on first union load");
@@ -265,7 +265,7 @@ mod tests {
         m2.set_temperature("300");
         mats.append(m2);
         // Reload with union (should reuse existing or reload). After this, loaded_temperatures must contain 300.
-    mats.read_nuclides(&nuclide_json_map).unwrap();
+    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc2 = mats.nuclide_data.get("Be9").unwrap();
         assert!(arc2.loaded_temperatures.iter().any(|t| t == "300"));
         // Pointer may have changed due to reload strategy; ensure at least temps present.
@@ -285,7 +285,7 @@ mod tests {
         m2.set_temperature("300");
         mats.append(m1);
         mats.append(m2);
-    mats.read_nuclides(&nuclide_json_map).unwrap();
+    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc = mats.nuclide_data.get("Be9").unwrap();
         assert_eq!(arc.loaded_temperatures, vec!["294".to_string(), "300".to_string()], "Union load with both temps requested simultaneously should load both temps");
     }

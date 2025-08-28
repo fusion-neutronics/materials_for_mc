@@ -228,6 +228,6 @@ impl PyReaction {
 
 #[cfg(feature = "pyo3")]
 #[pyfunction]
-pub fn clear_nuclide_cache_py() {
+pub fn clear_nuclide_cache() {
     crate::nuclide::clear_nuclide_cache();
 }

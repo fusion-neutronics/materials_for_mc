@@ -331,8 +331,8 @@ def test_sample_interacting_nuclide_li6_li7():
 
 
 def test_material_be9_selective_temperature_load():
-    from materials_for_mc import Config, Material, clear_nuclide_cache_py
-    clear_nuclide_cache_py()
+    from materials_for_mc import Config, Material, clear_nuclide_cache
+    clear_nuclide_cache()
     mat = Material()
     # Set material temperature to 300 K (Be9 JSON also has 294)
     mat.temperature = "300"
@@ -343,8 +343,8 @@ def test_material_be9_selective_temperature_load():
     assert temps == ["300"], f"Expected only ['300'] loaded for Be9, got {temps}"
 
 def test_material_be9_selective_temperature_load_294():
-    from materials_for_mc import Config, Material, clear_nuclide_cache_py
-    clear_nuclide_cache_py()
+    from materials_for_mc import Config, Material, clear_nuclide_cache
+    clear_nuclide_cache()
     mat = Material()
     # Set material temperature to 294 K (Be9 JSON also has 300)
     mat.temperature = "294"
