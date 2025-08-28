@@ -82,3 +82,19 @@ def test_read_be9_mt_numbers_per_temperature():
     assert mts_300 == expected_300, f"Be9 300K MT list mismatch: {mts_300}"
     # Ensure 300K list is subset of 294K list
     assert set(mts_300).issubset(set(mts_294))
+
+
+def test_read_be9_selective_single_temperature():
+    # Ensure only the specified temperature (300) is retained in reactions and loaded_temperatures
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json', temperatures=['300'])
+    assert nuc.available_temperatures == ['294', '300'], "available_temperatures should list all temps present in file"
+    assert nuc.loaded_temperatures == ['300'], f"loaded_temperatures should be only ['300'], got {nuc.loaded_temperatures}"
+    assert '300' in nuc.reactions, "300K reactions missing after selective load"
+    assert '294' not in nuc.reactions, "294K reactions should not be loaded when selectively requesting only 300K"
+    # MT list at 300 should match subset expectation
+    mts_300 = sorted(int(mt) for mt in nuc.reactions['300'].keys())
+    expected_300 = sorted([
+        1,2,3,16,27,101,102,103,104,105,107,203,204,205,207,301
+    ])
+    assert mts_300 == expected_300, f"Selective load 300K MT list mismatch: {mts_300}"

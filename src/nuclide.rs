@@ -20,6 +20,12 @@ pub fn clear_global_nuclide_cache() {
     cache.clear();
 }
 
+/// Clear the global nuclide cache (exposed for Python to ensure deterministic selective temperature tests)
+pub fn clear_nuclide_cache() {
+    let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+    cache.clear();
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {

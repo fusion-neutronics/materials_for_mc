@@ -58,9 +58,30 @@ impl PyNuclide {
         }
     }
 
-    pub fn read_nuclide_from_json(&mut self, path: &str) -> PyResult<()> {
-        let nuclide = crate::nuclide::read_nuclide_from_json(path)
+    #[pyo3(signature = (path, temperatures=None))]
+    pub fn read_nuclide_from_json(&mut self, path: &str, temperatures: Option<Vec<String>>) -> PyResult<()> {
+        let mut nuclide = crate::nuclide::read_nuclide_from_json(path)
             .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+
+        // If user supplied a non-empty temperature list, prune to that subset
+        if let Some(requested) = &temperatures {
+            if !requested.is_empty() {
+                use std::collections::HashSet;
+                let req: HashSet<String> = requested.iter().cloned().collect();
+                // Retain only requested temps in reactions
+                nuclide.reactions.retain(|k,_| req.contains(k));
+                // Prune energy map similarly
+                if let Some(mut energy_map) = nuclide.energy.take() {
+                    energy_map.retain(|k,_| req.contains(k));
+                    nuclide.energy = Some(energy_map);
+                }
+                // Update loaded_temperatures to reflect subset actually kept (sorted deterministically)
+                let mut loaded: Vec<String> = nuclide.reactions.keys().cloned().collect();
+                loaded.sort();
+                nuclide.loaded_temperatures = loaded;
+            }
+        }
+
         self.name = nuclide.name;
         self.element = nuclide.element;
         self.atomic_symbol = nuclide.atomic_symbol;
@@ -70,9 +91,9 @@ impl PyNuclide {
         self.library = nuclide.library;
         self.energy = nuclide.energy;
         self.reactions = nuclide.reactions;
-    self.available_temperatures = nuclide.available_temperatures;
-    self.loaded_temperatures = nuclide.loaded_temperatures;
-    self.data_path = nuclide.data_path;
+        self.available_temperatures = nuclide.available_temperatures;
+        self.loaded_temperatures = nuclide.loaded_temperatures;
+        self.data_path = nuclide.data_path;
         Ok(())
     }
 
@@ -203,4 +224,10 @@ impl PyReaction {
     pub fn new(reactants: Vec<String>, products: Vec<String>, energy: f64) -> Self {
         PyReaction { reactants, products, energy }
     }
+}
+
+#[cfg(feature = "pyo3")]
+#[pyfunction]
+pub fn clear_nuclide_cache_py() {
+    crate::nuclide::clear_nuclide_cache();
 }

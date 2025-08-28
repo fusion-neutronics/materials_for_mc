@@ -240,6 +240,14 @@ impl PyMaterial {
         Ok(self.internal.sample_interacting_nuclide(energy, &mut rng))
     }
 
+    /// Get the loaded temperatures for a specific nuclide in this material (after loading JSON).
+    fn nuclide_loaded_temperatures(&self, nuclide: &str) -> Option<Vec<String>> {
+        self.internal
+            .nuclide_data
+            .get(nuclide)
+            .map(|arc| arc.loaded_temperatures.clone())
+    }
+
 }
 
 
