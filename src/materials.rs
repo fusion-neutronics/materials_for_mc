@@ -274,6 +274,7 @@ mod tests {
 
     #[test]
     fn test_union_temperature_loading_subset_then_union() {
+    crate::nuclide::clear_global_nuclide_cache();
         // Prepare map for Be9 which has 294 and 300 temps
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
@@ -301,6 +302,7 @@ mod tests {
 
     #[test]
     fn test_union_temperature_loading_both_at_once() {
+    crate::nuclide::clear_global_nuclide_cache();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
         let mut mats = Materials::new();

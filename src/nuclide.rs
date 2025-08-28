@@ -13,6 +13,13 @@ use crate::reaction::Reaction;
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+// Test-only helper to ensure deterministic cache state
+#[cfg(test)]
+pub fn clear_global_nuclide_cache() {
+    let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+    cache.clear();
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
