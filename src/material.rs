@@ -3,10 +3,8 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
-use crate::data::ELEMENT_NAMES;
-use crate::data::SUM_RULES;
-use crate::utilities::add_to_processing_order;
-use rand::SeedableRng;
+use crate::data::ELEMENT_NAMES; // SUM_RULES not directly needed here
+// Removed unused imports: SUM_RULES, add_to_processing_order, SeedableRng
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -104,6 +102,11 @@ impl Material {
         let mut nuclides: Vec<String> = self.nuclides.keys().cloned().collect();
         nuclides.sort(); // Sort alphabetically for consistent output
         nuclides
+    }
+
+    /// Get the loaded temperatures for a specific nuclide (cloned vector)
+    pub fn nuclide_loaded_temperatures(&self, name: &str) -> Option<Vec<String>> {
+        self.nuclide_data.get(name).map(|n| n.loaded_temperatures.clone())
     }
 
     /// Read nuclide data from JSON files for this material
@@ -656,6 +659,9 @@ impl Material {
         assert!((avg - expected_mean).abs() < tolerance, "Average sampled distance incorrect: got {}, expected {}", avg, expected_mean);
     }
 mod tests {
+    use super::Material; // Explicitly import Material for tests
+    use rand::SeedableRng; // Needed for tests using StdRng::seed_from_u64
+    use std::collections::HashMap; // Needed for building nuclide_json_map in tests
     #[test]
     fn test_macroscopic_total_xs_by_nuclide_li6_li7() {
         use std::collections::HashMap;
@@ -724,7 +730,7 @@ mod tests {
         let xs = &macro_xs[&3];
         assert!(xs.iter().any(|&v| v > 0.0), "MT=3 cross section should have nonzero values");
     }
-    use super::*;
+    // Removed unused `use super::*;` (all required items referenced explicitly)
 
     #[test]
     fn test_new_material() {
@@ -1164,7 +1170,7 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+    let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections
         let micro_xs = material.calculate_microscopic_xs_neutron(None);
         // Check that both Li6 and Li7 are present
@@ -1175,8 +1181,8 @@ mod tests {
         assert!(micro_xs["Li6"].contains_key(&mt), "Li6 missing MT=2");
         assert!(micro_xs["Li7"].contains_key(&mt), "Li7 missing MT=2");
         // Check that the cross section arrays are the same length as the grid
-        assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
-        assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
+    assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
+    assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
     }
 
     #[test]
@@ -1191,7 +1197,7 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+    let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for the material
         let micro_xs_mat = material.calculate_microscopic_xs_neutron(None);
         // Get the nuclide directly
