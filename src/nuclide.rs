@@ -13,6 +13,12 @@ use crate::reaction::Reaction;
 // Global cache for nuclides to avoid reloading
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Clear the global nuclide cache (used by tests and Python to ensure deterministic selective temperature behavior)
+pub fn clear_nuclide_cache() {
+    let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+    cache.clear();
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
@@ -29,6 +35,10 @@ pub struct Nuclide {
     pub fissionable: bool,
     #[serde(skip, default)]
     pub available_temperatures: Vec<String>, // All temps listed in the JSON (even if not loaded)
+    #[serde(skip, default)]
+    pub loaded_temperatures: Vec<String>, // Subset actually loaded into reactions/energy
+    #[serde(skip, default)]
+    pub data_path: Option<String>, // Path JSON was loaded from (for potential future extension)
 }
 
 impl Nuclide {
@@ -154,7 +164,9 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         energy: None,
         reactions: HashMap::new(),
         fissionable: false,
-        available_temperatures: Vec::new(),
+    available_temperatures: Vec::new(),
+    loaded_temperatures: Vec::new(),
+    data_path: None,
     };
 
     // Parse basic metadata
@@ -372,8 +384,10 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         nuclide.fissionable = true;
     }
 
+    // Initially, loaded_temperatures is the full set (may be pruned later by selective loader)
+    nuclide.loaded_temperatures = nuclide.available_temperatures.clone();
     println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    println!("Found {} temperature(s) with matching energy + reactions", nuclide.available_temperatures.len());
+    println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
     Ok(nuclide)
 }
 
@@ -390,7 +404,9 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
     
     // Use the shared parsing function
-    parse_nuclide_from_json_value(json_value)
+    let mut nuclide = parse_nuclide_from_json_value(json_value)?;
+    nuclide.data_path = Some(path_ref.to_string_lossy().to_string());
+    Ok(nuclide)
 }
 
 // Read a nuclide from a JSON string, used by WASM
@@ -399,36 +415,65 @@ pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn
     let json_value: serde_json::Value = serde_json::from_str(json_content)?;
     
     // Use the shared parsing function
-    parse_nuclide_from_json_value(json_value)
+    let mut nuclide = parse_nuclide_from_json_value(json_value)?;
+    // No file path available
+    nuclide.data_path = None;
+    Ok(nuclide)
 }
 
-// Get a nuclide from the cache or load it from the specified JSON file
+/// Read (or fetch from cache) a nuclide, optionally keeping only a specified subset of temperatures.
+/// Records the full `available_temperatures` and tracks the actually retained subset in `loaded_temperatures`.
+/// Unified loader semantics:
+/// - `temperatures_to_include`: `None` or `Some(empty)` => load all temperatures.
+/// - `Some(nonempty)` => ensure those temperatures are loaded; if previously loaded with fewer temps, reload & prune to the union.
 pub fn get_or_load_nuclide(
-    nuclide_name: &str, 
-    json_path_map: &HashMap<String, String>
+    nuclide_name: &str,
+    json_path_map: &HashMap<String, String>,
+    temperatures_to_include: Option<&std::collections::HashSet<String>>,
 ) -> Result<Arc<Nuclide>, Box<dyn std::error::Error>> {
-    // Try to get from cache first
+    use std::collections::HashSet;
+    let requested: HashSet<String> = temperatures_to_include
+        .map(|s| s.iter().cloned().collect())
+        .unwrap_or_else(HashSet::new);
+    // Fast path: cache hit with sufficient temps
     {
         let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        if let Some(nuclide) = cache.get(nuclide_name) {
-            return Ok(Arc::clone(nuclide));
+        if let Some(existing) = cache.get(nuclide_name) {
+            if requested.is_empty() || requested.is_subset(&existing.loaded_temperatures.iter().cloned().collect()) {
+                return Ok(Arc::clone(existing));
+            }
         }
     }
-    
-    // Not in cache, load from JSON file
+    // Determine union (existing loaded + requested)
+    let mut union_set = requested.clone();
+    {
+        let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+        if let Some(existing) = cache.get(nuclide_name) {
+            for t in &existing.loaded_temperatures { union_set.insert(t.clone()); }
+        }
+    }
+    // Load full file then prune if subset requested
     let path = json_path_map.get(nuclide_name)
         .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
-    
-    let nuclide = read_nuclide_from_json(path)?;
-    let arc_nuclide = Arc::new(nuclide);
-    
-    // Store in cache
+    let full = read_nuclide_from_json(path)?;
+    let mut nuclide = if union_set.is_empty() { full.clone() } else { full.clone() };
+    if !union_set.is_empty() {
+        // Prune to union_set
+        if let Some(mut energy_map) = nuclide.energy.take() {
+            energy_map.retain(|k,_| union_set.contains(k));
+            nuclide.energy = Some(energy_map);
+        }
+        nuclide.reactions.retain(|k,_| union_set.contains(k));
+        let mut loaded: Vec<String> = nuclide.reactions.keys().cloned().collect();
+        loaded.sort();
+        nuclide.loaded_temperatures = loaded;
+    }
+    let arc = Arc::new(nuclide);
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        cache.insert(nuclide_name.to_string(), Arc::clone(&arc_nuclide));
+        cache.insert(nuclide_name.to_string(), Arc::clone(&arc));
     }
-    
-    Ok(arc_nuclide)
+    Ok(arc)
 }
 
 mod tests {
@@ -447,13 +492,13 @@ mod tests {
         // Don't assert cache state here (other tests may be using it)
         let mut json_map = HashMap::new();
         json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        let first = super::get_or_load_nuclide("Li6", &json_map).expect("Initial cached load failed");
+    let first = super::get_or_load_nuclide("Li6", &json_map, None).expect("Initial cached load failed");
         // Ensure Li6 now present in cache
         {
             let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
             assert!(cache.get("Li6").is_some(), "Li6 should be present after cached load");
         }
-        let second = super::get_or_load_nuclide("Li6", &json_map).expect("Second cached load failed");
+    let second = super::get_or_load_nuclide("Li6", &json_map, None).expect("Second cached load failed");
         assert!(std::sync::Arc::ptr_eq(&first, &second), "Expected identical Arc pointer from cache on second load");
         assert_eq!(first.name.as_deref(), raw.name.as_deref(), "Names differ between raw and cached");
     }
@@ -579,6 +624,7 @@ mod tests {
             vec!["294".to_string(), "300".to_string()],
             "available_temperatures should be ['294','300']"
         );
+    assert_eq!(nuclide_be9.loaded_temperatures, vec!["294".to_string(), "300".to_string()], "By default all temps are loaded");
         let temps_method = nuclide_be9.temperatures().expect("temperatures() returned None");
         assert_eq!(
             temps_method,

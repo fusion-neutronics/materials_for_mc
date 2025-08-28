@@ -328,3 +328,24 @@ def test_sample_interacting_nuclide_li6_li7():
     assert abs(frac_li6 + frac_li7 - 1.0) < 1e-6, "Fractions should sum to 1"
     # Li7 should be sampled more often than Li6
     assert frac_li6 > frac_li7, "Li6 should be sampled more often than Li6"
+
+
+def test_material_be9_selective_temperature_load():
+    from materials_for_mc import Config, Material, clear_nuclide_cache
+    clear_nuclide_cache()
+    mat = Material()
+    # Set material temperature to 300 K (Be9 JSON also has 294)
+    mat.temperature = "300"
+    mat.add_nuclide("Be9", 1.0)
+    Config.set_cross_sections({"Be9": "tests/Be9.json"})
+    mat.read_nuclides_from_json({"Be9": "tests/Be9.json"})
+
+def test_material_be9_selective_temperature_load_294():
+    from materials_for_mc import Config, Material, clear_nuclide_cache
+    clear_nuclide_cache()
+    mat = Material()
+    # Set material temperature to 294 K (Be9 JSON also has 300)
+    mat.temperature = "294"
+    mat.add_nuclide("Be9", 1.0)
+    Config.set_cross_sections({"Be9": "tests/Be9.json"})
+    mat.read_nuclides_from_json({"Be9": "tests/Be9.json"})

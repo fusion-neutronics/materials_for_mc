@@ -83,7 +83,8 @@ impl PyMaterials {
         self.get(index)
     }
 
-    /// Read nuclides from a JSON-like Python dictionary
+    /// Read nuclides from a JSON-like Python dictionary (delegates to Materials::read_nuclides)
+    #[pyo3(name = "read_nuclides_from_json")]
     fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: &PyDict) -> PyResult<()> {
         let mut rust_map = HashMap::new();
         for (k, v) in nuclide_json_map.iter() {
@@ -91,7 +92,7 @@ impl PyMaterials {
             let val: String = v.extract()?;
             rust_map.insert(key, val);
         }
-        self.internal.read_nuclides_from_json(&rust_map)
+    self.internal.read_nuclides_from_json(&rust_map)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 }

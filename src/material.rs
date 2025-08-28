@@ -3,10 +3,8 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
-use crate::data::ELEMENT_NAMES;
-use crate::data::SUM_RULES;
-use crate::utilities::add_to_processing_order;
-use rand::SeedableRng;
+use crate::data::ELEMENT_NAMES; // SUM_RULES not directly needed here
+// Removed unused imports: SUM_RULES, add_to_processing_order, SeedableRng
 
 #[derive(Debug, Clone)]
 pub struct Material {
@@ -112,8 +110,11 @@ impl Material {
         let nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
         
         // Load nuclides using the centralized function in the nuclide module
+        use std::collections::HashSet;
+        let mut temp_set: HashSet<String> = HashSet::new();
+        temp_set.insert(self.temperature.clone());
         for nuclide_name in nuclide_names {
-            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map)?;
+            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
         
@@ -144,8 +145,10 @@ impl Material {
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
-            // Load from the provided JSON path map
-            match get_or_load_nuclide(&nuclide_name, &config.cross_sections) {
+            use std::collections::HashSet;
+            let mut temps = HashSet::new();
+            temps.insert(self.temperature.clone());
+            match get_or_load_nuclide(&nuclide_name, &config.cross_sections, Some(&temps)) {
                 Ok(nuclide) => {
                     self.nuclide_data.insert(nuclide_name.clone(), nuclide);
                 },
@@ -651,6 +654,9 @@ impl Material {
         assert!((avg - expected_mean).abs() < tolerance, "Average sampled distance incorrect: got {}, expected {}", avg, expected_mean);
     }
 mod tests {
+    use super::Material; // Explicitly import Material for tests
+    use rand::SeedableRng; // Needed for tests using StdRng::seed_from_u64
+    use std::collections::HashMap; // Needed for building nuclide_json_map in tests
     #[test]
     fn test_macroscopic_total_xs_by_nuclide_li6_li7() {
         use std::collections::HashMap;
@@ -719,7 +725,7 @@ mod tests {
         let xs = &macro_xs[&3];
         assert!(xs.iter().any(|&v| v > 0.0), "MT=3 cross section should have nonzero values");
     }
-    use super::*;
+    // Removed unused `use super::*;` (all required items referenced explicitly)
 
     #[test]
     fn test_new_material() {
@@ -1120,6 +1126,34 @@ mod tests {
     }
 
     #[test]
+    fn test_selective_temperature_load_be9_300() {
+    crate::nuclide::clear_nuclide_cache();
+        let mut mat = Material::new();
+        mat.add_nuclide("Be9", 1.0).unwrap();
+        mat.set_temperature("300");
+        let mut map = std::collections::HashMap::new();
+        map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        mat.read_nuclides_from_json(&map).unwrap();
+        let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
+        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
+        assert_eq!(be9.loaded_temperatures, vec!["300".to_string()], "Should only load 300K data");
+    }
+
+    #[test]
+    fn test_selective_temperature_load_be9_294() {
+    crate::nuclide::clear_nuclide_cache();
+        let mut mat = Material::new();
+        mat.add_nuclide("Be9", 1.0).unwrap();
+        mat.set_temperature("294");
+        let mut map = std::collections::HashMap::new();
+        map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        mat.read_nuclides_from_json(&map).unwrap();
+        let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
+        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
+        assert_eq!(be9.loaded_temperatures, vec!["294".to_string()], "Should only load 294K data");
+    }
+
+    #[test]
     fn test_calculate_microscopic_xs_neutron_lithium() {
         use std::collections::HashMap;
         let mut material = Material::new();
@@ -1131,7 +1165,7 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+    let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections
         let micro_xs = material.calculate_microscopic_xs_neutron(None);
         // Check that both Li6 and Li7 are present
@@ -1142,8 +1176,8 @@ mod tests {
         assert!(micro_xs["Li6"].contains_key(&mt), "Li6 missing MT=2");
         assert!(micro_xs["Li7"].contains_key(&mt), "Li7 missing MT=2");
         // Check that the cross section arrays are the same length as the grid
-        assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
-        assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
+    assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
+    assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
     }
 
     #[test]
@@ -1158,11 +1192,11 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+    let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for the material
         let micro_xs_mat = material.calculate_microscopic_xs_neutron(None);
         // Get the nuclide directly
-        let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map).expect("Failed to load Li6");
+    let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map, None).expect("Failed to load Li6");
         let temperature = &material.temperature;
         // Get reactions and energy grid for nuclide
         let reactions = nuclide.reactions.get(temperature)
