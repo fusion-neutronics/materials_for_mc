@@ -1126,7 +1126,7 @@ mod tests {
 
     #[test]
     fn test_selective_temperature_load_be9_300() {
-        crate::nuclide::clear_global_nuclide_cache();
+    crate::nuclide::clear_nuclide_cache();
         let mut mat = Material::new();
         mat.add_nuclide("Be9", 1.0).unwrap();
         mat.set_temperature("300");
@@ -1140,7 +1140,7 @@ mod tests {
 
     #[test]
     fn test_selective_temperature_load_be9_294() {
-        crate::nuclide::clear_global_nuclide_cache();
+    crate::nuclide::clear_nuclide_cache();
         let mut mat = Material::new();
         mat.add_nuclide("Be9", 1.0).unwrap();
         mat.set_temperature("294");
