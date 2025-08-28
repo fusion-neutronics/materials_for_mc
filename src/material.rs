@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::nuclide::{Nuclide, get_or_load_nuclide};
+use crate::nuclide::{Nuclide, get_or_load_nuclide_with_temps};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
 use crate::data::ELEMENT_NAMES;
@@ -112,8 +112,11 @@ impl Material {
         let nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
         
         // Load nuclides using the centralized function in the nuclide module
+        use std::collections::HashSet;
+        let mut temp_set: HashSet<String> = HashSet::new();
+        temp_set.insert(self.temperature.clone());
         for nuclide_name in nuclide_names {
-            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map)?;
+            let nuclide = get_or_load_nuclide_with_temps(&nuclide_name, nuclide_json_map, &temp_set)?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
         
@@ -144,8 +147,10 @@ impl Material {
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
-            // Load from the provided JSON path map
-            match get_or_load_nuclide(&nuclide_name, &config.cross_sections) {
+            use std::collections::HashSet;
+            let mut temps = HashSet::new();
+            temps.insert(self.temperature.clone());
+            match get_or_load_nuclide_with_temps(&nuclide_name, &config.cross_sections, &temps) {
                 Ok(nuclide) => {
                     self.nuclide_data.insert(nuclide_name.clone(), nuclide);
                 },
@@ -1117,6 +1122,34 @@ mod tests {
         // The expected list should match the actual list from the JSON, including hierarchical MTs
         let expected = vec![1, 2, 3, 4, 5, 16, 24, 25, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203, 204, 205, 206, 207, 301, 444];
         assert_eq!(mts, expected, "Material lithium MT list does not match expected. Got {:?}", mts);
+    }
+
+    #[test]
+    fn test_selective_temperature_load_be9_300() {
+        crate::nuclide::clear_global_nuclide_cache();
+        let mut mat = Material::new();
+        mat.add_nuclide("Be9", 1.0).unwrap();
+        mat.set_temperature("300");
+        let mut map = std::collections::HashMap::new();
+        map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        mat.read_nuclides_from_json(&map).unwrap();
+        let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
+        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
+        assert_eq!(be9.loaded_temperatures, vec!["300".to_string()], "Should only load 300K data");
+    }
+
+    #[test]
+    fn test_selective_temperature_load_be9_294() {
+        crate::nuclide::clear_global_nuclide_cache();
+        let mut mat = Material::new();
+        mat.add_nuclide("Be9", 1.0).unwrap();
+        mat.set_temperature("294");
+        let mut map = std::collections::HashMap::new();
+        map.insert("Be9".to_string(), "tests/Be9.json".to_string());
+        mat.read_nuclides_from_json(&map).unwrap();
+        let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
+        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
+        assert_eq!(be9.loaded_temperatures, vec!["294".to_string()], "Should only load 294K data");
     }
 
     #[test]
