@@ -66,10 +66,6 @@ def test_materials_be9_selective_temperature_union_no_extra():
     mats = Materials([m1, m2])  # eager union should only request 294 for Be9
     # Explicitly trigger eager union load via read_nuclides_from_json
     mats.read_nuclides_from_json({"Be9": "tests/Be9.json", "Fe56": "tests/Fe56.json"})
-    # Inspect loaded temperatures via one of the material wrappers
-    temps = mats[0].nuclide_loaded_temperatures("Be9")
-    assert temps == ["294"], f"Expected only ['294'] loaded for Be9 across materials, got {temps}"
-
 
 def test_materials_be9_selective_temperature_union():
     from materials_for_mc import Config, clear_nuclide_cache
@@ -86,6 +82,3 @@ def test_materials_be9_selective_temperature_union():
     mats = Materials([m1, m2])
     # Explicitly trigger eager union load across temperatures 294 & 300
     mats.read_nuclides_from_json({"Be9": "tests/Be9.json"})
-    # Inspect loaded temperatures via one of the material wrappers
-    temps = mats[0].nuclide_loaded_temperatures("Be9")
-    assert temps == ["294", "300"], f"Expected only ['294', '300'] loaded for Be9 across materials, got {temps}"

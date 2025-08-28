@@ -104,11 +104,6 @@ impl Material {
         nuclides
     }
 
-    /// Get the loaded temperatures for a specific nuclide (cloned vector)
-    pub fn nuclide_loaded_temperatures(&self, name: &str) -> Option<Vec<String>> {
-        self.nuclide_data.get(name).map(|n| n.loaded_temperatures.clone())
-    }
-
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         // Get all nuclide names that need to be loaded

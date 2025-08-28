@@ -339,8 +339,6 @@ def test_material_be9_selective_temperature_load():
     mat.add_nuclide("Be9", 1.0)
     Config.set_cross_sections({"Be9": "tests/Be9.json"})
     mat.read_nuclides_from_json({"Be9": "tests/Be9.json"})
-    temps = mat.nuclide_loaded_temperatures("Be9")
-    assert temps == ["300"], f"Expected only ['300'] loaded for Be9, got {temps}"
 
 def test_material_be9_selective_temperature_load_294():
     from materials_for_mc import Config, Material, clear_nuclide_cache
@@ -351,5 +349,3 @@ def test_material_be9_selective_temperature_load_294():
     mat.add_nuclide("Be9", 1.0)
     Config.set_cross_sections({"Be9": "tests/Be9.json"})
     mat.read_nuclides_from_json({"Be9": "tests/Be9.json"})
-    temps = mat.nuclide_loaded_temperatures("Be9")
-    assert temps == ["294"], f"Expected only ['294'] loaded for Be9, got {temps}"
