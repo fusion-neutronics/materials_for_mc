@@ -61,9 +61,11 @@ impl PyNuclide {
     #[pyo3(signature = (path=None, temperatures=None))]
     pub fn read_nuclide_from_json(&mut self, path: Option<String>, temperatures: Option<Vec<String>>) -> PyResult<()> {
         use std::collections::HashSet;
-        let temps_hash: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
-        let name_hint = self.name.as_deref();
-        let nuclide = crate::nuclide::load_nuclide_auto(name_hint, path.as_deref(), temps_hash.as_ref())
+        let identifier = if let Some(p) = &path { p.as_str() } else {
+            self.name.as_deref().ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided"))?
+        };
+        let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
+        let nuclide = crate::nuclide::read_nuclide_from_json_with_temps(identifier, temps_set.as_ref())
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         self.name = nuclide.name;
