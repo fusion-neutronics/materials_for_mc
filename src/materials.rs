@@ -79,6 +79,14 @@ impl Materials {
     /// Read (and cache) all nuclides needed by materials from JSON paths, loading only the union of requested temperatures per nuclide.
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         use std::collections::{HashMap as StdHashMap, HashSet};
+        // Collect all nuclide names across materials
+        let mut merged: HashMap<String,String> = HashMap::new();
+        let cfg = CONFIG.lock().unwrap();
+        for mat in &self.materials { for n in mat.nuclides.keys() { if let Some(p) = cfg.cross_sections.get(n) { merged.insert(n.clone(), p.clone()); } } }
+        drop(cfg);
+        // Override with provided explicit mappings
+        for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
+        let source_map: &HashMap<String,String> = &merged;
         // Map nuclide -> set of requested temperatures
         let mut requests: StdHashMap<String, HashSet<String>> = StdHashMap::new();
         for mat in &self.materials {
@@ -89,7 +97,7 @@ impl Materials {
         }
         // Load each with union temps
         for (nuclide_name, temps) in &requests {
-            let arc = get_or_load_nuclide(nuclide_name, nuclide_json_map, Some(temps))?;
+            let arc = get_or_load_nuclide(nuclide_name, source_map, Some(temps))?;
             self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
         }
         // Distribute arcs to materials

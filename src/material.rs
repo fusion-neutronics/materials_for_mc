@@ -106,18 +106,25 @@ impl Material {
 
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
-        // Get all nuclide names that need to be loaded
+        // Collect needed nuclide names
         let nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
-        
+        // Build merged source map: explicit entries override, missing filled from CONFIG
+        let mut merged: HashMap<String,String> = HashMap::new();
+        // Start with global config entries for required nuclides
+        let cfg = crate::config::CONFIG.lock().unwrap();
+        for n in &nuclide_names { if let Some(p) = cfg.cross_sections.get(n) { merged.insert(n.clone(), p.clone()); } }
+        drop(cfg);
+        // Override with any provided mapping entries (even if extra keys not in composition)
+        for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
+        let source_map: &HashMap<String,String> = &merged;
         // Load nuclides using the centralized function in the nuclide module
         use std::collections::HashSet;
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
         for nuclide_name in nuclide_names {
-            let nuclide = get_or_load_nuclide(&nuclide_name, nuclide_json_map, Some(&temp_set))?;
+            let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
-        
         Ok(())
     }
 

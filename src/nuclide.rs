@@ -3,6 +3,7 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::collections::HashSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -80,6 +81,7 @@ impl Nuclide {
         let mut accum = 0.0;
 
         // Absorption
+
         let xs_absorption = get_xs(absorption_mt);
         accum += xs_absorption;
         if xi < accum && xs_absorption > 0.0 {
@@ -386,27 +388,58 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
 
     // Initially, loaded_temperatures is the full set (may be pruned later by selective loader)
     nuclide.loaded_temperatures = nuclide.available_temperatures.clone();
-    println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
+    // println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
+    // println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
     Ok(nuclide)
 }
 
-// Read a single nuclide from a JSON file
-pub fn read_nuclide_from_json<P: AsRef<Path>>(
-    path: P,
-) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let path_ref = path.as_ref();
-    println!("Reading {}", path_ref.display());
-    let file = File::open(path_ref)?;
+// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
+// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
+pub fn read_nuclide_from_json<P: AsRef<Path>>(path_or_name: P) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    let candidate_ref = path_or_name.as_ref();
+    let candidate_str = candidate_ref.to_string_lossy();
+    let candidate = candidate_ref; // Path view
+    let resolved_path: std::path::PathBuf;
+    if candidate.exists() {
+        resolved_path = candidate.to_path_buf();
+    } else {
+        // Treat as nuclide name
+        let cfg = crate::config::CONFIG.lock().unwrap();
+        let p = cfg.cross_sections.get(candidate_str.as_ref())
+            .ok_or_else(|| format!("Input '{}' is neither an existing file nor a key in Config cross_sections", candidate_str))?;
+        resolved_path = Path::new(p).to_path_buf();
+    }
+    let file = File::open(&resolved_path)?;
     let reader = BufReader::new(file);
-    
-    // Parse the JSON file
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
-    
-    // Use the shared parsing function
     let mut nuclide = parse_nuclide_from_json_value(json_value)?;
-    nuclide.data_path = Some(path_ref.to_string_lossy().to_string());
+    nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
+    let name_disp = nuclide.name.as_deref().unwrap_or(candidate_str.as_ref());
+    println!(
+        "Reading {} for nuclide={}, including temperatures={:?}",
+        resolved_path.display(),
+        name_disp,
+        nuclide.available_temperatures
+    );
     Ok(nuclide)
+}
+
+/// Extended loader allowing optional pruning to a subset of temperatures (empty or None => keep all)
+pub fn read_nuclide_from_json_with_temps<P: AsRef<Path>>(path_or_name: P, temps: Option<&std::collections::HashSet<String>>) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    let mut n = read_nuclide_from_json(path_or_name)?;
+    if let Some(set) = temps {
+        if !set.is_empty() {
+            if let Some(mut energy_map) = n.energy.take() {
+                energy_map.retain(|k,_| set.contains(k));
+                n.energy = Some(energy_map);
+            }
+            n.reactions.retain(|k,_| set.contains(k));
+            let mut loaded: Vec<String> = n.reactions.keys().cloned().collect();
+            loaded.sort();
+            n.loaded_temperatures = loaded;
+        }
+    }
+    Ok(n)
 }
 
 // Read a nuclide from a JSON string, used by WASM
@@ -585,8 +618,7 @@ mod tests {
 
     #[test]
     fn test_fissionable_false_for_be9_and_fe58() {
-        let path_be9 = std::path::Path::new("tests/Be9.json");
-        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+    let nuclide_be9 = super::read_nuclide_from_json("tests/Be9.json").expect("Failed to load Be9.json");
         assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
 
         let path_fe58 = std::path::Path::new("tests/Fe58.json");
@@ -678,8 +710,7 @@ mod tests {
 
     #[test]
     fn test_available_temperatures_fe56_includes_294() {
-        let path_fe56 = std::path::Path::new("tests/Fe56.json");
-        let nuclide_fe56 = super::read_nuclide_from_json(path_fe56).expect("Failed to load Fe56.json");
+    let nuclide_fe56 = super::read_nuclide_from_json("tests/Fe56.json").expect("Failed to load Fe56.json");
         assert!(
             nuclide_fe56
                 .available_temperatures

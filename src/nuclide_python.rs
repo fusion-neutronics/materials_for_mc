@@ -58,29 +58,15 @@ impl PyNuclide {
         }
     }
 
-    #[pyo3(signature = (path, temperatures=None))]
-    pub fn read_nuclide_from_json(&mut self, path: &str, temperatures: Option<Vec<String>>) -> PyResult<()> {
-        let mut nuclide = crate::nuclide::read_nuclide_from_json(path)
-            .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-
-        // If user supplied a non-empty temperature list, prune to that subset
-        if let Some(requested) = &temperatures {
-            if !requested.is_empty() {
-                use std::collections::HashSet;
-                let req: HashSet<String> = requested.iter().cloned().collect();
-                // Retain only requested temps in reactions
-                nuclide.reactions.retain(|k,_| req.contains(k));
-                // Prune energy map similarly
-                if let Some(mut energy_map) = nuclide.energy.take() {
-                    energy_map.retain(|k,_| req.contains(k));
-                    nuclide.energy = Some(energy_map);
-                }
-                // Update loaded_temperatures to reflect subset actually kept (sorted deterministically)
-                let mut loaded: Vec<String> = nuclide.reactions.keys().cloned().collect();
-                loaded.sort();
-                nuclide.loaded_temperatures = loaded;
-            }
-        }
+    #[pyo3(signature = (path=None, temperatures=None))]
+    pub fn read_nuclide_from_json(&mut self, path: Option<String>, temperatures: Option<Vec<String>>) -> PyResult<()> {
+        use std::collections::HashSet;
+        let identifier = if let Some(p) = &path { p.as_str() } else {
+            self.name.as_deref().ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided"))?
+        };
+        let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
+        let nuclide = crate::nuclide::read_nuclide_from_json_with_temps(identifier, temps_set.as_ref())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         self.name = nuclide.name;
         self.element = nuclide.element;
@@ -93,8 +79,8 @@ impl PyNuclide {
         self.reactions = nuclide.reactions;
         self.available_temperatures = nuclide.available_temperatures;
         self.loaded_temperatures = nuclide.loaded_temperatures;
-        self.data_path = nuclide.data_path;
-        Ok(())
+    self.data_path = nuclide.data_path;
+    Ok(())
     }
 
     #[getter]

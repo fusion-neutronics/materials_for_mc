@@ -30,7 +30,18 @@ jobs:
           python -m pip install virtualenv
           python -m virtualenv venv
           source venv/bin/activate
-          pip install pytest maturin numpy
+          python -m pip install pytest maturin numpy
           maturin develop --features pyo3
           pytest
-          python  examples/python/use_in_python.py
+          #  TODO need nuclear data in h5 format for openmc
+          # python -m pip install --extra-index-url https://shimwell.github.io/wheels openmc
+          # python examples/python/use_in_python.py
+          # python examples/python/compare_macroscopic_reaction.py
+          # python examples/python/compare_macroscopic_total_to_openmc.py
+          # python examples/python/compare_macroscopic_two_nuclides_reaction.py
+          # python examples/python/compare_mean_free_path_to_openmc.py
+          # python examples/python/compare_microscopic_reaction.py
+          python examples/python/material_example.py
+          python examples/python/materials_example.py
+          python examples/python/nuclide_example.py
+          python examples/python/use_in_python.py

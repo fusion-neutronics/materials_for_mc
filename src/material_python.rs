@@ -119,12 +119,15 @@ impl PyMaterial {
         self.internal.density_units.clone()
     }
 
-    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: &PyDict) -> PyResult<()> {
+    #[pyo3(signature = (nuclide_json_map=None))]
+    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: Option<&PyDict>) -> PyResult<()> {
         let mut rust_map = HashMap::new();
-        for (k, v) in nuclide_json_map.iter() {
-            let key: String = k.extract()?;
-            let val: String = v.extract()?;
-            rust_map.insert(key, val);
+        if let Some(d) = nuclide_json_map {
+            for (k, v) in d.iter() {
+                let key: String = k.extract()?;
+                let val: String = v.extract()?;
+                rust_map.insert(key, val);
+            }
         }
         self.internal.read_nuclides_from_json(&rust_map)
             .map_err(|e| PyValueError::new_err(e.to_string()))
