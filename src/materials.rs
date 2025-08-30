@@ -96,9 +96,14 @@ impl Materials {
             }
         }
         // Load each with union temps
-        for (nuclide_name, temps) in &requests {
-            let arc = get_or_load_nuclide(nuclide_name, source_map, Some(temps))?;
-            self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
+        // Load in deterministic alphabetical order
+        let mut request_keys: Vec<String> = requests.keys().cloned().collect();
+        request_keys.sort();
+        for nuclide_name in request_keys {
+            if let Some(temps) = requests.get(&nuclide_name) {
+                let arc = get_or_load_nuclide(&nuclide_name, source_map, Some(temps))?;
+                self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
+            }
         }
         // Distribute arcs to materials
         for mat in &mut self.materials {
