@@ -107,7 +107,8 @@ impl Material {
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         // Collect needed nuclide names
-        let nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
+    let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
+    nuclide_names.sort(); // ensure deterministic alphabetical load order
         // Build merged source map: explicit entries override, missing filled from CONFIG
         let mut merged: HashMap<String,String> = HashMap::new();
         // Start with global config entries for required nuclides
@@ -121,7 +122,7 @@ impl Material {
         use std::collections::HashSet;
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
-        for nuclide_name in nuclide_names {
+    for nuclide_name in nuclide_names {
             let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
