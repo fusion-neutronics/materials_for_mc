@@ -3,6 +3,7 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::collections::HashSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -80,6 +81,7 @@ impl Nuclide {
         let mut accum = 0.0;
 
         // Absorption
+
         let xs_absorption = get_xs(absorption_mt);
         accum += xs_absorption;
         if xi < accum && xs_absorption > 0.0 {
@@ -386,8 +388,8 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
 
     // Initially, loaded_temperatures is the full set (may be pruned later by selective loader)
     nuclide.loaded_temperatures = nuclide.available_temperatures.clone();
-    println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
+    // println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
+    // println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
     Ok(nuclide)
 }
 
@@ -396,16 +398,25 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path: P,
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
     let path_ref = path.as_ref();
-    println!("Reading {}", path_ref.display());
     let file = File::open(path_ref)?;
     let reader = BufReader::new(file);
-    
+
     // Parse the JSON file
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
-    
+
     // Use the shared parsing function
     let mut nuclide = parse_nuclide_from_json_value(json_value)?;
     nuclide.data_path = Some(path_ref.to_string_lossy().to_string());
+
+    // Log with nuclide name and temperatures parsed (available == initially loaded)
+    let name_disp = nuclide.name.as_deref().unwrap_or("unknown");
+    println!(
+        "Reading {} for nuclide={}, including temperatures={:?}",
+        path_ref.display(),
+        name_disp,
+        nuclide.available_temperatures
+    );
+
     Ok(nuclide)
 }
 
