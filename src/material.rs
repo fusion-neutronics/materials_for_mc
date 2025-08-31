@@ -517,7 +517,7 @@ impl Material {
         // Calculate atom densities using OpenMC's approach
         for (nuclide, &fraction) in &self.nuclides {
             let normalized_fraction = fraction / total_fraction;
-            let mass = nuclide_masses.get(nuclide).unwrap();
+            let _mass = nuclide_masses.get(nuclide).unwrap();
             
             // For a mixture, use the formula:
             // atom_density = density * N_A / avg_molar_mass * normalized_fraction * 1e-24
@@ -540,7 +540,7 @@ impl Material {
 
         // Try to match as symbol (case-sensitive, exact match)
         let mut found_symbol: Option<String> = None;
-        for (symbol, name) in ELEMENT_NAMES.iter() {
+        for (symbol, _name) in ELEMENT_NAMES.iter() {
             if *symbol == input {
                 found_symbol = Some(symbol.to_string());
                 break;
@@ -662,9 +662,8 @@ impl Material {
         assert!((avg - expected_mean).abs() < tolerance, "Average sampled distance incorrect: got {}, expected {}", avg, expected_mean);
     }
 mod tests {
-    use super::Material; // Explicitly import Material for tests
-    use rand::SeedableRng; // Needed for tests using StdRng::seed_from_u64
-    use std::collections::HashMap; // Needed for building nuclide_json_map in tests
+    #[allow(unused_imports)]
+    use super::Material;
     #[test]
     fn test_macroscopic_total_xs_by_nuclide_li6_li7() {
         use std::collections::HashMap;
@@ -1254,7 +1253,7 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+        let _grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for all MTs
         let micro_xs_all = material.calculate_microscopic_xs_neutron(None);
         // Calculate microscopic cross sections for only MT=2
@@ -1303,7 +1302,7 @@ mod tests {
         let mut nuclide_json_map = std::collections::HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let grid = material.unified_energy_grid_neutron();
+        let _grid = material.unified_energy_grid_neutron();
 
         // Should panic when calculating macroscopic cross sections with no density
         let result = std::panic::catch_unwind(move || {
@@ -1364,6 +1363,7 @@ mod tests {
 
     #[test]
     fn test_sample_distance_to_collision_li6() {
+        use std::collections::HashMap;
         // Create Li6 material
         let mut mat = Material::new();
         mat.add_nuclide("Li6", 1.0).unwrap();
@@ -1381,8 +1381,9 @@ mod tests {
         let mut sum = 0.0;
         let n_samples = 1000;
         use rand::rngs::StdRng;
+        use rand::SeedableRng; // Needed for seed_from_u64
         for seed in 0..n_samples {
-            let mut rng = <StdRng as rand::SeedableRng>::seed_from_u64(seed as u64);
+            let mut rng = StdRng::seed_from_u64(seed as u64);
             let dist = mat.sample_distance_to_collision(14_000_000.0, &mut rng)
                 .unwrap_or_else(|| panic!("sample_distance_to_collision returned None at 14 MeV!"));
             sum += dist;

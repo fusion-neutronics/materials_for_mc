@@ -65,8 +65,18 @@ impl PyNuclide {
             self.name.as_deref().ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided"))?
         };
         let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
-    let nuclide = crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
+        
+        // First load without temperature filtering to get all available temperatures
+        let full_nuclide = crate::nuclide::read_nuclide_from_json(identifier, None)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        
+        // Now load with temperature filtering if specified
+        let nuclide = if temps_set.is_some() {
+            crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+        } else {
+            full_nuclide.clone()
+        };
 
         self.name = nuclide.name;
         self.element = nuclide.element;
@@ -77,10 +87,11 @@ impl PyNuclide {
         self.library = nuclide.library;
         self.energy = nuclide.energy;
         self.reactions = nuclide.reactions;
-        self.available_temperatures = nuclide.available_temperatures;
+        // Always preserve full available_temperatures from the unfiltered load
+        self.available_temperatures = full_nuclide.available_temperatures;
         self.loaded_temperatures = nuclide.loaded_temperatures;
-    self.data_path = nuclide.data_path;
-    Ok(())
+        self.data_path = nuclide.data_path;
+        Ok(())
     }
 
     #[getter]
