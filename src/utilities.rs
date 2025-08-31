@@ -6,26 +6,21 @@
 /// Given arrays of x and y values, interpolate to find the y value at x_new.
 /// If x_new is outside the range of x, returns the first or last y value.
 pub fn interpolate_linear(x: &[f64], y: &[f64], x_new: f64) -> f64 {
-    // Handle edge cases
-    if x_new <= x[0] {
-        return y[0];
+    // Edge cases
+    if x.is_empty() { return f64::NAN; }
+    if x.len() == 1 { return y[0]; }
+    if x_new <= x[0] { return y[0]; }
+    if x_new >= x[x.len() - 1] { return y[y.len() - 1]; }
+
+    // Binary search for interval: find largest i with x[i] <= x_new
+    let mut low = 0usize;
+    let mut high = x.len() - 1; // invariant: target interval within (low, high]
+    while high - low > 1 { // maintain at least two-point span
+        let mid = (low + high) >> 1; // divide by 2
+        if x[mid] <= x_new { low = mid; } else { high = mid; }
     }
-    if x_new >= x[x.len() - 1] {
-        return y[y.len() - 1];
-    }
-    
-    // Find the two points to interpolate between
-    let mut idx = 0;
-    while idx < x.len() - 1 && x[idx + 1] < x_new {
-        idx += 1;
-    }
-    
-    // Linear interpolation formula: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
-    let x1 = x[idx];
-    let x2 = x[idx + 1];
-    let y1 = y[idx];
-    let y2 = y[idx + 1];
-    
+    let idx = low; // x[idx] <= x_new < x[idx+1]
+    let x1 = x[idx]; let x2 = x[idx + 1]; let y1 = y[idx]; let y2 = y[idx + 1];
     y1 + (x_new - x1) * (y2 - y1) / (x2 - x1)
 }
 
@@ -35,32 +30,24 @@ pub fn interpolate_linear(x: &[f64], y: &[f64], x_new: f64) -> f64 {
 /// If x_new is outside the range of x, returns the first or last y value.
 /// All x and y values must be positive.
 pub fn interpolate_log_log(x: &[f64], y: &[f64], x_new: f64) -> f64 {
-    // Handle edge cases
-    if x_new <= x[0] {
-        return y[0];
+    // Edge cases / validation
+    if x.is_empty() { return f64::NAN; }
+    if x.len() == 1 { return y[0]; }
+    if x_new <= x[0] { return y[0]; }
+    if x_new >= x[x.len() - 1] { return y[y.len() - 1]; }
+
+    // Binary search for interval
+    let mut low = 0usize;
+    let mut high = x.len() - 1;
+    while high - low > 1 {
+        let mid = (low + high) >> 1;
+        if x[mid] <= x_new { low = mid; } else { high = mid; }
     }
-    if x_new >= x[x.len() - 1] {
-        return y[y.len() - 1];
-    }
-    
-    // Find the two points to interpolate between
-    let mut idx = 0;
-    while idx < x.len() - 1 && x[idx + 1] < x_new {
-        idx += 1;
-    }
-    
-    // Log-log interpolation formula: ln(y) = ln(y1) + ln(x/x1) * ln(y2/y1) / ln(x2/x1)
-    let x1 = x[idx];
-    let x2 = x[idx + 1];
-    let y1 = y[idx];
-    let y2 = y[idx + 1];
-    
-    let log_x1 = x1.ln();
-    let log_x2 = x2.ln();
-    let log_y1 = y1.ln();
-    let log_y2 = y2.ln();
+    let idx = low;
+    let x1 = x[idx]; let x2 = x[idx + 1]; let y1 = y[idx]; let y2 = y[idx + 1];
+    let log_x1 = x1.ln(); let log_x2 = x2.ln();
+    let log_y1 = y1.ln(); let log_y2 = y2.ln();
     let log_x_new = x_new.ln();
-    
     let log_y_new = log_y1 + (log_x_new - log_x1) * (log_y2 - log_y1) / (log_x2 - log_x1);
     log_y_new.exp()
 }
