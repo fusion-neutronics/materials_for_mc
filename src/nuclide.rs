@@ -410,8 +410,6 @@ fn parse_nuclide_from_json_value(
     } else {
         nuclide.loaded_temperatures = nuclide.available_temperatures.clone();
     }
-    // println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    // println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
     Ok(nuclide)
 }
 
@@ -429,6 +427,9 @@ fn load_nuclide_internal<P: AsRef<Path>>(path_or_name: P, temps: Option<&std::co
             .ok_or_else(|| format!("Input '{}' is neither an existing file nor a key in Config cross_sections", candidate_str))?;
         Path::new(p).to_path_buf()
     };
+    if temps.is_none() {
+        println!("Loaded nuclide '{}' from '{}' (all temperatures)", candidate_str, resolved_path.display());
+    }
     // Unified parse path (pseudo-streaming removed). If temps filter provided and non-empty, apply it.
     let file = File::open(&resolved_path)?;
     let reader = BufReader::new(file);
@@ -436,6 +437,13 @@ fn load_nuclide_internal<P: AsRef<Path>>(path_or_name: P, temps: Option<&std::co
     let filter_opt = temps.and_then(|s| if s.is_empty() { None } else { Some(s) });
     let mut nuclide = parse_nuclide_from_json_value(json_value, filter_opt)?;
     nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
+    println!(
+        "Loaded nuclide '{}' from '{}' (loaded temps: {}; available temps: {} )",
+        nuclide.name.as_deref().unwrap_or("<unknown>"),
+        resolved_path.display(),
+        if nuclide.loaded_temperatures.is_empty() { "none".to_string() } else { nuclide.loaded_temperatures.join(", ") },
+        if nuclide.available_temperatures.is_empty() { "none".to_string() } else { nuclide.available_temperatures.join(", ") }
+    );
     Ok(nuclide)
 }
 
