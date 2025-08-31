@@ -65,7 +65,7 @@ impl PyNuclide {
             self.name.as_deref().ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided"))?
         };
         let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
-        let nuclide = crate::nuclide::read_nuclide_from_json_with_temps(identifier, temps_set.as_ref())
+    let nuclide = crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         self.name = nuclide.name;
@@ -187,7 +187,7 @@ impl From<PyNuclide> for Nuclide {
 #[cfg(feature = "pyo3")]
 #[pyfunction]
 pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
-    let nuclide = crate::nuclide::read_nuclide_from_json(path)
+    let nuclide = crate::nuclide::read_nuclide_from_json(path, None)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     Ok(PyNuclide::from(nuclide))
 }
