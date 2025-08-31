@@ -14,7 +14,6 @@ use crate::reaction::Reaction;
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Clear the global nuclide cache (used by tests and Python to ensure deterministic selective temperature behavior)
-#[cfg(test)]
 pub fn clear_nuclide_cache() {
     let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
     cache.clear();
@@ -440,10 +439,6 @@ fn parse_nuclide_from_json_value(
     loaded_temps.sort();
     nuclide.loaded_temperatures = loaded_temps;
     
-    println!("DEBUG: Finished parsing nuclide: {} with available_temps={:?}, loaded_temps={:?}",
-             nuclide.name.as_deref().unwrap_or("unknown"),
-             nuclide.available_temperatures,
-             nuclide.loaded_temperatures);
     Ok(nuclide)
 }
 
@@ -502,10 +497,6 @@ pub fn read_nuclide_from_json_with_temps<P: AsRef<Path>>(path_or_name: P, temps:
     let mut nuclide = parse_nuclide_from_json_value(json_value, temps)?;
     nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
     
-    // Add debugging info
-    println!("DEBUG: available_temperatures={:?}", nuclide.available_temperatures);
-    println!("DEBUG: loaded_temperatures={:?}", nuclide.loaded_temperatures);
-    
     Ok(nuclide)
 }
 
@@ -523,9 +514,18 @@ pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn
 
 /// Read (or fetch from cache) a nuclide, optionally keeping only a specified subset of temperatures.
 /// Records the full `available_temperatures` and tracks the actually retained subset in `loaded_temperatures`.
+/// 
+/// This function ensures that:
+/// 1. All temperatures present in the JSON file are recorded in `available_temperatures` regardless of filtering
+/// 2. Only the temperatures that pass the filter are loaded into `loaded_temperatures` and the actual data structures
+/// 
 /// Unified loader semantics:
 /// - `temperatures_to_include`: `None` or `Some(empty)` => load all temperatures.
 /// - `Some(nonempty)` => ensure those temperatures are loaded; if previously loaded with fewer temps, reload & prune to the union.
+/// 
+/// Implementation note: This function performs two passes on the JSON data when filtering:
+/// - First pass with no filter to determine all available temperatures
+/// - Second pass with the filter to load only the requested temperatures
 pub fn get_or_load_nuclide(
     nuclide_name: &str,
     json_path_map: &HashMap<String, String>,
@@ -536,15 +536,11 @@ pub fn get_or_load_nuclide(
         .map(|s| s.iter().cloned().collect())
         .unwrap_or_else(HashSet::new);
     
-    println!("DEBUG: get_or_load_nuclide for {} with filter={:?}", nuclide_name, requested);
-    
     // Fast path: cache hit with sufficient temps
     {
         let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
         if let Some(existing) = cache.get(nuclide_name) {
             if requested.is_empty() || requested.is_subset(&existing.loaded_temperatures.iter().cloned().collect()) {
-                println!("DEBUG: Cache hit with sufficient temps: available={:?}, loaded={:?}", 
-                         existing.available_temperatures, existing.loaded_temperatures);
                 return Ok(Arc::clone(existing));
             }
         }
