@@ -62,22 +62,22 @@ impl Material {
         }
     }
 
-    pub fn add_nuclide(&mut self, nuclide: &str, fraction: f64) -> Result<(), String> {
+    pub fn add_nuclide(&mut self, nuclide: impl AsRef<str>, fraction: f64) -> Result<(), String> {
         if fraction < 0.0 {
             return Err(String::from("Fraction cannot be negative"));
         }
 
-        self.nuclides.insert(String::from(nuclide), fraction);
+        self.nuclides.insert(String::from(nuclide.as_ref()), fraction);
         Ok(())
     }
 
-    pub fn set_density(&mut self, unit: &str, value: f64) -> Result<(), String> {
+    pub fn set_density(&mut self, unit: impl AsRef<str>, value: f64) -> Result<(), String> {
         if value <= 0.0 {
             return Err(String::from("Density must be positive"));
         }
 
         self.density = Some(value);
-        self.density_units = String::from(unit);
+        self.density_units = String::from(unit.as_ref());
         Ok(())
     }
 
@@ -91,8 +91,8 @@ impl Material {
         Ok(self.volume)
     }
 
-    pub fn set_temperature(&mut self, temperature: &str) {
-        self.temperature = String::from(temperature);
+    pub fn set_temperature(&mut self, temperature: impl AsRef<str>) {
+        self.temperature = String::from(temperature.as_ref());
         // Clear cached data that depends on temperature
         self.unified_energy_grid_neutron.clear();
         self.macroscopic_xs_neutron.clear();
@@ -530,13 +530,13 @@ impl Material {
         atoms_per_cc
     }
 
-    pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), String> {
+    pub fn add_element(&mut self, element: impl AsRef<str>, fraction: f64) -> Result<(), String> {
         if fraction <= 0.0 {
             return Err(String::from("Fraction must be positive"));
         }
 
         // Canonicalize input: trim only (do not lowercase or otherwise change user input)
-        let input = element.trim();
+        let input = element.as_ref().trim();
 
         // Try to match as symbol (case-sensitive, exact match)
         let mut found_symbol: Option<String> = None;
@@ -560,7 +560,7 @@ impl Material {
             None => {
                 return Err(format!(
                     "Element '{}' is not a recognized element symbol or name (case-sensitive, must match exactly)",
-                    element
+                    element.as_ref()
                 ));
             }
         };
