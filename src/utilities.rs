@@ -65,22 +65,3 @@ pub fn interpolate_log_log(x: &[f64], y: &[f64], x_new: f64) -> f64 {
     log_y_new.exp()
 }
 
-/// Helper for dependency-ordered processing of MTs (children before parents)
-pub fn add_to_processing_order(
-    mt: i32,
-    sum_rules: &std::collections::HashMap<i32, Vec<i32>>,
-    processed: &mut std::collections::HashSet<i32>,
-    order: &mut Vec<i32>,
-    restrict: &std::collections::HashSet<i32>,
-) {
-    if processed.contains(&mt) || !restrict.contains(&mt) {
-        return;
-    }
-    if let Some(constituents) = sum_rules.get(&mt) {
-        for &constituent in constituents {
-            add_to_processing_order(constituent, sum_rules, processed, order, restrict);
-        }
-    }
-    processed.insert(mt);
-    order.push(mt);
-}
