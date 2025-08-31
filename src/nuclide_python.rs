@@ -68,6 +68,7 @@ impl PyNuclide {
         let identifier = if let Some(p) = &path { p.as_str() } else {
             self.name.as_deref().ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided"))?
         };
+<<<<<<< HEAD
         
         // Determine the file path to read
         let candidate = Path::new(identifier);
@@ -86,6 +87,10 @@ impl PyNuclide {
             .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
         let reader = BufReader::new(file);
         let json_value: serde_json::Value = serde_json::from_reader(reader)
+=======
+        let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
+    let nuclide = crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
+>>>>>>> main
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         
         // Note: Temperature filtering is not supported in this simplified implementation
@@ -426,6 +431,7 @@ impl From<PyNuclide> for Nuclide {
 #[cfg(feature = "pyo3")]
 #[pyfunction]
 pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
+<<<<<<< HEAD
     // Create a PyNuclide instance
     let mut py_nuclide = PyNuclide::new(Some(path.to_string()));
     
@@ -433,6 +439,11 @@ pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
     py_nuclide.read_nuclide_from_json(Some(path.to_string()), None)?;
     
     Ok(py_nuclide)
+=======
+    let nuclide = crate::nuclide::read_nuclide_from_json(path, None)
+        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    Ok(PyNuclide::from(nuclide))
+>>>>>>> main
 }
 
 #[cfg(feature = "pyo3")]
