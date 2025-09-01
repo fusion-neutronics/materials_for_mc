@@ -107,22 +107,33 @@ impl Material {
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         // Collect needed nuclide names
-    let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
-    nuclide_names.sort(); // ensure deterministic alphabetical load order
+        let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
+        nuclide_names.sort(); // ensure deterministic alphabetical load order
+        
         // Build merged source map: explicit entries override, missing filled from CONFIG
         let mut merged: HashMap<String,String> = HashMap::new();
-        // Start with global config entries for required nuclides
-        let cfg = crate::config::CONFIG.lock().unwrap();
-        for n in &nuclide_names { if let Some(p) = cfg.cross_sections.get(n) { merged.insert(n.clone(), p.clone()); } }
+        
+        // Start with global config entries for required nuclides, with proper error handling
+        let cfg = crate::config::CONFIG.lock()
+            .map_err(|e| format!("Failed to acquire lock on CONFIG: {}", e))?;
+            
+        for n in &nuclide_names { 
+            if let Some(p) = cfg.cross_sections.get(n) { 
+                merged.insert(n.clone(), p.clone()); 
+            } 
+        }
         drop(cfg);
+        
         // Override with any provided mapping entries (even if extra keys not in composition)
         for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
         let source_map: &HashMap<String,String> = &merged;
+        
         // Load nuclides using the centralized function in the nuclide module
         use std::collections::HashSet;
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
-    for nuclide_name in nuclide_names {
+        
+        for nuclide_name in nuclide_names {
             let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
@@ -148,8 +159,9 @@ impl Material {
             return Ok(());
         }
         
-        // Get the global configuration
-        let config = CONFIG.lock().unwrap();
+        // Get the global configuration with proper error handling
+        let config = CONFIG.lock()
+            .map_err(|e| format!("Failed to acquire lock on CONFIG: poisoned mutex - {}", e))?;
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
