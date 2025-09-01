@@ -38,7 +38,7 @@ def test_macroscopic_xs_neutron():
     assert len(material.macroscopic_xs_neutron) > 0, "macroscopic_xs_neutron property is empty"
     assert material.macroscopic_xs_neutron == macro_xs, "macroscopic_xs_neutron doesn't match the calculated values"
 
-def test_macroscopic_xs_with_atoms_per_cc():
+def test_macroscopic_xs_with_atoms_per_barn_cm():
     # Create a material with Li isotopes that have defined atomic masses
     Config.set_cross_sections({"Li6": "tests/Li6.json", "Li7": "tests/Li7.json"})
     material = Material()
@@ -48,7 +48,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
     material.temperature = "294"
     
     # Get the atoms per cc
-    atoms_per_cc = material.get_atoms_per_cc()
+    atoms_per_cc = material.get_atoms_per_barn_cm()
     
     # Calculate macroscopic cross sections
     energy, macro_xs = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
@@ -59,7 +59,7 @@ def test_macroscopic_xs_with_atoms_per_cc():
     # Test the relationship between density and macroscopic XS
     # If we double the density, atoms per cc should double, and so should macroscopic XS
     material.set_density("g/cm3", 2.0)
-    atoms_per_cc_doubled = material.get_atoms_per_cc()
+    atoms_per_cc_doubled = material.get_atoms_per_barn_cm()
     macro_xs_doubled = material.calculate_macroscopic_xs_neutron(by_nuclide=False)
     
     # Check that atoms per cc doubled
@@ -86,7 +86,7 @@ def test_macroscopic_xs_calculation_formula():
     micro_xs = material.calculate_microscopic_xs_neutron()
     
     # Get atoms per cc
-    atoms_per_cc = material.get_atoms_per_cc()
+    atoms_per_cc = material.get_atoms_per_barn_cm()
     
     # Calculate macroscopic cross sections
     energy, macro_xs = material.calculate_macroscopic_xs_neutron(mt_filter=[2], by_nuclide=False)
