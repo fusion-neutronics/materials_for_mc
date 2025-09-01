@@ -2,7 +2,7 @@ import pytest
 from materials_for_mc import Material
 
 
-def test_get_atoms_per_cc():
+def test_get_atoms_per_barn_cm():
 
 
     # Test with Li isotopes - proper atomic mass calculation
@@ -11,7 +11,7 @@ def test_get_atoms_per_cc():
     material.add_nuclide("Li7", 0.5)
     material.set_density("g/cm3", 1.0)
     
-    atoms = material.get_atoms_per_cc()
+    atoms = material.get_atoms_per_barn_cm()
     assert len(atoms) == 2, "Should have 2 nuclides in the dict"
     
     # Calculate expected values using OpenMC's formula: N_A * density * fraction / atomic_mass
@@ -37,7 +37,7 @@ def test_get_atoms_per_cc():
     # material.add_nuclide("CustomNuclide", 1.0)
     # material.set_density("g/cm3", 5.0)
     
-    atoms = material.get_atoms_per_cc()
+    atoms = material.get_atoms_per_barn_cm()
     assert len(atoms) == 2, "Should have 2 nuclides in the dict"
 
  
@@ -46,7 +46,7 @@ def test_get_atoms_per_cc():
     material.add_nuclide("Li6", 1.0)
     material.set_density("kg/m3", 1000.0)  # 1000 kg/m³ = 1 g/cm³
     
-    atoms_kg_m3 = material.get_atoms_per_cc()
+    atoms_kg_m3 = material.get_atoms_per_barn_cm()
     assert len(atoms_kg_m3) == 1, "Should have 1 nuclide in the dict"
     
     # Compare with same material using g/cm³
@@ -54,7 +54,7 @@ def test_get_atoms_per_cc():
     material_g_cm3.add_nuclide("Li6", 1.0)
     material_g_cm3.set_density("g/cm3", 1.0)
     
-    atoms_g_cm3 = material_g_cm3.get_atoms_per_cc()
+    atoms_g_cm3 = material_g_cm3.get_atoms_per_barn_cm()
     
     # Both should give the same result since the densities are equivalent
     assert atoms_kg_m3["Li6"] == pytest.approx(atoms_g_cm3["Li6"], rel=0.01), "Different density units should give consistent results"

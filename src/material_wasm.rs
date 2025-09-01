@@ -64,7 +64,7 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
-    pub fn get_atoms_per_cc(&self) -> Result<JsValue, JsValue> {
+    pub fn get_atoms_per_barn_cm(&self) -> Result<JsValue, JsValue> {
         // Safe to use try-catch pattern with WASM since panics will be converted to JS exceptions
         if self.inner.density.is_none() {
             return Err(JsValue::from_str("Cannot calculate atoms per cc: Material has no density defined"));
@@ -74,11 +74,11 @@ impl WasmMaterial {
             return Err(JsValue::from_str("Cannot calculate atoms per cc: Material has no nuclides defined"));
         }
         
-        // Now it's safe to call get_atoms_per_cc without risk of panic
-        let atoms_per_cc = self.inner.get_atoms_per_cc();
-        
+        // Now it's safe to call get_atoms_per_barn_cm without risk of panic
+        let atoms_per_barn_cm = self.inner.get_atoms_per_barn_cm();
+
         let map = Map::new();
-        for (nuclide, density) in atoms_per_cc {
+        for (nuclide, density) in atoms_per_barn_cm {
             map.set(&JsValue::from_str(&nuclide), &JsValue::from_f64(density));
         }
         Ok(map.into())

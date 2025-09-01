@@ -166,13 +166,24 @@ impl PyMaterial {
         self.internal.calculate_microscopic_xs_neutron(mt_filter.as_ref())
     }
 
-    /// Calculate macroscopic cross sections for neutrons on the unified energy grid
-    /// If unified_energy_grid is None or not provided, it will use the cached grid or build a new one
-    /// If mt_filter is provided, only those MTs will be included (by string match)
-    /// If by_nuclide is True, also populate per-nuclide macroscopic total xs (MT=1)
-    /// Calculate macroscopic cross sections for neutrons on the unified energy grid
-    /// mt_filter is required and must be a Vec<i32> (no default, no Option)
-    /// by_nuclide is required and must be a bool
+    /// Calculate macroscopic cross sections for neutrons
+    ///
+    /// This method calculates macroscopic cross sections on the unified energy grid.
+    /// The energy grid is created internally if it doesn't exist yet.
+    ///
+    /// Parameters:
+    /// -----------
+    /// mt_filter : list[int], optional
+    ///     MT reaction numbers to include (default is [1] for total)
+    /// by_nuclide : bool, default=False
+    ///     Whether to store per-nuclide macroscopic cross sections
+    ///
+    /// Returns:
+    /// --------
+    /// tuple(list[float], dict[int, list[float]])
+    ///     A tuple containing:
+    ///     - The energy grid (list of energy points in eV)
+    ///     - Dictionary mapping MT numbers to cross section values
     #[pyo3(signature = (mt_filter = None, by_nuclide = false))]
     fn calculate_macroscopic_xs_neutron(
         &mut self,
@@ -194,9 +205,9 @@ impl PyMaterial {
         self.internal.macroscopic_xs_neutron.clone()
     }
 
-    /// Get the atoms per cubic centimeter for each nuclide in the material
-    fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
-        self.internal.get_atoms_per_cc()
+    /// Get the atoms per barn-centimeter for each nuclide in the material
+    fn get_atoms_per_barn_cm(&self) -> HashMap<String, f64> {
+        self.internal.get_atoms_per_barn_cm()
     }
 
     /// Calculate the neutron mean free path at a given energy

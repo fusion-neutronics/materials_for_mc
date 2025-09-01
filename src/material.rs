@@ -368,8 +368,8 @@ impl Material {
             macro_xs.insert(mt, vec![0.0; grid_length]);
         }
         // Calculate macroscopic cross section for each MT
-        // Get atoms per cc for all nuclides
-        let atoms_per_bcm_map = self.get_atoms_per_cc();
+        // Get atoms per barn-cm for all nuclides
+        let atoms_per_bcm_map = self.get_atoms_per_barn_cm();
         // ...existing code...
         // Optionally: collect per-nuclide macroscopic total xs (MT=1) if requested
         let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide { Some(HashMap::new()) } else { None };
@@ -469,7 +469,7 @@ impl Material {
         }
     }
 
-    /// Calculate atoms per cubic centimeter for each nuclide in the material
+    /// Calculate atoms per barn-centimeter for each nuclide in the material
     /// 
     /// This method calculates the number density of atoms for each nuclide,
     /// using the atomic fractions and material density.
@@ -477,17 +477,17 @@ impl Material {
     /// Returns a HashMap mapping nuclide symbols to their atom density in atoms/b-cm,
     /// which is the unit used by OpenMC (atoms per barn-centimeter).
     /// Returns an empty HashMap if the material density is not set.
-    pub fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
-        let mut atoms_per_cc = HashMap::new();
+    pub fn get_atoms_per_barn_cm(&self) -> HashMap<String, f64> {
+        let mut atoms_per_bcm = HashMap::new();
         
         // Return empty HashMap if density is not set
         if self.density.is_none() {
-            panic!("Cannot calculate atoms per cc: Material has no density defined");
+            panic!("Cannot calculate atoms per barn-cm: Material has no density defined");
         }
         
         // Return empty HashMap if no nuclides are defined
         if self.nuclides.is_empty() {
-            panic!("Cannot calculate atoms per cc: Material has no nuclides defined");
+            panic!("Cannot calculate atoms per barn-cm: Material has no nuclides defined");
         }
         
         // Convert density to g/cm³ if necessary
@@ -536,10 +536,10 @@ impl Material {
             const AVOGADRO: f64 = 6.02214076e23;
             let atom_density = density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
             
-            atoms_per_cc.insert(nuclide.clone(), atom_density);
+            atoms_per_bcm.insert(nuclide.clone(), atom_density);
         }
         
-        atoms_per_cc
+        atoms_per_bcm
     }
 
     pub fn add_element(&mut self, element: impl AsRef<str>, fraction: f64) -> Result<(), String> {
@@ -889,12 +889,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_atoms_per_cc() {
+    fn test_get_atoms_per_barn_cm() {
         let material = Material::new();
         
         // Test with no density set - should panic
         let result = std::panic::catch_unwind(|| {
-            material.get_atoms_per_cc()
+            material.get_atoms_per_barn_cm()
         });
         assert!(result.is_err(), "Should panic when density is not set");
         
@@ -903,7 +903,7 @@ mod tests {
         material_single.add_nuclide("Li6", 2.5).unwrap();
         material_single.set_density("g/cm3", 1.0).unwrap();
         
-        let atoms_single = material_single.get_atoms_per_cc();
+        let atoms_single = material_single.get_atoms_per_barn_cm();
         assert_eq!(atoms_single.len(), 1, "Should have 1 nuclide in the HashMap");
         
         // For a single nuclide, we normalize the fraction to 1.0
@@ -924,7 +924,7 @@ mod tests {
         material_multi.add_nuclide("Li7", 0.5).unwrap();
         material_multi.set_density("g/cm3", 1.0).unwrap();
         
-        let atoms_multi = material_multi.get_atoms_per_cc();
+        let atoms_multi = material_multi.get_atoms_per_barn_cm();
         assert_eq!(atoms_multi.len(), 2, "Should have 2 nuclides in the HashMap");
         
         // For multiple nuclides, the fractions are normalized and used with average molar mass
@@ -950,7 +950,7 @@ mod tests {
         material_non_norm.add_nuclide("Li7", 1.0).unwrap(); // Total fractions = 2.0
         material_non_norm.set_density("g/cm3", 1.0).unwrap();
         
-        let atoms_non_norm = material_non_norm.get_atoms_per_cc();
+        let atoms_non_norm = material_non_norm.get_atoms_per_barn_cm();
         
         // Fractions should be normalized to 0.5 each (1.0/2.0)
         let avg_mass_non_norm = (1.0 * li6_mass + 1.0 * li7_mass) / 2.0;
@@ -969,12 +969,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_atoms_per_cc_no_density() {
+    fn test_get_atoms_per_barn_cm_no_density() {
         let material = Material::new();
         
         // Should panic when density is not set
         let result = std::panic::catch_unwind(|| {
-            material.get_atoms_per_cc()
+            material.get_atoms_per_barn_cm()
         });
         assert!(result.is_err(), "Should panic when density is not set");
         
@@ -983,7 +983,7 @@ mod tests {
         material_with_density.set_density("g/cm3", 1.0).unwrap();
         
         let result = std::panic::catch_unwind(|| {
-            material_with_density.get_atoms_per_cc()
+            material_with_density.get_atoms_per_barn_cm()
         });
         assert!(result.is_err(), "Should panic when no nuclides are defined");
     }
