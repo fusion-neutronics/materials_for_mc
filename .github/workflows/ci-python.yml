@@ -25,24 +25,62 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Create environment, install package, test
+      - name: Create environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install virtualenv
           python -m virtualenv venv
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv\Scripts\activate.ps1
+          python -m pip install pytest maturin numpy
+          maturin develop --features pyo3
+          
+      - name: Install dependencies (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
           source venv/bin/activate
           python -m pip install pytest maturin numpy
           maturin develop --features pyo3
+          
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv\Scripts\activate.ps1
           pytest
-          #  TODO need nuclear data in h5 format for openmc
-          # python -m pip install --extra-index-url https://shimwell.github.io/wheels openmc
-          # python examples/python/use_in_python.py
-          # python examples/python/compare_macroscopic_reaction.py
-          # python examples/python/compare_macroscopic_total_to_openmc.py
-          # python examples/python/compare_macroscopic_two_nuclides_reaction.py
-          # python examples/python/compare_mean_free_path_to_openmc.py
-          # python examples/python/compare_microscopic_reaction.py
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          source venv/bin/activate
+          pytest
+          
+      - name: Run example scripts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv\Scripts\activate.ps1
           python examples/python/material_example.py
           python examples/python/materials_example.py
           python examples/python/nuclide_example.py
           python examples/python/use_in_python.py
+          
+      - name: Run example scripts (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          source venv/bin/activate
+          python examples/python/material_example.py
+          python examples/python/materials_example.py
+          python examples/python/nuclide_example.py
+          python examples/python/use_in_python.py
+          
+      # TODO: Commented out OpenMC-dependent examples
+      # python -m pip install --extra-index-url https://shimwell.github.io/wheels openmc
+      # python examples/python/compare_macroscopic_reaction.py
+      # python examples/python/compare_macroscopic_total_to_openmc.py
+      # python examples/python/compare_macroscopic_two_nuclides_reaction.py
+      # python examples/python/compare_mean_free_path_to_openmc.py
+      # python examples/python/compare_microscopic_reaction.py
