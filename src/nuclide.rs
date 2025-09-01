@@ -3,7 +3,6 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -15,6 +14,7 @@ use crate::reaction::Reaction;
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Clear the global nuclide cache (used by tests and Python to ensure deterministic selective temperature behavior)
+#[allow(dead_code)]
 pub fn clear_nuclide_cache() {
     let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
     cache.clear();
@@ -153,8 +153,14 @@ impl Nuclide {
     }
 }
 
-// Parse a nuclide from a JSON value
-fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclide, Box<dyn std::error::Error>> {
+// Internal: parse a nuclide from a JSON value with optional temperature filter.
+// If `temps_filter` is Some, only those temperatures will have reaction/energy data
+// materialized into the returned struct. `available_temperatures` will always list
+// the full set present in the file for deterministic behavior.
+fn parse_nuclide_from_json_value(
+    json_value: serde_json::Value,
+    temps_filter: Option<&std::collections::HashSet<String>>,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
     let mut nuclide = Nuclide {
         name: None,
         element: None,
@@ -166,9 +172,9 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         energy: None,
         reactions: HashMap::new(),
         fissionable: false,
-    available_temperatures: Vec::new(),
-    loaded_temperatures: Vec::new(),
-    data_path: None,
+        available_temperatures: Vec::new(),
+        loaded_temperatures: Vec::new(),
+        data_path: None,
     };
 
     // Parse basic metadata
@@ -207,13 +213,48 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         nuclide.library = Some(lib.to_string());
     }
     
-    // We will process energy after collecting available temps
+    // First, collect ALL available temperatures from multiple locations in the JSON
+    let mut all_temperatures = std::collections::HashSet::new();
     
-    // Process reactions - check multiple formats
+    // Step 1: Check the dedicated "temperatures" array (this is the source of truth)
+    // The "temperatures" array in the JSON is the authoritative source of all available temperatures
+    if let Some(temps_array) = json_value.get("temperatures").and_then(|v| v.as_array()) {
+        for temp_value in temps_array {
+            if let Some(temp_str) = temp_value.as_str() {
+                all_temperatures.insert(temp_str.to_string());
+            }
+        }
+    }
+    
+    // Step 2: Also check the reactions object for temperatures
+    if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
+        for temp in reactions_obj.keys() {
+            all_temperatures.insert(temp.clone());
+        }
+    }
+    
+    // Step 3: Also check energy object for temperatures
+    if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
+        for temp in energy_obj.keys() {
+            all_temperatures.insert(temp.clone());
+        }
+    }
+    
+    // Store all available temperatures (regardless of filtering)
+    let mut available_temps: Vec<String> = all_temperatures.iter().cloned().collect();
+    available_temps.sort();
+    nuclide.available_temperatures = available_temps;
     
     // Check if we have the format with "reactions" field
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
-    for (temp, mt_reactions) in reactions_obj {
+        for (temp, mt_reactions) in reactions_obj {
+            // Skip temperatures not in the filter if a filter is provided and non-empty
+            if let Some(filter) = temps_filter {
+                if !filter.is_empty() && !filter.contains(temp) {
+                    continue;
+                }
+            }
+            
             let mut temp_reactions: HashMap<i32, Reaction> = HashMap::new();
             
             // Process all MT reactions for this temperature
@@ -287,12 +328,20 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
                 nuclide.reactions.insert(temp.clone(), temp_reactions);
             }
         }
-    } 
+    }
 
     // Process energy (after reactions so we know which temps to keep)
     if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
         let mut energy_map = HashMap::new();
-    for (temp, energy_arr) in energy_obj {
+        
+        for (temp, energy_arr) in energy_obj {
+            // Skip temperatures not in the filter if a filter is provided and non-empty
+            if let Some(filter) = temps_filter {
+                if !filter.is_empty() && !filter.contains(temp) {
+                    continue;
+                }
+            }
+            
             if let Some(energy_values) = energy_arr.as_array() {
                 let energy_vec: Vec<f64> = energy_values
                     .iter()
@@ -386,60 +435,44 @@ fn parse_nuclide_from_json_value(json_value: serde_json::Value) -> Result<Nuclid
         nuclide.fissionable = true;
     }
 
-    // Initially, loaded_temperatures is the full set (may be pruned later by selective loader)
-    nuclide.loaded_temperatures = nuclide.available_temperatures.clone();
-    // println!("Successfully loaded nuclide: {}", nuclide.name.as_deref().unwrap_or("unknown"));
-    // println!("Found {} temperature(s) with matching energy + reactions (all loaded by default)", nuclide.available_temperatures.len());
+    // Set loaded_temperatures based on what was actually loaded
+    let mut loaded_temps: Vec<String> = nuclide.reactions.keys().cloned().collect();
+    loaded_temps.sort();
+    nuclide.loaded_temperatures = loaded_temps;
+    
     Ok(nuclide)
 }
 
 // Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
 // treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
-pub fn read_nuclide_from_json<P: AsRef<Path>>(path_or_name: P) -> Result<Nuclide, Box<dyn std::error::Error>> {
+
+
+/// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
+/// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
+/// Optional temperature filtering is supported.
+#[allow(dead_code)]
+pub fn read_nuclide_from_json<P: AsRef<Path>>(path_or_name: P, temps: Option<&std::collections::HashSet<String>>) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Load the JSON file
     let candidate_ref = path_or_name.as_ref();
-    let candidate_str = candidate_ref.to_string_lossy();
-    let candidate = candidate_ref; // Path view
-    let resolved_path: std::path::PathBuf;
-    if candidate.exists() {
-        resolved_path = candidate.to_path_buf();
+    let resolved_path = if candidate_ref.exists() {
+        candidate_ref.to_path_buf()
     } else {
         // Treat as nuclide name
         let cfg = crate::config::CONFIG.lock().unwrap();
-        let p = cfg.cross_sections.get(candidate_str.as_ref())
-            .ok_or_else(|| format!("Input '{}' is neither an existing file nor a key in Config cross_sections", candidate_str))?;
-        resolved_path = Path::new(p).to_path_buf();
-    }
+        let p = cfg.cross_sections.get(candidate_ref.to_string_lossy().as_ref())
+            .ok_or_else(|| format!("Input '{}' is neither an existing file nor a key in Config cross_sections", candidate_ref.to_string_lossy()))?;
+        Path::new(p).to_path_buf()
+    };
+    
     let file = File::open(&resolved_path)?;
     let reader = BufReader::new(file);
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
-    let mut nuclide = parse_nuclide_from_json_value(json_value)?;
+    
+    // Use the filtering version of parse_nuclide_from_json_value
+    let mut nuclide = parse_nuclide_from_json_value(json_value, temps)?;
     nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
-    let name_disp = nuclide.name.as_deref().unwrap_or(candidate_str.as_ref());
-    println!(
-        "Reading {} for nuclide={}, including temperatures={:?}",
-        resolved_path.display(),
-        name_disp,
-        nuclide.available_temperatures
-    );
+    
     Ok(nuclide)
-}
-
-/// Extended loader allowing optional pruning to a subset of temperatures (empty or None => keep all)
-pub fn read_nuclide_from_json_with_temps<P: AsRef<Path>>(path_or_name: P, temps: Option<&std::collections::HashSet<String>>) -> Result<Nuclide, Box<dyn std::error::Error>> {
-    let mut n = read_nuclide_from_json(path_or_name)?;
-    if let Some(set) = temps {
-        if !set.is_empty() {
-            if let Some(mut energy_map) = n.energy.take() {
-                energy_map.retain(|k,_| set.contains(k));
-                n.energy = Some(energy_map);
-            }
-            n.reactions.retain(|k,_| set.contains(k));
-            let mut loaded: Vec<String> = n.reactions.keys().cloned().collect();
-            loaded.sort();
-            n.loaded_temperatures = loaded;
-        }
-    }
-    Ok(n)
 }
 
 // Read a nuclide from a JSON string, used by WASM
@@ -448,7 +481,7 @@ pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn
     let json_value: serde_json::Value = serde_json::from_str(json_content)?;
     
     // Use the shared parsing function
-    let mut nuclide = parse_nuclide_from_json_value(json_value)?;
+    let mut nuclide = parse_nuclide_from_json_value(json_value, None)?;
     // No file path available
     nuclide.data_path = None;
     Ok(nuclide)
@@ -456,9 +489,18 @@ pub fn read_nuclide_from_json_str(json_content: &str) -> Result<Nuclide, Box<dyn
 
 /// Read (or fetch from cache) a nuclide, optionally keeping only a specified subset of temperatures.
 /// Records the full `available_temperatures` and tracks the actually retained subset in `loaded_temperatures`.
+/// 
+/// This function ensures that:
+/// 1. All temperatures present in the JSON file are recorded in `available_temperatures` regardless of filtering
+/// 2. Only the temperatures that pass the filter are loaded into `loaded_temperatures` and the actual data structures
+/// 
 /// Unified loader semantics:
 /// - `temperatures_to_include`: `None` or `Some(empty)` => load all temperatures.
 /// - `Some(nonempty)` => ensure those temperatures are loaded; if previously loaded with fewer temps, reload & prune to the union.
+/// 
+/// Implementation note: This function performs two passes on the JSON data when filtering:
+/// - First pass with no filter to determine all available temperatures
+/// - Second pass with the filter to load only the requested temperatures
 pub fn get_or_load_nuclide(
     nuclide_name: &str,
     json_path_map: &HashMap<String, String>,
@@ -468,6 +510,7 @@ pub fn get_or_load_nuclide(
     let requested: HashSet<String> = temperatures_to_include
         .map(|s| s.iter().cloned().collect())
         .unwrap_or_else(HashSet::new);
+    
     // Fast path: cache hit with sufficient temps
     {
         let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
@@ -485,22 +528,37 @@ pub fn get_or_load_nuclide(
             for t in &existing.loaded_temperatures { union_set.insert(t.clone()); }
         }
     }
-    // Load full file then prune if subset requested
+    // Load directly with temperature filtering
     let path = json_path_map.get(nuclide_name)
         .ok_or_else(|| format!("No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.", nuclide_name))?;
-    let full = read_nuclide_from_json(path)?;
-    let mut nuclide = if union_set.is_empty() { full.clone() } else { full.clone() };
-    if !union_set.is_empty() {
-        // Prune to union_set
-        if let Some(mut energy_map) = nuclide.energy.take() {
-            energy_map.retain(|k,_| union_set.contains(k));
-            nuclide.energy = Some(energy_map);
-        }
-        nuclide.reactions.retain(|k,_| union_set.contains(k));
-        let mut loaded: Vec<String> = nuclide.reactions.keys().cloned().collect();
-        loaded.sort();
-        nuclide.loaded_temperatures = loaded;
-    }
+    
+    // Load the JSON file once
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let json_value: serde_json::Value = serde_json::from_reader(reader)?;
+    
+    // Parse with temperature filter if needed
+    let filter_option = if union_set.is_empty() { None } else { Some(&union_set) };
+    
+    // First, do a parse with no filtering to get all available temperatures
+    let all_temps_nuclide = parse_nuclide_from_json_value(json_value.clone(), None)?;
+    
+    // Now parse with the filter to get the loaded data
+    let mut nuclide = parse_nuclide_from_json_value(json_value, filter_option)?;
+    nuclide.data_path = Some(path.to_string());
+    
+    // Copy the available_temperatures from the unfiltered parse
+    nuclide.available_temperatures = all_temps_nuclide.available_temperatures;
+    
+    // Print loading info
+    let name_disp = nuclide.name.as_deref().unwrap_or(nuclide_name);
+    println!(
+        "Reading {} for nuclide={}, found {} temperatures, loaded {}",
+        path,
+        name_disp,
+        nuclide.available_temperatures.len(),
+        nuclide.loaded_temperatures.len()
+    );
     let arc = Arc::new(nuclide);
     {
         let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
@@ -520,7 +578,7 @@ mod tests {
             let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
             cache.remove("Li6");
         }
-        let raw = super::read_nuclide_from_json(li6_path).expect("Direct read failed");
+        let raw = super::read_nuclide_from_json(li6_path, None).expect("Direct read failed");
         assert_eq!(raw.name.as_deref(), Some("Li6"));
         // Don't assert cache state here (other tests may be using it)
         let mut json_map = HashMap::new();
@@ -542,7 +600,7 @@ mod tests {
         use rand::rngs::StdRng;
         use rand::SeedableRng;
         let path = std::path::Path::new("tests/Li6.json");
-        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let nuclide = super::read_nuclide_from_json(path, None).expect("Failed to load Li6.json");
         let temperature = "294";
 
         // Vary energy from 1.0 to 15e6 (10 steps)
@@ -587,7 +645,7 @@ mod tests {
     fn test_reaction_mts_li6() {
         // Load Li6 nuclide from test JSON
         let path = std::path::Path::new("tests/Li6.json");
-        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let nuclide = super::read_nuclide_from_json(path, None).expect("Failed to load Li6.json");
         let mts = nuclide.reaction_mts().expect("No MTs found");
         let expected = vec![102, 103, 105, 2, 203, 204, 205, 207, 24, 301, 444, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81];
         for mt in &expected {
@@ -601,7 +659,7 @@ mod tests {
     fn test_reaction_mts_li7() {
         // Load Li7 nuclide from test JSON
         let path = std::path::Path::new("tests/Li7.json");
-        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li7.json");
+        let nuclide = super::read_nuclide_from_json(path, None).expect("Failed to load Li7.json");
         let mts = nuclide.reaction_mts().expect("No MTs found");
         // Check for presence of key hierarchical and explicit MTs
         assert!(mts.contains(&1), "MT=1 should be present");
@@ -618,11 +676,11 @@ mod tests {
 
     #[test]
     fn test_fissionable_false_for_be9_and_fe58() {
-    let nuclide_be9 = super::read_nuclide_from_json("tests/Be9.json").expect("Failed to load Be9.json");
+    let nuclide_be9 = super::read_nuclide_from_json("tests/Be9.json", None).expect("Failed to load Be9.json");
         assert_eq!(nuclide_be9.fissionable, false, "Be9 should not be fissionable");
 
         let path_fe58 = std::path::Path::new("tests/Fe58.json");
-        let nuclide_fe58 = super::read_nuclide_from_json(path_fe58).expect("Failed to load Fe58.json");
+        let nuclide_fe58 = super::read_nuclide_from_json(path_fe58, None).expect("Failed to load Fe58.json");
         assert_eq!(nuclide_fe58.fissionable, false, "Fe58 should not be fissionable");
     }
 
@@ -630,7 +688,7 @@ mod tests {
     fn test_li6_reactions_contain_specific_mts() {
         // Load Li6 nuclide from test JSON
         let path = std::path::Path::new("tests/Li6.json");
-        let nuclide = super::read_nuclide_from_json(path).expect("Failed to load Li6.json");
+        let nuclide = super::read_nuclide_from_json(path, None).expect("Failed to load Li6.json");
 
         // Check that required MTs are present and mt_number is not 0
         let required = [2, 24, 51, 444];
@@ -650,7 +708,7 @@ mod tests {
     #[test]
     fn test_available_temperatures_be9() {
         let path_be9 = std::path::Path::new("tests/Be9.json");
-        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        let nuclide_be9 = super::read_nuclide_from_json(path_be9, None).expect("Failed to load Be9.json");
         assert_eq!(
             nuclide_be9.available_temperatures,
             vec!["294".to_string(), "300".to_string()],
@@ -668,7 +726,7 @@ mod tests {
     #[test]
     fn test_be9_mt_numbers_per_temperature() {
         let path_be9 = std::path::Path::new("tests/Be9.json");
-        let nuclide_be9 = super::read_nuclide_from_json(path_be9).expect("Failed to load Be9.json");
+        let nuclide_be9 = super::read_nuclide_from_json(path_be9, None).expect("Failed to load Be9.json");
 
         // Expected full MT list at 294 K (extended set including higher MTs)
         let mut expected_294: Vec<i32> = vec![
@@ -710,7 +768,7 @@ mod tests {
 
     #[test]
     fn test_available_temperatures_fe56_includes_294() {
-    let nuclide_fe56 = super::read_nuclide_from_json("tests/Fe56.json").expect("Failed to load Fe56.json");
+    let nuclide_fe56 = super::read_nuclide_from_json("tests/Fe56.json", None).expect("Failed to load Fe56.json");
         assert!(
             nuclide_fe56
                 .available_temperatures
@@ -723,5 +781,28 @@ mod tests {
             temps_method.iter().any(|t| t == "294"),
             "Fe56 temperatures() should contain '294'"
         );
+    }
+    
+    #[test]
+    fn test_clear_nuclide_cache() {
+        // Insert a test nuclide into the cache
+        let li6_path = std::path::Path::new("tests/Li6.json");
+        let nuclide = super::read_nuclide_from_json(li6_path, None).expect("Failed to load Li6.json");
+        let nuclide_arc = std::sync::Arc::new(nuclide);
+        
+        {
+            let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+            cache.insert("Test_Nuclide".to_string(), std::sync::Arc::clone(&nuclide_arc));
+            
+            // Verify it's in the cache
+            assert!(cache.contains_key("Test_Nuclide"), "Test nuclide should be in cache before clearing");
+        }
+        
+        // Call the clear function
+        super::clear_nuclide_cache();
+        
+        // Verify cache is now empty
+        let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+        assert!(cache.is_empty(), "Cache should be empty after calling clear_nuclide_cache");
     }
 }

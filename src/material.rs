@@ -68,22 +68,22 @@ impl Material {
         }
     }
 
-    pub fn add_nuclide(&mut self, nuclide: &str, fraction: f64) -> Result<(), String> {
+    pub fn add_nuclide(&mut self, nuclide: impl AsRef<str>, fraction: f64) -> Result<(), String> {
         if fraction < 0.0 {
             return Err(String::from("Fraction cannot be negative"));
         }
 
-        self.nuclides.insert(String::from(nuclide), fraction);
+        self.nuclides.insert(String::from(nuclide.as_ref()), fraction);
         Ok(())
     }
 
-    pub fn set_density(&mut self, unit: &str, value: f64) -> Result<(), String> {
+    pub fn set_density(&mut self, unit: impl AsRef<str>, value: f64) -> Result<(), String> {
         if value <= 0.0 {
             return Err(String::from("Density must be positive"));
         }
 
         self.density = Some(value);
-        self.density_units = String::from(unit);
+        self.density_units = String::from(unit.as_ref());
         Ok(())
     }
 
@@ -97,8 +97,8 @@ impl Material {
         Ok(self.volume)
     }
 
-    pub fn set_temperature(&mut self, temperature: &str) {
-        self.temperature = String::from(temperature);
+    pub fn set_temperature(&mut self, temperature: impl AsRef<str>) {
+        self.temperature = String::from(temperature.as_ref());
         // Clear cached data that depends on temperature
         self.unified_energy_grid_neutron.clear();
     self.unified_energy_grid_neutron_slopes_total = None;
@@ -115,22 +115,33 @@ impl Material {
     /// Read nuclide data from JSON files for this material
     pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
         // Collect needed nuclide names
-    let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
-    nuclide_names.sort(); // ensure deterministic alphabetical load order
+        let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
+        nuclide_names.sort(); // ensure deterministic alphabetical load order
+        
         // Build merged source map: explicit entries override, missing filled from CONFIG
         let mut merged: HashMap<String,String> = HashMap::new();
-        // Start with global config entries for required nuclides
-        let cfg = crate::config::CONFIG.lock().unwrap();
-        for n in &nuclide_names { if let Some(p) = cfg.cross_sections.get(n) { merged.insert(n.clone(), p.clone()); } }
+        
+        // Start with global config entries for required nuclides, with proper error handling
+        let cfg = crate::config::CONFIG.lock()
+            .map_err(|e| format!("Failed to acquire lock on CONFIG: {}", e))?;
+            
+        for n in &nuclide_names { 
+            if let Some(p) = cfg.cross_sections.get(n) { 
+                merged.insert(n.clone(), p.clone()); 
+            } 
+        }
         drop(cfg);
+        
         // Override with any provided mapping entries (even if extra keys not in composition)
         for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
         let source_map: &HashMap<String,String> = &merged;
+        
         // Load nuclides using the centralized function in the nuclide module
         use std::collections::HashSet;
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
-    for nuclide_name in nuclide_names {
+        
+        for nuclide_name in nuclide_names {
             let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
@@ -156,8 +167,9 @@ impl Material {
             return Ok(());
         }
         
-        // Get the global configuration
-        let config = CONFIG.lock().unwrap();
+        // Get the global configuration with proper error handling
+        let config = CONFIG.lock()
+            .map_err(|e| format!("Failed to acquire lock on CONFIG: poisoned mutex - {}", e))?;
         
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
@@ -545,7 +557,7 @@ impl Material {
         // Calculate atom densities using OpenMC's approach
         for (nuclide, &fraction) in &self.nuclides {
             let normalized_fraction = fraction / total_fraction;
-            let mass = nuclide_masses.get(nuclide).unwrap();
+            let _mass = nuclide_masses.get(nuclide).unwrap();
             
             // For a mixture, use the formula:
             // atom_density = density * N_A / avg_molar_mass * normalized_fraction * 1e-24
@@ -558,17 +570,17 @@ impl Material {
         atoms_per_cc
     }
 
-    pub fn add_element(&mut self, element: &str, fraction: f64) -> Result<(), String> {
+    pub fn add_element(&mut self, element: impl AsRef<str>, fraction: f64) -> Result<(), String> {
         if fraction <= 0.0 {
             return Err(String::from("Fraction must be positive"));
         }
 
         // Canonicalize input: trim only (do not lowercase or otherwise change user input)
-        let input = element.trim();
+        let input = element.as_ref().trim();
 
         // Try to match as symbol (case-sensitive, exact match)
         let mut found_symbol: Option<String> = None;
-        for (symbol, name) in ELEMENT_NAMES.iter() {
+        for (symbol, _name) in ELEMENT_NAMES.iter() {
             if *symbol == input {
                 found_symbol = Some(symbol.to_string());
                 break;
@@ -588,7 +600,7 @@ impl Material {
             None => {
                 return Err(format!(
                     "Element '{}' is not a recognized element symbol or name (case-sensitive, must match exactly)",
-                    element
+                    element.as_ref()
                 ));
             }
         };
@@ -690,9 +702,8 @@ impl Material {
         assert!((avg - expected_mean).abs() < tolerance, "Average sampled distance incorrect: got {}, expected {}", avg, expected_mean);
     }
 mod tests {
-    use super::Material; // Explicitly import Material for tests
-    use rand::SeedableRng; // Needed for tests using StdRng::seed_from_u64
-    use std::collections::HashMap; // Needed for building nuclide_json_map in tests
+    #[allow(unused_imports)]
+    use super::Material;
     #[test]
     fn test_macroscopic_total_xs_by_nuclide_li6_li7() {
         use std::collections::HashMap;
@@ -1282,7 +1293,7 @@ mod tests {
         // Read in the nuclear data
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-        let grid = material.unified_energy_grid_neutron();
+        let _grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for all MTs
         let micro_xs_all = material.calculate_microscopic_xs_neutron(None);
         // Calculate microscopic cross sections for only MT=2
@@ -1331,7 +1342,7 @@ mod tests {
         let mut nuclide_json_map = std::collections::HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let grid = material.unified_energy_grid_neutron();
+        let _grid = material.unified_energy_grid_neutron();
 
         // Should panic when calculating macroscopic cross sections with no density
         let result = std::panic::catch_unwind(move || {
@@ -1392,6 +1403,7 @@ mod tests {
 
     #[test]
     fn test_sample_distance_to_collision_li6() {
+        use std::collections::HashMap;
         // Create Li6 material
         let mut mat = Material::new();
         mat.add_nuclide("Li6", 1.0).unwrap();
@@ -1409,8 +1421,9 @@ mod tests {
         let mut sum = 0.0;
         let n_samples = 1000;
         use rand::rngs::StdRng;
+        use rand::SeedableRng; // Needed for seed_from_u64
         for seed in 0..n_samples {
-            let mut rng = <StdRng as rand::SeedableRng>::seed_from_u64(seed as u64);
+            let mut rng = StdRng::seed_from_u64(seed as u64);
             let dist = mat.sample_distance_to_collision(14_000_000.0, &mut rng)
                 .unwrap_or_else(|| panic!("sample_distance_to_collision returned None at 14 MeV!"));
             sum += dist;
