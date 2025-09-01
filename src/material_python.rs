@@ -194,9 +194,14 @@ impl PyMaterial {
         self.internal.macroscopic_xs_neutron.clone()
     }
 
-    /// Get the atoms per cubic centimeter for each nuclide in the material
+    /// Get the atoms per barn-centimeter for each nuclide in the material
+    fn get_atoms_per_barn_cm(&self) -> HashMap<String, f64> {
+        self.internal.get_atoms_per_barn_cm()
+    }
+    
+    /// Get the atoms per cubic centimeter for each nuclide in the material (alias for get_atoms_per_barn_cm for backward compatibility)
     fn get_atoms_per_cc(&self) -> HashMap<String, f64> {
-        self.internal.get_atoms_per_cc()
+        self.internal.get_atoms_per_barn_cm()
     }
 
     /// Calculate the neutron mean free path at a given energy
