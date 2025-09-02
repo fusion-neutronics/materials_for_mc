@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
-use crate::utilities::interpolate_linear;
+use crate::utilities::{interpolate_linear, precompute_slopes, interpolate_linear_fast};
 use crate::data::ELEMENT_NAMES; // SUM_RULES not directly needed here
 // Removed unused imports: SUM_RULES, add_to_processing_order, SeedableRng
 
@@ -25,6 +25,10 @@ pub struct Material {
     pub macroscopic_xs_neutron: HashMap<i32, Vec<f64>>,
     /// Unified energy grid for neutrons
     pub unified_energy_grid_neutron: Vec<f64>,
+    /// Precomputed slopes for MT=1 (total) macroscopic xs on unified grid
+    pub unified_energy_grid_neutron_slopes_total: Option<Vec<f64>>,
+    /// Hint index for fast successive interpolations (MT=1)
+    pub unified_energy_grid_neutron_hint_total: usize,
     /// Optional: Per-nuclide macroscopic total cross section (MT=1) on the unified grid
     /// Map: nuclide name -> Vec<f64> (same length as unified_energy_grid_neutron)
     pub macroscopic_total_xs_by_nuclide: Option<HashMap<String, Vec<f64>>>,
@@ -58,6 +62,8 @@ impl Material {
             nuclide_data: HashMap::new(),
             macroscopic_xs_neutron: HashMap::new(),
             unified_energy_grid_neutron: Vec::new(),
+            unified_energy_grid_neutron_slopes_total: None,
+            unified_energy_grid_neutron_hint_total: 0,
             macroscopic_total_xs_by_nuclide: None,
         }
     }
@@ -95,6 +101,8 @@ impl Material {
         self.temperature = String::from(temperature.as_ref());
         // Clear cached data that depends on temperature
         self.unified_energy_grid_neutron.clear();
+    self.unified_energy_grid_neutron_slopes_total = None;
+    self.unified_energy_grid_neutron_hint_total = 0;
         self.macroscopic_xs_neutron.clear();
     }
 
@@ -218,7 +226,10 @@ impl Material {
         all_energies.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
 
         // Cache the result
-        self.unified_energy_grid_neutron = all_energies.clone();
+    self.unified_energy_grid_neutron = all_energies.clone();
+    // Invalidate slope cache
+    self.unified_energy_grid_neutron_slopes_total = None;
+    self.unified_energy_grid_neutron_hint_total = 0;
         
         all_energies
     }
@@ -409,6 +420,13 @@ impl Material {
         }
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
+        // If total (MT=1) present, precompute slopes for fast interpolation
+        if let Some(total) = self.macroscopic_xs_neutron.get(&1) {
+            if total.len() >= 2 && self.unified_energy_grid_neutron.len() == total.len() {
+                self.unified_energy_grid_neutron_slopes_total = Some(precompute_slopes(&self.unified_energy_grid_neutron, total));
+                self.unified_energy_grid_neutron_hint_total = 0;
+            }
+        }
         // All hierarchical MTs are now constructed in Python and present in the JSON files.
         // No need to generate or copy hierarchical MTs here.
         (energy_grid, macro_xs)
@@ -454,11 +472,21 @@ impl Material {
         
         // Interpolate to get the cross section at the requested energy
         // Using linear-linear interpolation
-        let cross_section = interpolate_linear(
-            &self.unified_energy_grid_neutron, 
-            total_xs, 
-            energy
-        );
+        let cross_section = if let Some(slopes) = &self.unified_energy_grid_neutron_slopes_total {
+            interpolate_linear_fast(
+                &self.unified_energy_grid_neutron,
+                total_xs,
+                slopes,
+                energy,
+                &mut self.unified_energy_grid_neutron_hint_total,
+            )
+        } else {
+            interpolate_linear(
+                &self.unified_energy_grid_neutron,
+                total_xs,
+                energy,
+            )
+        };
         
         // Mean free path = 1/Σ
         // Check for zero to avoid division by zero
