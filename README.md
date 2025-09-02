@@ -1,21 +1,44 @@
 # Materials for MC
 
-A Rust package with Python bindings and WebAssembly support for making neutronics materials.
+Make materials for use in neutronics workflows.
 
-Features:
+🦀Rust back end for speed
+🐍Python API for ease of use
+🕸️WASM API for online deployment
 
-- Built up materials
-    - set densities
-    - add nuclides
+General features:
+- Build Nuclides
+    - Get microscopic cross sections 
+- Build up Materials
+    - Set densities
+    - Add nuclides
+    - Add elements
+    - Get macroscopic cross sections
 - Set the nuclear data paths
-    - Package caches nuclides to avoid duplicate reading
+    - Per nuclide, material or globally
+    - Using local JSON files
+    - On the fly downloading
+    - Caches nuclides to avoid duplicate reading
+
+Features speciffically for usage Monte Carlo Tranport 
 - Get unified energy grid for material
 - Calculate MT reactions cross sections at specified energy
 - Calculate total macroscopic cross section
 - Calculate mean free path
-- Bindings for Python and WASM are fully optional
 
-## Prerequisites
+## User install
+
+Install as a Python package if you want to use the package with your own Python code
+```bash
+pip install materials_for_mc
+```
+
+Install the Rust crate if you want to use the package with your own Rust code
+```
+cargo install materials_for_mc
+```
+
+## Developer install
 
 Depending on your usage you may need to  Rust, Python 
 ```
@@ -23,7 +46,7 @@ git clone git@github.com:fusion-neutronics/materials_for_mc.git
 cd materials_for_mc
 ```
 
-## Example python usage
+### Example python usage
 
 ```
 python3.11 -m venv .materials_for_mc_env
@@ -37,7 +60,7 @@ maturin develop --features pyo3
 python examples/use_in_python.py
 ```
 
-## Example rust usage
+### Example rust usage
 
 ```
 cargo build
@@ -46,7 +69,7 @@ cargo build
 cargo run
 ```
 
-## WebAssembly Support
+### WebAssembly Support
 
 The package can be compiled to WebAssembly for use in web browsers:
 
@@ -72,7 +95,7 @@ The WebAssembly demos include:
 - Interactive plotting with Plotly
 
 
-## Testing
+### Testing
 
 Tests are present for both the core Rust code and the Python wrapper
 ```
