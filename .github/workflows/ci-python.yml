@@ -35,7 +35,8 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           venv\Scripts\activate.ps1
-          python -m pip install .[tests]
+          python -m pip install pytest maturin numpy
+          maturin develop --features pyo3
           
       - name: Install dependencies (Unix)
         if: runner.os != 'Windows'
