@@ -7,39 +7,126 @@ use crate::reaction::Reaction;
 use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]
+/// Nuclide data container exposed to Python.
+///
+/// Create a new (optionally named) nuclide instance.
+///
+/// Args:
+///     name (Optional[str]): Optional nuclide identifier (e.g. "Li6", "Fe56"). If not
+///         supplied you must pass `path` to `read_nuclide_from_json` later.
+///
+/// Notes:
+///     Individual fields (e.g. `name`, `atomic_number`, `available_temperatures`,
+///     `loaded_temperatures`) are exposed as read-only attributes via PyO3 getters.
+///     Detailed descriptions appear once each in the generated documentation—this
+///     summary omits a full per-attribute list to avoid duplication.
 #[pyclass(name = "Nuclide")]
 #[derive(Clone, Default)]
 pub struct PyNuclide {
-    #[pyo3(get)]
     pub name: Option<String>,
-    #[pyo3(get)]
     pub element: Option<String>,
-    #[pyo3(get)]
     pub atomic_symbol: Option<String>,
-    #[pyo3(get)]
     pub atomic_number: Option<u32>,
-    #[pyo3(get)]
     pub neutron_number: Option<u32>,
-    #[pyo3(get)]
     pub mass_number: Option<u32>,
-    #[pyo3(get)]
     pub library: Option<String>,
     pub energy: Option<HashMap<String, Vec<f64>>>,
     pub reactions: HashMap<String, HashMap<i32, Reaction>>,
-    #[pyo3(get)]
     pub fissionable: bool,
-    #[pyo3(get)]
     pub available_temperatures: Vec<String>,
-    #[pyo3(get)]
     pub loaded_temperatures: Vec<String>,
-    #[pyo3(get)]
     pub data_path: Option<String>,
 }
 
 #[cfg(feature = "pyo3")]
 #[pymethods]
 impl PyNuclide {
+    /// Name / identifier for the nuclide (e.g. "Li6", "Fe56").
+    ///
+    /// Returns:
+    ///     Optional[str]: Nuclide name or None if not yet set.
+    #[getter]
+    pub fn name(&self) -> Option<String> { self.name.clone() }
+
+    /// Chemical element symbol (e.g. "Fe").
+    ///
+    /// Returns:
+    ///     Optional[str]: Element symbol or None if data not loaded.
+    #[getter]
+    pub fn element(&self) -> Option<String> { self.element.clone() }
+
+    /// Atomic symbol (currently same as element symbol).
+    ///
+    /// Returns:
+    ///     Optional[str]: Atomic symbol string.
+    #[getter]
+    pub fn atomic_symbol(&self) -> Option<String> { self.atomic_symbol.clone() }
+
+    /// Proton number Z.
+    ///
+    /// Returns:
+    ///     Optional[int]: Atomic number.
+    #[getter]
+    pub fn atomic_number(&self) -> Option<u32> { self.atomic_number }
+
+    /// Neutron number N.
+    ///
+    /// Returns:
+    ///     Optional[int]: Neutron count.
+    #[getter]
+    pub fn neutron_number(&self) -> Option<u32> { self.neutron_number }
+
+    /// Mass number A = Z + N.
+    ///
+    /// Returns:
+    ///     Optional[int]: Mass number.
+    #[getter]
+    pub fn mass_number(&self) -> Option<u32> { self.mass_number }
+
+    /// Originating nuclear data library identifier.
+    ///
+    /// Returns:
+    ///     Optional[str]: Library name/code.
+    #[getter]
+    pub fn library(&self) -> Option<String> { self.library.clone() }
+
+    /// Whether the nuclide is fissionable.
+    ///
+    /// Returns:
+    ///     bool: True if fissionable.
+    #[getter]
+    pub fn fissionable(&self) -> bool { self.fissionable }
+
+    /// All temperatures present in the source data file.
+    ///
+    /// Returns:
+    ///     List[str]: Temperature labels (e.g. ["293K"]).
+    #[getter]
+    pub fn available_temperatures(&self) -> Vec<String> { self.available_temperatures.clone() }
+
+    /// Temperatures actually loaded into memory (subset of available_temperatures).
+    ///
+    /// Returns:
+    ///     List[str]: Loaded temperatures.
+    #[getter]
+    pub fn loaded_temperatures(&self) -> Vec<String> { self.loaded_temperatures.clone() }
+
+    /// Path to the data file used to populate this nuclide (if known).
+    ///
+    /// Returns:
+    ///     Optional[str]: Filesystem path or None.
+    #[getter]
+    pub fn data_path(&self) -> Option<String> { self.data_path.clone() }
+    /// Create a new (optionally named) nuclide.
+    ///
+    /// Args:
+    ///     name (Optional[str]): Optional nuclide identifier (e.g. "Li6", "Fe56"). If not
+    ///         supplied you must pass `path` to `read_nuclide_from_json` later.
+    ///
+    /// Returns:
+    ///     Nuclide: A nuclide object with no data loaded yet.
     #[new]
+    #[pyo3(text_signature = "(name=None)")]
     pub fn new(name: Option<String>) -> Self {
         PyNuclide {
             name,
@@ -58,7 +145,28 @@ impl PyNuclide {
         }
     }
 
-    #[pyo3(signature = (path=None, temperatures=None))]
+    /// Load nuclear data from a JSON file.
+    ///
+    /// You can either provide a JSON file path explicitly via `path` or rely on
+    /// the `name` given at construction if your application resolves it.
+    ///
+    /// When `temperatures` is provided only those temperatures are loaded while
+    /// `available_temperatures` always lists every temperature present in the
+    /// file. The subset actually loaded is stored in `loaded_temperatures`.
+    ///
+    /// Args:
+    ///     path (Optional[str]): Optional path to the nuclide JSON file. If omitted the
+    ///         constructor `name` must have been set and is used as the path / key.
+    ///     temperatures (Optional[List[str]]): Temperature strings (e.g. ["293K"]).
+    ///         If given only these temperatures are loaded.
+    ///
+    /// Returns:
+    ///     None
+    ///
+    /// Raises:
+    ///     ValueError: If neither `path` nor `name` is available, or if the
+    ///         JSON cannot be read / parsed.
+    #[pyo3(signature = (path=None, temperatures=None), text_signature = "(self, path=None, temperatures=None)")]
     pub fn read_nuclide_from_json(&mut self, path: Option<String>, temperatures: Option<Vec<String>>) -> PyResult<()> {
         use std::collections::HashSet;
         let identifier = if let Some(p) = &path { p.as_str() } else {
@@ -94,6 +202,16 @@ impl PyNuclide {
         Ok(())
     }
 
+    /// Mapping of temperature -> MT number -> reaction data.
+    ///
+    /// Returns:
+    ///     Dict[str, Dict[int, Dict[str, Any]]]: Nested dictionary. The innermost
+    ///     dictionary has these keys:
+    ///
+    ///         - cross_section (List[float])
+    ///         - threshold_idx (int)
+    ///         - interpolation (List[int])
+    ///         - energy (Optional[List[float]]): Present when reaction has its own grid
     #[getter]
     pub fn reactions(&self, py: Python) -> PyResult<PyObject> {
         let py_dict = PyDict::new(py);
@@ -117,11 +235,20 @@ impl PyNuclide {
         Ok(py_dict.into())
     }
 
+    /// List of MT numbers available for the (first) loaded temperature.
+    ///
+    /// Returns:
+    ///     Optional[List[int]]: List of MT identifiers or None if no data.
     #[getter]
     pub fn reaction_mts(&self) -> Option<Vec<i32>> {
         Nuclide::from(self.clone()).reaction_mts()
     }
 
+    /// Energy grids by temperature.
+    ///
+    /// Returns:
+    ///     Optional[Dict[str, List[float]]]: Map of temperature key to energy grid
+    ///     or None if no energy data loaded.
     #[getter]
     pub fn energy(&self, py: Python) -> PyResult<Option<PyObject>> {
         if let Some(energy_map) = &self.energy {
@@ -135,13 +262,26 @@ impl PyNuclide {
         }
     }
     
-    // Get the energy grid for a specific temperature
+    /// Get the energy grid for a specific temperature.
+    ///
+    /// Args:
+    ///     temperature (str): Temperature key (e.g. "293K").
+    ///
+    /// Returns:
+    ///     Optional[List[float]]: The energy grid or None if not present.
     pub fn energy_grid(&self, temperature: &str) -> Option<Vec<f64>> {
         let nuclide = Nuclide::from(self.clone());
         nuclide.energy_grid(temperature).cloned()
     }
     
-    // Get the reaction energy grid for a specific reaction
+    /// Get the reaction-specific energy grid for a given MT at a temperature.
+    ///
+    /// Args:
+    ///     temperature (str): Temperature key (e.g. "293K").
+    ///     mt (int): ENDF MT reaction number.
+    ///
+    /// Returns:
+    ///     Optional[List[float]]: Reaction energy grid if present.
     pub fn get_reaction_energy_grid(&self, temperature: &str, mt: i32) -> Option<Vec<f64>> {
         if let Some(temp_reactions) = self.reactions.get(temperature) {
             if let Some(reaction) = temp_reactions.get(&mt) {
@@ -197,6 +337,17 @@ impl From<PyNuclide> for Nuclide {
 
 #[cfg(feature = "pyo3")]
 #[pyfunction]
+/// Read a nuclide JSON file and return a `Nuclide` instance.
+///
+/// Args:
+///     path (str): Path to nuclide JSON file.
+///
+/// Returns:
+///     Nuclide: A fully populated `Nuclide` object with all available temperatures loaded.
+///
+/// Raises:
+///     OSError: If the file cannot be opened or parsed.
+#[pyo3(text_signature = "(path)")]
 pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
     let nuclide = crate::nuclide::read_nuclide_from_json(path, None)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
@@ -205,6 +356,15 @@ pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
 
 #[cfg(feature = "pyo3")]
 #[pyclass]
+/// Lightweight reaction summary exposed to Python.
+///
+/// Represents a single nuclear reaction channel with reactants, products and an
+/// associated energy (e.g. Q-value or representative energy in MeV).
+///
+/// Attributes:
+///     reactants (List[str]): Names / symbols of incoming particles or nuclei.
+///     products (List[str]): Names / symbols of outgoing particles or nuclei.
+///     energy (float): Reaction energy value (units depend on source data, typically MeV).
 pub struct PyReaction {
     #[pyo3(get)]
     pub reactants: Vec<String>,
@@ -217,6 +377,16 @@ pub struct PyReaction {
 #[cfg(feature = "pyo3")]
 #[pymethods]
 impl PyReaction {
+    /// Create a reaction description.
+    ///
+    /// Args:
+    ///     reactants (List[str]): Incoming particles/nuclei.
+    ///     products (List[str]): Outgoing particles/nuclei.
+    ///     energy (float): Reaction energy (e.g. Q-value, MeV).
+    ///
+    /// Returns:
+    ///     PyReaction: New reaction object.
+    #[pyo3(text_signature = "(reactants, products, energy)")]
     #[new]
     pub fn new(reactants: Vec<String>, products: Vec<String>, energy: f64) -> Self {
         PyReaction { reactants, products, energy }
@@ -225,6 +395,13 @@ impl PyReaction {
 
 #[cfg(feature = "pyo3")]
 #[pyfunction]
+/// Clear any internally cached nuclide data.
+///
+/// This forces subsequent reads to re-parse JSON files.
+///
+/// Returns:
+///     None
+#[pyo3(text_signature = "()")]
 pub fn clear_nuclide_cache() {
     crate::nuclide::clear_nuclide_cache();
 }
