@@ -45,9 +45,9 @@ def test_element_class():
     assert "U235" in u_nuclides
     assert "U238" in u_nuclides
 
-def test_get_element_isotopes():
-    """Test per-element get_element_isotopes method returns list for that element."""
-    al_isotopes = m4mc.Element('Al').get_element_isotopes()
+def test_get_nuclides():
+    """Test per-element get_nuclides method returns list for that element."""
+    al_isotopes = m4mc.Element('Al').get_nuclides()
     assert isinstance(al_isotopes, list)
     assert all(iso.startswith('Al') for iso in al_isotopes)
     assert len(al_isotopes) > 0

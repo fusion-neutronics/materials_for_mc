@@ -30,8 +30,5 @@ impl PyElement {
 	///
 	/// Returns:
 	///     List[str]: Isotope names sorted by mass number.
-	fn get_element_isotopes(&self) -> Vec<String> { self.inner.get_element_isotopes() }
-
-	/// Backwards compatibility alias for previous API.
 	fn get_nuclides(&self) -> Vec<String> { self.inner.get_nuclides() }
 }

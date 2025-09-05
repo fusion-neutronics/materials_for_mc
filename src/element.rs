@@ -39,16 +39,13 @@ pub struct Element {
 impl Element {
     pub fn new<S: Into<String>>(name: S) -> Self { Self { name: name.into() } }
 
-    /// Return the list of isotope names (e.g. ["Fe54", "Fe56", ...]) for this element.
-    pub fn get_element_isotopes(&self) -> Vec<String> {
+    /// Return the list of nuclide (isotope) names (e.g. ["Fe54", "Fe56", ...]) for this element.
+    pub fn get_nuclides(&self) -> Vec<String> {
         let map = element_isotopes_map();
         map.get(self.name.as_str())
             .map(|v| v.iter().map(|s| s.to_string()).collect())
             .unwrap_or_default()
     }
-
-    /// Backwards-compat: alias for get_element_isotopes (if earlier API used get_nuclides)
-    pub fn get_nuclides(&self) -> Vec<String> { self.get_element_isotopes() }
 }
 
 #[cfg(test)]
@@ -58,7 +55,7 @@ mod tests {
     #[test]
     fn test_element_struct_isotopes() {
         let fe = Element::new("Fe");
-        let list = fe.get_element_isotopes();
+    let list = fe.get_nuclides();
         assert!(list.contains(&"Fe54".to_string()));
         assert!(list.contains(&"Fe56".to_string()));
         assert!(list.contains(&"Fe57".to_string()));
@@ -75,7 +72,7 @@ mod tests {
     #[test]
     fn test_unknown_element() {
         let fake = Element::new("Xx");
-        assert!(fake.get_element_isotopes().is_empty());
+    assert!(fake.get_nuclides().is_empty());
     }
 }
 

@@ -14,8 +14,8 @@ impl WasmElement {
 	#[wasm_bindgen(getter)]
 	pub fn name(&self) -> String { self.inner.name.clone() }
 
-	#[wasm_bindgen(js_name = getElementIsotopes)]
-	pub fn get_element_isotopes(&self) -> js_sys::Array {
-		self.inner.get_element_isotopes().into_iter().map(JsValue::from).collect()
+	#[wasm_bindgen(js_name = getNuclides)]
+	pub fn get_nuclides(&self) -> js_sys::Array {
+		self.inner.get_nuclides().into_iter().map(JsValue::from).collect()
 	}
 }
