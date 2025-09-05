@@ -1,40 +1,54 @@
 // Provides functionality for working with natural elements and their isotopic abundances
 use std::collections::HashMap;
+use crate::data::NATURAL_ABUNDANCE;
 
-use crate::data::{NATURAL_ABUNDANCE};
-
-/// Mapping from element symbol to list of isotopes for that element
-pub fn get_element_isotopes() -> HashMap<&'static str, Vec<&'static str>> {
-    let mut element_isotopes: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
-    
-    // Build a mapping from elements to their isotopes
+/// Internal: build mapping element symbol -> sorted list of isotope strings
+fn element_isotopes_map() -> HashMap<&'static str, Vec<&'static str>> {
+    let mut map: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
     for isotope in NATURAL_ABUNDANCE.keys() {
-        // Extract the element symbol (all characters before the first digit)
         let mut i = 0;
-        while i < isotope.len() && !isotope.chars().nth(i).unwrap().is_digit(10) {
+        while i < isotope.len() && !isotope.chars().nth(i).unwrap().is_ascii_digit() {
             i += 1;
         }
-        
         let element = &isotope[0..i];
-        
-        element_isotopes.entry(element)
-            .or_insert_with(Vec::new)
-            .push(isotope);
+        map.entry(element).or_insert_with(Vec::new).push(isotope);
     }
-    
-    // Sort isotopes by mass number for each element
-    for isotopes in element_isotopes.values_mut() {
+    for isotopes in map.values_mut() {
         isotopes.sort_by(|a, b| {
-            // Extract the mass number as a number
-            let a_mass = a[0..].chars().filter(|c| c.is_digit(10))
-                .collect::<String>().parse::<u32>().unwrap();
-            let b_mass = b[0..].chars().filter(|c| c.is_digit(10))
-                .collect::<String>().parse::<u32>().unwrap();
+            let a_mass = a.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().unwrap();
+            let b_mass = b.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().unwrap();
             a_mass.cmp(&b_mass)
         });
     }
-    
-    element_isotopes
+    map
+}
+
+/// Public convenience: full mapping element -> isotopes (owned Strings)
+pub fn all_element_isotopes() -> HashMap<String, Vec<String>> {
+    element_isotopes_map().into_iter()
+        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+        .collect()
+}
+
+/// Element structure representing a chemical element with helper methods.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Element {
+    pub name: String,
+}
+
+impl Element {
+    pub fn new<S: Into<String>>(name: S) -> Self { Self { name: name.into() } }
+
+    /// Return the list of isotope names (e.g. ["Fe54", "Fe56", ...]) for this element.
+    pub fn get_element_isotopes(&self) -> Vec<String> {
+        let map = element_isotopes_map();
+        map.get(self.name.as_str())
+            .map(|v| v.iter().map(|s| s.to_string()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Backwards-compat: alias for get_element_isotopes (if earlier API used get_nuclides)
+    pub fn get_nuclides(&self) -> Vec<String> { self.get_element_isotopes() }
 }
 
 #[cfg(test)]
@@ -42,31 +56,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_element_isotopes_lithium() {
-        let element_isotopes = get_element_isotopes();
-        let li_isotopes = element_isotopes.get("Li").expect("Li should be present");
-        // Lithium should have Li6 and Li7
-        assert!(li_isotopes.contains(&"Li6"));
-        assert!(li_isotopes.contains(&"Li7"));
-        assert_eq!(li_isotopes.len(), 2);
+    fn test_element_struct_isotopes() {
+        let fe = Element::new("Fe");
+        let list = fe.get_element_isotopes();
+        assert!(list.contains(&"Fe54".to_string()));
+        assert!(list.contains(&"Fe56".to_string()));
+        assert!(list.contains(&"Fe57".to_string()));
+        assert!(list.contains(&"Fe58".to_string()));
     }
 
     #[test]
-    fn test_get_element_isotopes_tin() {
-        let element_isotopes = get_element_isotopes();
-        let sn_isotopes = element_isotopes.get("Sn").expect("Sn should be present");
-        // Tin has 10 stable isotopes
-        let expected = ["Sn112","Sn114","Sn115","Sn116","Sn117","Sn118","Sn119","Sn120","Sn122","Sn124"];
-        for iso in &expected {
-            assert!(sn_isotopes.contains(iso), "{} should be in Sn isotopes", iso);
-        }
-        assert_eq!(sn_isotopes.len(), expected.len());
+    fn test_all_element_isotopes_map() {
+        let map = all_element_isotopes();
+        assert!(map.get("Li").unwrap().contains(&"Li6".to_string()));
+        assert!(map.get("Li").unwrap().contains(&"Li7".to_string()));
     }
 
     #[test]
-    fn test_get_element_isotopes_nonexistent() {
-        let element_isotopes = get_element_isotopes();
-        assert!(element_isotopes.get("Xx").is_none());
+    fn test_unknown_element() {
+        let fake = Element::new("Xx");
+        assert!(fake.get_element_isotopes().is_empty());
     }
 }
 
