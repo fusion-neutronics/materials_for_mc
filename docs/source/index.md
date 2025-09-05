@@ -1,6 +1,6 @@
-# Minimal Documentation
+# Documentation
 
-Minimal Sphinx + MyST setup documenting only the Python `Nuclide` class.
+Sphinx + MyST documentation for the Python API exposed by the Rust core library.
 
 ```{toctree}
 :maxdepth: 1
