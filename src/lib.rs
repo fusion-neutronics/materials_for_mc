@@ -30,6 +30,8 @@ mod materials_python;
 #[cfg(feature = "pyo3")]
 mod nuclide_python;
 #[cfg(feature = "pyo3")]
+mod reaction_python;
+#[cfg(feature = "pyo3")]
 mod config_python;
 #[cfg(feature = "pyo3")]
 mod element_python;
@@ -43,6 +45,8 @@ pub use materials_python::*;
 pub use nuclide_python::*;
 #[cfg(feature = "pyo3")]
 pub use nuclide_python::PyNuclide as Nuclide;
+#[cfg(feature = "pyo3")]
+pub use reaction_python::*;
 #[cfg(feature = "pyo3")]
 pub use config_python::*;
 #[cfg(feature = "pyo3")]
@@ -102,7 +106,7 @@ fn materials_for_mc(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<material_python::PyMaterial>()?;
     m.add_class::<materials_python::PyMaterials>()?;
     m.add_class::<nuclide_python::PyNuclide>()?;
-    m.add_class::<nuclide_python::PyReaction>()?;
+    m.add_class::<reaction_python::PyReaction>()?; // Exposed as Reaction in Python
     m.add_class::<config_python::PyConfig>()?;
     m.add_class::<element_python::PyElement>()?;
     m.add_function(wrap_pyfunction!(nuclide_python::py_read_nuclide_from_json, m)?)?;
