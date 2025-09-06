@@ -1,5 +1,28 @@
-import os, sys, importlib
-sys.path.insert(0, os.path.abspath('../..'))
+import os, sys, importlib, subprocess
+root_dir = os.path.abspath('../..')
+sys.path.insert(0, root_dir)
+
+# Attempt to import the compiled extension; if unavailable, build it quietly with maturin.
+def _ensure_extension():
+    try:
+        import materials_for_mc  # noqa: F401
+        return
+    except Exception:
+        pass
+    maturin = shutil.which('maturin') if 'shutil' in globals() else None
+    if maturin is None:
+        import shutil  # local import to avoid unused if already present
+        maturin = shutil.which('maturin')
+    if maturin:
+        try:
+            subprocess.run([maturin, 'develop', '--features', 'pyo3', '-q'], check=True, cwd=root_dir)
+            import materials_for_mc  # noqa: F401
+        except Exception as e:  # pragma: no cover
+            print(f"WARNING: Failed to build extension with maturin: {e}")
+    else:
+        print("WARNING: 'maturin' not found; API autodoc will use mocked objects.")
+
+_ensure_extension()
 
 project = 'materials_for_mc'
 copyright = '2025, fusion-neutronics'
@@ -101,7 +124,7 @@ autodoc_default_options = {
 }
 
 # Use stub files for documentation
-autodoc_typehints = 'description'
+autodoc_typehints = 'both'
 autodoc_typehints_format = 'short'
 
 # Enable autosummary for stub-based documentation
