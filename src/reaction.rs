@@ -1,12 +1,24 @@
 use serde::{Deserialize, Serialize};
 
+/// Represents a single reaction channel (identified by ENDF/MT number) for a
+/// specific nuclide at a given temperature.
+///
+/// The reaction may either provide its own truncated energy grid or rely on
+/// the parent nuclide's top‑level temperature grid (offset by `threshold_idx`).
+/// `cross_section` values correspond 1‑to‑1 with the reaction's effective
+/// energy grid (either its own `energy` or a slice of the parent grid).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reaction {
+    /// Cross section values in barns for the reaction energy grid.
     pub cross_section: Vec<f64>,
+    /// Index into the parent (top‑level) energy grid where this reaction becomes active.
     pub threshold_idx: usize,
+    /// Interpolation flags (currently informational; retained from source data).
     pub interpolation: Vec<i32>,
+    /// Reaction‑specific energy grid (may be empty until synthesized).
     #[serde(skip, default)]
     pub energy: Vec<f64>,  // Reaction-specific energy grid
+    /// ENDF/MT reaction identifier.
     pub mt_number: i32,  // The MT number for this reaction
 }
 

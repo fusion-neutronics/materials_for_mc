@@ -5,6 +5,30 @@ use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
 use crate::data::ELEMENT_NAMES;
 
+/// Represents a heterogeneous collection of nuclides (or elements expanded to
+/// their naturally abundant isotopes) along with bulk properties and cached
+/// nuclear data needed for transport / analysis.
+///
+/// A `Material` starts empty; users add nuclides with [`Material::add_nuclide`]
+/// or elements with [`Material::add_element`] (which expands to isotopes using
+/// natural abundances). Density (with units), temperature (string key matching
+/// JSON data), and optional volume may then be specified. On‑demand the
+/// structure loads JSON nuclide data (through the global [`crate::config::Config`]) and builds
+/// a unified energy grid for neutrons so reaction cross sections for different
+/// nuclides can be interpolated on a common axis.
+///
+/// Key cached members:
+/// * `unified_energy_grid_neutron` – lazily constructed common energy grid.
+/// * `macroscopic_xs_neutron` – map MT -> Σ(E) on the unified grid.
+/// * `macroscopic_total_xs_by_nuclide` – optional per‑nuclide Σ_t(E) when
+///   requested (used for sampling interacting nuclides).
+///
+/// Typical workflow:
+/// 1. Create with [`Material::new`].
+/// 2. Populate composition (nuclides or elements) and set density.
+/// 3. Optionally set temperature (clears caches if changed).
+/// 4. Call cross section building methods (e.g.
+///    [`Material::calculate_macroscopic_xs_neutron`]) or sampling utilities.
 #[derive(Debug, Clone)]
 pub struct Material {
     /// Composition of the material as a map of nuclide names to their atomic fractions
@@ -17,7 +41,7 @@ pub struct Material {
     pub volume: Option<f64>,
     /// Temperature of the material in K
     pub temperature: String,
-    /// Loaded nuclide data (name -> Arc<Nuclide>)
+    /// Loaded nuclide data (name -> `Arc<Nuclide>`) shared for this material instance
     pub nuclide_data: HashMap<String, Arc<Nuclide>>,
     /// Macroscopic cross sections for different MT numbers (neutron only for now)
     /// Map of MT number (i32) -> cross sections
@@ -25,7 +49,7 @@ pub struct Material {
     /// Unified energy grid for neutrons
     pub unified_energy_grid_neutron: Vec<f64>,
     /// Optional: Per-nuclide macroscopic total cross section (MT=1) on the unified grid
-    /// Map: nuclide name -> Vec<f64> (same length as unified_energy_grid_neutron)
+    /// Map: nuclide name -> `Vec<f64>` (same length as unified_energy_grid_neutron)
     pub macroscopic_total_xs_by_nuclide: Option<HashMap<String, Vec<f64>>>,
 }
 
@@ -577,7 +601,7 @@ impl Material {
         };
 
         // Get the isotopes for this element
-    let element_isotopes = crate::element::all_element_isotopes();
+    let element_isotopes = crate::element::Element::all_nuclides_map();
 
         // Check if the element exists in our database
         let isotopes = element_isotopes.get(element_sym.as_str()).ok_or_else(|| {

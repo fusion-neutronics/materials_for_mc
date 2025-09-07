@@ -8,9 +8,20 @@ pub static CONFIG: Lazy<Mutex<Config>> = Lazy::new(|| {
     Mutex::new(Config::new())
 });
 
+/// Global configuration container for the library.
+///
+/// The configuration is primarily a mapping from nuclide names (e.g. "Li6")
+/// to the file system path of the JSON file that stores the reaction / energy
+/// data for that nuclide. Helper methods are provided to set a single path,
+/// bulk insert many paths, or query the mapping.
+///
+/// A single global instance is exposed via the `CONFIG` static (a
+/// `Lazy<Mutex<Config>>`). Most code should obtain a guard with
+/// [`Config::global`] rather than accessing the mutex directly to keep usage
+/// consistent and centralized.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Paths to nuclide cross section JSON files (nuclide name -> file path)
+    /// Map of nuclide name -> absolute or relative path to its JSON data file.
     pub cross_sections: HashMap<String, String>,
 }
 

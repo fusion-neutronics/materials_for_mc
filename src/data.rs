@@ -2,7 +2,13 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 
 
-/// Map from element symbol to sorted Vec of nuclide names (e.g. "Li" -> ["Li6", "Li7"])
+/// Map from element symbol to sorted vector of nuclide (isotope) identifiers.
+///
+/// Keys are element symbols (e.g. `"Li"`) and values are the sorted list of
+/// nuclide names for naturally occurring isotopes of that element (e.g.
+/// `["Li6", "Li7"]`). The mapping is derived automatically from
+/// [`NATURAL_ABUNDANCE`] so it stays consistent with the set of isotopes for
+/// which natural abundances are defined.
 pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy::new(|| {
     let mut map: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
     for &nuclide in NATURAL_ABUNDANCE.keys() {
@@ -21,9 +27,17 @@ pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = La
 });
 // src/data.rs
 // This module contains large static data tables for the materials library.
-// NATURAL_ABUNDANCE: canonical natural     m for all stable isotopes.
+// The volume of data is significant; doc comments summarize the intent of
+// each table while the literals provide the canonical numeric values.
 
 
+/// Natural terrestrial isotopic abundances (fractional, summing to ~1.0 per
+/// element) for stable isotopes.
+///
+/// Each key is a nuclide name (e.g. `"Fe56"`) and the value is its natural
+/// abundance by atom fraction. Values are sourced from standard reference
+/// compilations (rounded as needed). Elements with a single stable isotope are
+/// assigned 1.0.
 pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     let mut m = HashMap::new();
     // ...existing NATURAL_ABUNDANCE data from element.rs...
@@ -490,6 +504,11 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m
 });
 
+/// Mapping from element symbol to its lowercase English name.
+///
+/// Provided for convenience when presenting user‑facing descriptions and for
+/// validating element inputs (case sensitive symbol keys matching the raw
+/// nuclear data tables).
 pub static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut names = HashMap::new();
     names.insert("H", "hydrogen");
@@ -598,6 +617,14 @@ pub static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(
     names
 });
 
+/// Atomic (nuclidic) masses in atomic mass units (u) for a broad set of
+/// isotopes.
+///
+/// Keys follow the same nuclide naming convention used throughout the crate
+/// (e.g. `"U235"`). Values are taken from mass evaluation data (truncated to
+/// available precision here) and can be used for number density conversions or
+/// other mass‑dependent calculations. This table may include short‑lived or
+/// synthetic isotopes beyond those appearing in [`NATURAL_ABUNDANCE`].
 pub static ATOMIC_MASSES: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert("N1", 1.0086649159);
