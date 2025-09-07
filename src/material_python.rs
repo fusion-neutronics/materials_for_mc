@@ -13,7 +13,19 @@ pub struct PyMaterial {
 
 #[pymethods]
 impl PyMaterial {
-    /// Python binding for sample_distance_to_collision
+    /// Sample a distance to the next neutron collision.
+    ///
+    /// Uses the macroscopic total cross section (calculating it first if missing)
+    /// and an exponential distribution to sample a path length. A deterministic
+    /// RNG seed can be supplied for reproducibility.
+    ///
+    /// Args:
+    ///     energy (float): Neutron energy in eV.
+    ///     seed (Optional[int]): RNG seed; if omitted a fixed internal seed is used.
+    ///
+    /// Returns:
+    ///     Optional[float]: Sampled distance in cm, or None if total XS unavailable.
+    #[pyo3(text_signature = "(self, energy, seed=None)")]
     fn sample_distance_to_collision(&self, energy: f64, seed: Option<u64>) -> Option<f64> {
         use rand::SeedableRng;
         use rand::rngs::StdRng;
@@ -23,19 +35,42 @@ impl PyMaterial {
         };
         self.internal.sample_distance_to_collision(energy, &mut rng)
     }
+    /// Create an empty material.
+    ///
+    /// Returns:
+    ///     Material: A new material with no density or nuclides set.
     #[new]
+    #[pyo3(text_signature = "()")]
     fn new() -> Self {
         PyMaterial {
             internal: Material::new(),
         }
     }
 
+    /// Add (or update) a nuclide number fraction.
+    ///
+    /// Args:
+    ///     nuclide (str): Nuclide name (e.g. "Fe56").
+    ///     fraction (float): Number fraction (will be normalized with others later).
+    ///
+    /// Raises:
+    ///     ValueError: On invalid fraction or name.
+    #[pyo3(text_signature = "(self, nuclide, fraction)")]
     fn add_nuclide(&mut self, nuclide: String, fraction: f64) -> PyResult<()> {
         self.internal
             .add_nuclide(&nuclide, fraction)
             .map_err(|e| PyValueError::new_err(e))
     }
 
+    /// Set material density.
+    ///
+    /// Args:
+    ///     unit (str): Density unit (e.g. "g/cm3", "atoms/b-cm").
+    ///     value (float): Density value.
+    ///
+    /// Raises:
+    ///     ValueError: If unit not supported.
+    #[pyo3(text_signature = "(self, unit, value)")]
     fn set_density(&mut self, unit: String, value: f64) -> PyResult<()> {
         self.internal
             .set_density(&unit, value)
@@ -57,11 +92,13 @@ impl PyMaterial {
         nuclide_vec
     }
 
+    /// Material volume in cm^3, if set.
     #[getter]
     fn volume(&self) -> Option<f64> {
         self.internal.volume
     }
 
+    /// Set the material volume (cm^3).
     #[setter]
     fn set_volume(&mut self, value: f64) -> PyResult<()> {
         self.internal
@@ -70,6 +107,8 @@ impl PyMaterial {
         Ok(())
     }
     // Then try this:
+    /// Return a list of nuclide names currently present in the material.
+    #[pyo3(text_signature = "(self)")]
     fn get_nuclide_names(&self) -> Vec<String> {
         self.internal.get_nuclides()
     }
@@ -109,17 +148,26 @@ impl PyMaterial {
         self.__str__()
     }
 
+    /// Density value (in current units) or None.
     #[getter]
     fn density(&self) -> Option<f64> {
         self.internal.density
     }
 
+    /// Density units string.
     #[getter]
     fn density_units(&self) -> String {
         self.internal.density_units.clone()
     }
 
     #[pyo3(signature = (nuclide_json_map=None))]
+    /// Bulk load nuclide data from a mapping of nuclide -> JSON path.
+    ///
+    /// Args:
+    ///     nuclide_json_map (Optional[Dict[str,str]]): Mapping of nuclide names to JSON file paths.
+    ///
+    /// Raises:
+    ///     ValueError: If any JSON file cannot be read / parsed.
     fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: Option<&PyDict>) -> PyResult<()> {
         let mut rust_map = HashMap::new();
         if let Some(d) = nuclide_json_map {
@@ -133,7 +181,13 @@ impl PyMaterial {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Return the pointer address of the Arc<Nuclide> for a given nuclide name (for debugging/sharing checks)
+    /// Return raw pointer address of an internal shared Nuclide (debug only).
+    ///
+    /// Args:
+    ///     nuclide (str): Nuclide name.
+    ///
+    /// Returns:
+    ///     Optional[int]: Address value (process-local) or None if not present.
     fn nuclide_ptr_addr(&self, nuclide: &str) -> Option<usize> {
         self.internal.nuclide_data.get(nuclide).map(|arc| {
             let ptr: *const crate::nuclide::Nuclide = std::sync::Arc::as_ptr(arc);
@@ -141,23 +195,34 @@ impl PyMaterial {
         })
     }
 
+    /// Temperature label (e.g. "293K").
     #[getter]
     fn temperature(&self) -> String {
         self.internal.temperature.clone()
     }
     
+    /// Set current temperature label.
     #[setter]
     fn set_temperature(&mut self, temperature: &str) {
         self.internal.set_temperature(temperature);
     }
 
-    /// Return the unified energy grid for neutrons across all MT reactions
+    /// Return (and build if needed) the unified neutron energy grid.
+    ///
+    /// Returns:
+    ///     List[float]: Energy grid in eV.
+    #[pyo3(text_signature = "(self)")]
     fn unified_energy_grid_neutron(&mut self) -> Vec<f64> {
         self.internal.unified_energy_grid_neutron()
     }
 
-    /// Calculate microscopic cross sections for neutrons on the unified energy grid
-    /// If mt_filter is provided, only those MTs will be included (by integer match)
+    /// Calculate microscopic neutron cross sections on the unified energy grid.
+    ///
+    /// Args:
+    ///     mt_filter (Optional[List[int]]): Restrict to these MT numbers.
+    ///
+    /// Returns:
+    ///     Dict[str, Dict[int, List[float]]]: nuclide -> MT -> xs array
     #[pyo3(signature = (mt_filter=None))]
     fn calculate_microscopic_xs_neutron(
         &mut self,
@@ -166,24 +231,16 @@ impl PyMaterial {
         self.internal.calculate_microscopic_xs_neutron(mt_filter.as_ref())
     }
 
-    /// Calculate macroscopic cross sections for neutrons
+    /// Calculate macroscopic neutron cross sections (total or subset of MTs).
     ///
-    /// This method calculates macroscopic cross sections on the unified energy grid.
-    /// The energy grid is created internally if it doesn't exist yet.
+    /// Builds the unified energy grid if not already present.
     ///
-    /// Parameters:
-    /// -----------
-    /// mt_filter : list[int], optional
-    ///     MT reaction numbers to include (default is [1] for total)
-    /// by_nuclide : bool, default=False
-    ///     Whether to store per-nuclide macroscopic cross sections
+    /// Args:
+    ///     mt_filter (Optional[List[int]]): MT numbers to include (default [1] total).
+    ///     by_nuclide (bool): If True, store per-nuclide macroscopic XS internally.
     ///
     /// Returns:
-    /// --------
-    /// tuple(list[float], dict[int, list[float]])
-    ///     A tuple containing:
-    ///     - The energy grid (list of energy points in eV)
-    ///     - Dictionary mapping MT numbers to cross section values
+    ///     Tuple[List[float], Dict[int, List[float]]]: (energy grid, MT -> Σ array)
     #[pyo3(signature = (mt_filter = None, by_nuclide = false))]
     fn calculate_macroscopic_xs_neutron(
         &mut self,
@@ -199,50 +256,60 @@ impl PyMaterial {
         (energy_grid, xs_dict_i32)
     }
 
-    /// Get the macroscopic cross sections for neutrons
+    /// Cached macroscopic neutron cross sections (MT -> Σ(E)).
     #[getter]
     fn macroscopic_xs_neutron(&self) -> HashMap<i32, Vec<f64>> {
         self.internal.macroscopic_xs_neutron.clone()
     }
 
-    /// Get the atoms per barn-centimeter for each nuclide in the material
+    /// Number density (atoms / barn-cm) per nuclide.
+    ///
+    /// Returns:
+    ///     Dict[str, float]: nuclide -> atoms / b-cm
     fn get_atoms_per_barn_cm(&self) -> HashMap<String, f64> {
         self.internal.get_atoms_per_barn_cm()
     }
 
-    /// Calculate the neutron mean free path at a given energy
-    /// 
-    /// This method calculates the mean free path of a neutron at a specific energy
-    /// by interpolating the total macroscopic cross section and then taking 1/Σ.
-    /// 
-    /// If the total macroscopic cross section hasn't been calculated yet, it will
-    /// automatically call calculate_total_xs_neutron() first.
-    /// 
-    /// # Arguments
-    /// * `energy` - The energy of the neutron in eV
-    /// 
-    /// # Returns
-    /// * The mean free path in cm, or None if there's no cross section data
+    /// Compute neutron mean free path at a given energy.
+    ///
+    /// Args:
+    ///     energy (float): Neutron energy in eV.
+    ///
+    /// Returns:
+    ///     Optional[float]: Mean free path (cm) or None if total XS unavailable.
     fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
         self.internal.mean_free_path_neutron(energy)
     }
 
+    /// Add a natural element by atomic fraction (expands to isotopes internally).
+    ///
+    /// Args:
+    ///     element (str): Element symbol (e.g. "Fe").
+    ///     fraction (float): Atomic fraction for the element.
+    #[pyo3(text_signature = "(self, element, fraction)")]
     fn add_element(&mut self, element: String, fraction: f64) -> PyResult<()> {
         self.internal
             .add_element(&element, fraction)
             .map_err(|e| PyValueError::new_err(e))
     }
 
-    /// Get the sorted list of all unique MT numbers available in this material (across all nuclides)
+    /// Sorted list of all unique MT reaction numbers present.
     #[getter]
     fn reaction_mts(&mut self) -> PyResult<Vec<i32>> {
         self.internal
             .reaction_mts()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
-    /// Sample which nuclide a neutron interacts with at a given energy, using per-nuclide macroscopic total xs
-    /// Returns the nuclide name as a String, or raises if not possible
-    /// If seed is provided, uses it for reproducibility
+    /// Sample which nuclide undergoes an interaction at a given energy.
+    ///
+    /// Uses per-nuclide macroscopic total cross sections as weights.
+    ///
+    /// Args:
+    ///     energy (float): Neutron energy in eV.
+    ///     seed (Optional[int]): RNG seed for reproducibility.
+    ///
+    /// Returns:
+    ///     str: Selected nuclide name.
     #[pyo3(signature = (energy, seed=None))]
     fn sample_interacting_nuclide(&self, energy: f64, seed: Option<u64>) -> PyResult<String> {
         use rand::SeedableRng;
