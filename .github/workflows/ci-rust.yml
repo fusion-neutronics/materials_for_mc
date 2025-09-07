@@ -28,6 +28,8 @@ jobs:
         run: cargo build --verbose
       - name: Test
         run: cargo test --verbose
+      - name: Build Rust docs (public API)
+        run: cargo doc --no-deps
       - name: Test examples
         run: |
           cd examples/rust
