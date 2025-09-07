@@ -3,8 +3,7 @@ use std::sync::Arc;
 use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use crate::utilities::interpolate_linear;
-use crate::data::ELEMENT_NAMES; // SUM_RULES not directly needed here
-// Removed unused imports: SUM_RULES, add_to_processing_order, SeedableRng
+use crate::data::ELEMENT_NAMES;
 
 #[derive(Debug, Clone)]
 pub struct Material {

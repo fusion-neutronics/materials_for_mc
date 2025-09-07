@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen::to_value;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, SUM_RULES, ELEMENT_NAMES, ATOMIC_MASSES, get_all_mt_descendants};
+use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, ELEMENT_NAMES, ATOMIC_MASSES};
 
 #[wasm_bindgen]
 pub fn natural_abundance() -> JsValue {
@@ -20,12 +20,6 @@ pub fn element_nuclides() -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn sum_rules() -> JsValue {
-    let map: std::collections::HashMap<i32, Vec<i32>> = SUM_RULES.iter().map(|(k, v)| (*k, v.clone())).collect();
-    to_value(&map).unwrap()
-}
-
-#[wasm_bindgen]
 pub fn element_names() -> JsValue {
     let map: std::collections::HashMap<String, String> = ELEMENT_NAMES.iter().map(|(symbol, name)| ((*symbol).to_string(), (*name).to_string())).collect();
     to_value(&map).unwrap()
@@ -35,10 +29,4 @@ pub fn element_names() -> JsValue {
 pub fn atomic_masses() -> JsValue {
     let map: std::collections::HashMap<String, f64> = ATOMIC_MASSES.iter().map(|(nuclide, mass)| ((*nuclide).to_string(), *mass)).collect();
     to_value(&map).unwrap()
-}
-
-#[wasm_bindgen]
-pub fn wasm_get_all_mt_descendants(mt_num: i32) -> js_sys::Array {
-    let v = get_all_mt_descendants(mt_num);
-    v.into_iter().map(|x| wasm_bindgen::JsValue::from(js_sys::Number::from(x))).collect::<js_sys::Array>()
 }
