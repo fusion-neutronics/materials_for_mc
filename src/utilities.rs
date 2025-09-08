@@ -1,7 +1,8 @@
 // ...existing code...
 /// Utility functions for materials_for_mc
 
-/// Linear interpolation on a linear scale
+#[doc(hidden)]
+/// Linear interpolation on a linear scale (hidden from docs)
 ///
 /// Given arrays of x and y values, interpolate to find the y value at x_new.
 /// If x_new is outside the range of x, returns the first or last y value.
@@ -40,7 +41,8 @@ pub fn interpolate_linear(x: &[f64], y: &[f64], x_new: f64) -> f64 {
     y1 + (x_new - x1) * (y2 - y1) / (x2 - x1)
 }
 
-/// Log-log interpolation
+#[doc(hidden)]
+/// Log-log interpolation (hidden from docs)
 ///
 /// Given arrays of x and y values, interpolate on a log-log scale to find the y value at x_new.
 /// If x_new is outside the range of x, returns the first or last y value.
