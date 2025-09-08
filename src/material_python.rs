@@ -1,4 +1,3 @@
-
 use pyo3::prelude::*;
 // use pyo3::types::PyDict;
 use crate::material::Material;
@@ -27,8 +26,8 @@ impl PyMaterial {
     ///     Optional[float]: Sampled distance in cm, or None if total XS unavailable.
     #[pyo3(text_signature = "(self, energy, seed=None)")]
     fn sample_distance_to_collision(&self, energy: f64, seed: Option<u64>) -> Option<f64> {
-        use rand::SeedableRng;
         use rand::rngs::StdRng;
+        use rand::SeedableRng;
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::seed_from_u64(12345),
@@ -81,14 +80,16 @@ impl PyMaterial {
     #[getter]
     fn nuclides(&self) -> Vec<(String, f64)> {
         // Convert HashMap to a Vec of tuples
-        let mut nuclide_vec: Vec<(String, f64)> = self.internal.nuclides
+        let mut nuclide_vec: Vec<(String, f64)> = self
+            .internal
+            .nuclides
             .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect();
-        
+
         // Sort by nuclide name for consistent order
         nuclide_vec.sort_by(|a, b| a.0.cmp(&b.0));
-        
+
         nuclide_vec
     }
 
@@ -168,7 +169,11 @@ impl PyMaterial {
     ///
     /// Raises:
     ///     ValueError: If any JSON file cannot be read / parsed.
-    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: Option<&PyDict>) -> PyResult<()> {
+    fn read_nuclides_from_json(
+        &mut self,
+        py: Python,
+        nuclide_json_map: Option<&PyDict>,
+    ) -> PyResult<()> {
         let mut rust_map = HashMap::new();
         if let Some(d) = nuclide_json_map {
             for (k, v) in d.iter() {
@@ -177,7 +182,8 @@ impl PyMaterial {
                 rust_map.insert(key, val);
             }
         }
-        self.internal.read_nuclides_from_json(&rust_map)
+        self.internal
+            .read_nuclides_from_json(&rust_map)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
@@ -200,7 +206,7 @@ impl PyMaterial {
     fn temperature(&self) -> String {
         self.internal.temperature.clone()
     }
-    
+
     /// Set current temperature label.
     #[setter]
     fn set_temperature(&mut self, temperature: &str) {
@@ -228,7 +234,8 @@ impl PyMaterial {
         &mut self,
         mt_filter: Option<Vec<i32>>,
     ) -> HashMap<String, HashMap<i32, Vec<f64>>> {
-        self.internal.calculate_microscopic_xs_neutron(mt_filter.as_ref())
+        self.internal
+            .calculate_microscopic_xs_neutron(mt_filter.as_ref())
     }
 
     /// Calculate macroscopic neutron cross sections (total or subset of MTs).
@@ -252,7 +259,9 @@ impl PyMaterial {
             Some(v) => v,
             None => &default_mt,
         };
-        let (energy_grid, xs_dict_i32) = self.internal.calculate_macroscopic_xs_neutron(mt_vec, by_nuclide);
+        let (energy_grid, xs_dict_i32) = self
+            .internal
+            .calculate_macroscopic_xs_neutron(mt_vec, by_nuclide);
         (energy_grid, xs_dict_i32)
     }
 
@@ -312,17 +321,15 @@ impl PyMaterial {
     ///     str: Selected nuclide name.
     #[pyo3(signature = (energy, seed=None))]
     fn sample_interacting_nuclide(&self, energy: f64, seed: Option<u64>) -> PyResult<String> {
-        use rand::SeedableRng;
         use rand::rngs::StdRng;
+        use rand::SeedableRng;
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::seed_from_u64(12345),
         };
         Ok(self.internal.sample_interacting_nuclide(energy, &mut rng))
     }
-
 }
-
 
 // Add these helper methods in a separate impl block
 impl PyMaterial {
@@ -330,7 +337,7 @@ impl PyMaterial {
     pub(crate) fn get_internal(&self) -> &Material {
         &self.internal
     }
-    
+
     // Helper method to create a PyMaterial from a Material
     pub(crate) fn from_material(material: Material) -> Self {
         PyMaterial { internal: material }

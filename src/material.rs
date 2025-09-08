@@ -1,12 +1,12 @@
+use crate::config::CONFIG;
+use crate::data::ELEMENT_NAMES;
+use crate::nuclide::{get_or_load_nuclide, Nuclide};
+use crate::utilities::interpolate_linear;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::nuclide::{Nuclide, get_or_load_nuclide};
-use crate::config::CONFIG;
-use crate::utilities::interpolate_linear;
-use crate::data::ELEMENT_NAMES;
 
 /// Represents a heterogeneous collection of nuclides (or elements expanded to
-/// their naturally abundant isotopes) along with bulk properties and cached
+/// their naturally abundant isotopes) along with the material density and
 /// nuclear data needed for transport / analysis.
 ///
 /// A `Material` starts empty; users add nuclides with [`Material::add_nuclide`]
@@ -20,7 +20,7 @@ use crate::data::ELEMENT_NAMES;
 /// Key cached members:
 /// * `unified_energy_grid_neutron` – lazily constructed common energy grid.
 /// * `macroscopic_xs_neutron` – map MT -> Σ(E) on the unified grid.
-/// * `macroscopic_total_xs_by_nuclide` – optional per‑nuclide Σ_t(E) when
+/// * `macroscopic_xs_neutron_total_by_nuclide` – optional per‑nuclide Σ_t(E) when
 ///   requested (used for sampling interacting nuclides).
 ///
 /// Typical workflow:
@@ -50,10 +50,33 @@ pub struct Material {
     pub unified_energy_grid_neutron: Vec<f64>,
     /// Optional: Per-nuclide macroscopic total cross section (MT=1) on the unified grid
     /// Map: nuclide name -> `Vec<f64>` (same length as unified_energy_grid_neutron)
-    pub macroscopic_total_xs_by_nuclide: Option<HashMap<String, Vec<f64>>>,
+    pub macroscopic_xs_neutron_total_by_nuclide: Option<HashMap<String, Vec<f64>>>,
 }
 
 impl Material {
+    pub fn new() -> Self {
+        Material {
+            nuclides: HashMap::new(),
+            density: None,
+            density_units: String::from("g/cm3"),
+            volume: None,                     // Initialize volume as None
+            temperature: String::from("294"), // Default temperature in K (room temperature)
+            nuclide_data: HashMap::new(),
+            macroscopic_xs_neutron: HashMap::new(),
+            unified_energy_grid_neutron: Vec::new(),
+            macroscopic_xs_neutron_total_by_nuclide: None,
+        }
+    }
+
+    pub fn add_nuclide(&mut self, nuclide: impl AsRef<str>, fraction: f64) -> Result<(), String> {
+        if fraction < 0.0 {
+            return Err(String::from("Fraction cannot be negative"));
+        }
+
+        self.nuclides
+            .insert(String::from(nuclide.as_ref()), fraction);
+        Ok(())
+    }
 
     /// Sample the distance to the next collision for a neutron at the given energy.
     /// Uses the total macroscopic cross section (MT=1).
@@ -64,34 +87,13 @@ impl Material {
         rng: &mut R,
     ) -> Option<f64> {
         let xs_vec = self.macroscopic_xs_neutron.get(&1)?;
-        let sigma_t = crate::utilities::interpolate_linear(&self.unified_energy_grid_neutron, xs_vec, energy);
+        let sigma_t =
+            crate::utilities::interpolate_linear(&self.unified_energy_grid_neutron, xs_vec, energy);
         if sigma_t <= 0.0 {
             return None;
         }
         let xi: f64 = rng.gen_range(0.0..1.0);
         Some(-xi.ln() / sigma_t)
-    }
-    pub fn new() -> Self {
-        Material {
-            nuclides: HashMap::new(),
-            density: None,
-            density_units: String::from("g/cm3"),
-            volume: None, // Initialize volume as None
-            temperature: String::from("294"), // Default temperature in K (room temperature)
-            nuclide_data: HashMap::new(),
-            macroscopic_xs_neutron: HashMap::new(),
-            unified_energy_grid_neutron: Vec::new(),
-            macroscopic_total_xs_by_nuclide: None,
-        }
-    }
-
-    pub fn add_nuclide(&mut self, nuclide: impl AsRef<str>, fraction: f64) -> Result<(), String> {
-        if fraction < 0.0 {
-            return Err(String::from("Fraction cannot be negative"));
-        }
-
-        self.nuclides.insert(String::from(nuclide.as_ref()), fraction);
-        Ok(())
     }
 
     pub fn set_density(&mut self, unit: impl AsRef<str>, value: f64) -> Result<(), String> {
@@ -128,34 +130,40 @@ impl Material {
     }
 
     /// Read nuclide data from JSON files for this material
-    pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn read_nuclides_from_json(
+        &mut self,
+        nuclide_json_map: &HashMap<String, String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Collect needed nuclide names
         let mut nuclide_names: Vec<String> = self.nuclides.keys().cloned().collect();
         nuclide_names.sort(); // ensure deterministic alphabetical load order
-        
+
         // Build merged source map: explicit entries override, missing filled from CONFIG
-        let mut merged: HashMap<String,String> = HashMap::new();
-        
+        let mut merged: HashMap<String, String> = HashMap::new();
+
         // Start with global config entries for required nuclides, with proper error handling
-        let cfg = crate::config::CONFIG.lock()
+        let cfg = crate::config::CONFIG
+            .lock()
             .map_err(|e| format!("Failed to acquire lock on CONFIG: {}", e))?;
-            
-        for n in &nuclide_names { 
-            if let Some(p) = cfg.cross_sections.get(n) { 
-                merged.insert(n.clone(), p.clone()); 
-            } 
+
+        for n in &nuclide_names {
+            if let Some(p) = cfg.cross_sections.get(n) {
+                merged.insert(n.clone(), p.clone());
+            }
         }
         drop(cfg);
-        
+
         // Override with any provided mapping entries (even if extra keys not in composition)
-        for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
-        let source_map: &HashMap<String,String> = &merged;
-        
+        for (k, v) in nuclide_json_map {
+            merged.insert(k.clone(), v.clone());
+        }
+        let source_map: &HashMap<String, String> = &merged;
+
         // Load nuclides using the centralized function in the nuclide module
         use std::collections::HashSet;
         let mut temp_set: HashSet<String> = HashSet::new();
         temp_set.insert(self.temperature.clone());
-        
+
         for nuclide_name in nuclide_names {
             let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
@@ -165,27 +173,35 @@ impl Material {
 
     /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.
     /// If the nuclide already exists it will be overwritten.
-    pub fn load_nuclide_from_json_str(&mut self, nuclide_name: &str, json_content: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_nuclide_from_json_str(
+        &mut self,
+        nuclide_name: &str,
+        json_content: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let nuclide = crate::nuclide::read_nuclide_from_json_str(json_content)?;
-        self.nuclide_data.insert(nuclide_name.to_string(), Arc::new(nuclide));
+        self.nuclide_data
+            .insert(nuclide_name.to_string(), Arc::new(nuclide));
         Ok(())
     }
 
     /// Ensure all nuclides are loaded, using the global configuration if needed
     fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let nuclide_names: Vec<String> = self.nuclides.keys()
+        let nuclide_names: Vec<String> = self
+            .nuclides
+            .keys()
             .filter(|name| !self.nuclide_data.contains_key(*name))
             .cloned()
             .collect();
-        
+
         if nuclide_names.is_empty() {
             return Ok(());
         }
-        
+
         // Get the global configuration with proper error handling
-        let config = CONFIG.lock()
+        let config = CONFIG
+            .lock()
             .map_err(|e| format!("Failed to acquire lock on CONFIG: poisoned mutex - {}", e))?;
-        
+
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
             use std::collections::HashSet;
@@ -194,31 +210,29 @@ impl Material {
             match get_or_load_nuclide(&nuclide_name, &config.cross_sections, Some(&temps)) {
                 Ok(nuclide) => {
                     self.nuclide_data.insert(nuclide_name.clone(), nuclide);
-                },
+                }
                 Err(e) => {
                     return Err(format!("Failed to load nuclide '{}': {}", nuclide_name, e).into());
                 }
             }
         }
-        
+
         Ok(())
     }
 
     /// Build a unified energy grid for all nuclides for neutrons across all MT reactions
     /// This method also stores the result in the material's unified_energy_grid_neutron property
-    pub fn unified_energy_grid_neutron(
-        &mut self,
-    ) -> Vec<f64> {
+    pub fn unified_energy_grid_neutron(&mut self) -> Vec<f64> {
         // Ensure nuclides are loaded before proceeding
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
+
         // Check if we already have this grid in the cache
         if !self.unified_energy_grid_neutron.is_empty() {
             return self.unified_energy_grid_neutron.clone();
         }
-        
+
         // If not cached, build the grid
         let mut all_energies = Vec::new();
         let temperature = &self.temperature;
@@ -228,7 +242,6 @@ impl Material {
             if let Some(nuclide_data) = self.nuclide_data.get(nuclide) {
                 // Check if there's a top-level energy grid
                 if let Some(energy_map) = &nuclide_data.energy {
-
                     if let Some(energy_grid) = energy_map.get(temperature) {
                         all_energies.extend(energy_grid);
                     }
@@ -242,14 +255,12 @@ impl Material {
 
         // Cache the result
         self.unified_energy_grid_neutron = all_energies.clone();
-        
+
         all_energies
     }
 
-
-
     /// Calculate microscopic cross sections for neutrons on the unified energy grid
-    /// 
+    ///
     /// This method interpolates the microscopic cross sections for each nuclide
     /// onto the unified energy grid for all available MT reactions, or only for the specified MTs if provided.
     /// If mt_filter is Some, only those MTs will be included (by int match).
@@ -262,89 +273,56 @@ impl Material {
         if let Err(e) = self.ensure_nuclides_loaded() {
             panic!("Error loading nuclides: {}", e);
         }
-        
+
         let grid = self.unified_energy_grid_neutron();
         let mut micro_xs: HashMap<String, HashMap<i32, Vec<f64>>> = HashMap::new();
         let temperature = &self.temperature;
-
-        // All hierarchical MTs are now present in the JSON files, so we only need to interpolate explicit reactions.
-        if let Some(filter) = mt_filter {
-            let mt_set: std::collections::HashSet<i32> = filter.iter().copied().collect();
-            for nuclide_name in self.nuclides.keys() {
-                if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
-                    let mut nuclide_xs: HashMap<i32, Vec<f64>> = HashMap::new();
-                    let temp_reactions_opt = nuclide_data.reactions.get(temperature);
-                    if let Some(temp_reactions) = temp_reactions_opt {
-                        if let Some(energy_map) = &nuclide_data.energy {
-                            if let Some(energy_grid) = energy_map.get(temperature) {
-                                for (&mt, reaction) in temp_reactions {
-                                    if mt_set.contains(&mt) {
-                                        let threshold_idx = reaction.threshold_idx;
-                                        if threshold_idx < energy_grid.len() {
-                                            let reaction_energy = &energy_grid[threshold_idx..];
-                                            if reaction.cross_section.len() == reaction_energy.len() {
-                                                let mut xs_values = Vec::with_capacity(grid.len());
-                                                for &grid_energy in &grid {
-                                                    if grid_energy < reaction_energy[0] {
-                                                        xs_values.push(0.0);
-                                                    } else {
-                                                        let xs = interpolate_linear(&reaction_energy, &reaction.cross_section, grid_energy);
-                                                        xs_values.push(xs);
-                                                    }
-                                                }
-                                                nuclide_xs.insert(mt, xs_values);
+        // Unified logic: iterate all reactions; if a filter is provided skip non-matching MTs.
+        let mt_set_opt: Option<std::collections::HashSet<i32>> = mt_filter.map(|v| v.iter().copied().collect());
+        for nuclide_name in self.nuclides.keys() {
+            if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
+                let mut nuclide_reactions_map: HashMap<i32, Vec<f64>> = HashMap::new();
+                if let Some(temp_reactions) = nuclide_data.reactions.get(temperature) {
+                    if let Some(energy_map) = &nuclide_data.energy {
+                        if let Some(energy_grid) = energy_map.get(temperature) {
+                            for (&mt, reaction) in temp_reactions {
+                                if let Some(ref set) = mt_set_opt {
+                                    if !set.contains(&mt) { continue; }
+                                }
+                                let threshold_idx = reaction.threshold_idx;
+                                if threshold_idx < energy_grid.len() {
+                                    let reaction_energy = &energy_grid[threshold_idx..];
+                                    if reaction.cross_section.len() == reaction_energy.len() {
+                                        let mut xs_values = Vec::with_capacity(grid.len());
+                                        for &grid_energy in &grid {
+                                            if grid_energy < reaction_energy[0] {
+                                                xs_values.push(0.0);
+                                            } else {
+                                                let xs = interpolate_linear(
+                                                    &reaction_energy,
+                                                    &reaction.cross_section,
+                                                    grid_energy,
+                                                );
+                                                xs_values.push(xs);
                                             }
                                         }
+                                        nuclide_reactions_map.insert(mt, xs_values);
                                     }
                                 }
                             }
                         }
-                    }
-                    if !nuclide_xs.is_empty() {
-                        micro_xs.insert(nuclide_name.clone(), nuclide_xs);
                     }
                 }
-            }
-        } else {
-            for nuclide_name in self.nuclides.keys() {
-                if let Some(nuclide_data) = self.nuclide_data.get(nuclide_name) {
-                    let mut explicit_reactions = HashMap::new();
-                    let temp_reactions_opt = nuclide_data.reactions.get(temperature);
-                    if let Some(temp_reactions) = temp_reactions_opt {
-                        if let Some(energy_map) = &nuclide_data.energy {
-                            if let Some(energy_grid) = energy_map.get(temperature) {
-                                for (&mt, reaction) in temp_reactions {
-                                    let threshold_idx = reaction.threshold_idx;
-                                    if threshold_idx < energy_grid.len() {
-                                        let reaction_energy = &energy_grid[threshold_idx..];
-                                        if reaction.cross_section.len() == reaction_energy.len() {
-                                            let mut xs_values = Vec::with_capacity(grid.len());
-                                            for &grid_energy in &grid {
-                                                if grid_energy < reaction_energy[0] {
-                                                    xs_values.push(0.0);
-                                                } else {
-                                                    let xs = interpolate_linear(&reaction_energy, &reaction.cross_section, grid_energy);
-                                                    xs_values.push(xs);
-                                                }
-                                            }
-                                            explicit_reactions.insert(mt, xs_values);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !explicit_reactions.is_empty() {
-                        micro_xs.insert(nuclide_name.clone(), explicit_reactions);
-                    }
+                if !nuclide_reactions_map.is_empty() {
+                    micro_xs.insert(nuclide_name.clone(), nuclide_reactions_map);
                 }
             }
         }
         micro_xs
     }
-                               
+
     /// Calculate macroscopic cross sections for neutrons on the unified energy grid
-    /// 
+    ///
     /// This method calculates the total macroscopic cross section by:
     /// 1. Interpolating the microscopic cross sections onto the unified grid
     /// 2. Multiplying by atom density for each nuclide
@@ -372,7 +350,6 @@ impl Material {
         // Use the filter directly, as all hierarchical MTs are now present in the JSON files.
         let micro_xs = self.calculate_microscopic_xs_neutron(Some(mt_filter));
 
-
         // Create a map to hold macroscopic cross sections for each MT (i32)
         let mut macro_xs: HashMap<i32, Vec<f64>> = HashMap::new();
         // Find all unique MT numbers across all nuclides (as i32)
@@ -385,7 +362,11 @@ impl Material {
             }
         }
         // Get the grid length (from any MT reaction of any nuclide, all should have same length)
-        let grid_length = micro_xs.values().next().and_then(|xs| xs.values().next()).map_or(0, |v| v.len());
+        let grid_length = micro_xs
+            .values()
+            .next()
+            .and_then(|xs| xs.values().next())
+            .map_or(0, |v| v.len());
         // Initialize macro_xs with zeros for each MT
         for &mt in &all_mts {
             macro_xs.insert(mt, vec![0.0; grid_length]);
@@ -395,7 +376,11 @@ impl Material {
         let atoms_per_bcm_map = self.get_atoms_per_barn_cm();
         // ...existing code...
         // Optionally: collect per-nuclide macroscopic total xs (MT=1) if requested
-        let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide { Some(HashMap::new()) } else { None };
+        let mut by_nuclide_map: Option<HashMap<String, Vec<f64>>> = if by_nuclide {
+            Some(HashMap::new())
+        } else {
+            None
+        };
 
         for (nuclide, _) in &self.nuclides {
             let atoms_per_bcm = atoms_per_bcm_map.get(nuclide);
@@ -404,13 +389,23 @@ impl Material {
             if by_nuclide_map.is_some() {
                 if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
                     if let Some(xs_values) = nuclide_data.get(&1) {
-                        let macro_vec: Vec<f64> = xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect();
-                        by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), macro_vec);
+                        let macro_vec: Vec<f64> =
+                            xs_values.iter().map(|&xs| atoms_per_bcm * xs).collect();
+                        by_nuclide_map
+                            .as_mut()
+                            .unwrap()
+                            .insert(nuclide.clone(), macro_vec);
                     } else {
-                    by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
+                        by_nuclide_map
+                            .as_mut()
+                            .unwrap()
+                            .insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
                     }
                 } else {
-                    by_nuclide_map.as_mut().unwrap().insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
+                    by_nuclide_map
+                        .as_mut()
+                        .unwrap()
+                        .insert(nuclide.clone(), vec![0.0; energy_grid.len()]);
                 }
             }
             if let (Some(nuclide_data), Some(atoms_per_bcm)) = (nuclide_data, atoms_per_bcm) {
@@ -426,9 +421,9 @@ impl Material {
 
         // If by_nuclide was requested, update struct field
         if by_nuclide {
-            self.macroscopic_total_xs_by_nuclide = by_nuclide_map;
+            self.macroscopic_xs_neutron_total_by_nuclide = by_nuclide_map;
         } else {
-            self.macroscopic_total_xs_by_nuclide = None;
+            self.macroscopic_xs_neutron_total_by_nuclide = None;
         }
         // Cache the results in the material
         self.macroscopic_xs_neutron = macro_xs.clone();
@@ -437,18 +432,17 @@ impl Material {
         (energy_grid, macro_xs)
     }
 
-
     /// Calculate the neutron mean free path at a given energy
-    /// 
+    ///
     /// This method calculates the mean free path of a neutron at a specific energy
     /// by interpolating the total macroscopic cross section and then taking 1/Σ.
-    /// 
+    ///
     /// If the total macroscopic cross section hasn't been calculated yet, it will
     /// automatically call calculate_total_xs_neutron() first.
-    /// 
+    ///
     /// # Arguments
     /// * `energy` - The energy of the neutron in eV
-    /// 
+    ///
     /// # Returns
     /// * The mean free path in cm, or None if there's no cross section data
     pub fn mean_free_path_neutron(&mut self, energy: f64) -> Option<f64> {
@@ -463,26 +457,22 @@ impl Material {
         }
         // Get the total cross section and energy grid
         let total_xs = &self.macroscopic_xs_neutron[&1];
-        
+
         // If we have an empty cross section array, return None
         if total_xs.is_empty() || self.unified_energy_grid_neutron.is_empty() {
             return None;
         }
-        
+
         // Make sure the energy grid and cross section have the same length
         if total_xs.len() != self.unified_energy_grid_neutron.len() {
             eprintln!("Error: Energy grid and cross section lengths don't match");
             return None;
         }
-        
+
         // Interpolate to get the cross section at the requested energy
         // Using linear-linear interpolation
-        let cross_section = interpolate_linear(
-            &self.unified_energy_grid_neutron, 
-            total_xs, 
-            energy
-        );
-        
+        let cross_section = interpolate_linear(&self.unified_energy_grid_neutron, total_xs, energy);
+
         // Mean free path = 1/Σ
         // Check for zero to avoid division by zero
         if cross_section <= 0.0 {
@@ -493,38 +483,38 @@ impl Material {
     }
 
     /// Calculate atoms per barn-centimeter for each nuclide in the material
-    /// 
+    ///
     /// This method calculates the number density of atoms for each nuclide,
     /// using the atomic fractions and material density.
-    /// 
+    ///
     /// Returns a HashMap mapping nuclide symbols to their atom density in atoms/b-cm,
     /// which is the unit used by OpenMC (atoms per barn-centimeter).
     /// Returns an empty HashMap if the material density is not set.
     pub fn get_atoms_per_barn_cm(&self) -> HashMap<String, f64> {
         let mut atoms_per_bcm = HashMap::new();
-        
+
         // Return empty HashMap if density is not set
         if self.density.is_none() {
             panic!("Cannot calculate atoms per barn-cm: Material has no density defined");
         }
-        
+
         // Return empty HashMap if no nuclides are defined
         if self.nuclides.is_empty() {
             panic!("Cannot calculate atoms per barn-cm: Material has no nuclides defined");
         }
-        
+
         // Convert density to g/cm³ if necessary
         let mut density = self.density.unwrap();
-        
+
         // Handle different density units
         match self.density_units.as_str() {
-            "g/cm3" => (), // Already in the right units
+            "g/cm3" => (),                         // Already in the right units
             "kg/m3" => density = density / 1000.0, // Convert kg/m³ to g/cm³
             _ => {
                 // For any other units, just use the value as is, but it may give incorrect results
             }
         }
-        
+
         // Use canonical atomic masses from crate::data::ATOMIC_MASSES
         let atomic_masses = &crate::data::ATOMIC_MASSES;
         // First, get the atomic masses for all nuclides
@@ -533,14 +523,17 @@ impl Material {
             let mass = if let Some(mass_value) = atomic_masses.get(nuclide.as_str()) {
                 *mass_value
             } else {
-                panic!("Atomic mass for nuclide '{}' not found in the database", nuclide);
+                panic!(
+                    "Atomic mass for nuclide '{}' not found in the database",
+                    nuclide
+                );
             };
             nuclide_masses.insert(nuclide.clone(), mass);
         }
-        
+
         // Normalize the fractions to sum to 1.0 for all cases
         let total_fraction: f64 = self.nuclides.values().sum();
-        
+
         // Calculate the average molar mass (weighted)
         let mut weighted_mass_sum = 0.0;
         for (nuclide, &fraction) in &self.nuclides {
@@ -548,20 +541,21 @@ impl Material {
             weighted_mass_sum += fraction * mass;
         }
         let average_molar_mass = weighted_mass_sum / total_fraction;
-        
+
         // Calculate atom densities using OpenMC's approach
         for (nuclide, &fraction) in &self.nuclides {
             let normalized_fraction = fraction / total_fraction;
             let _mass = nuclide_masses.get(nuclide).unwrap();
-            
+
             // For a mixture, use the formula:
             // atom_density = density * N_A / avg_molar_mass * normalized_fraction * 1e-24
             const AVOGADRO: f64 = 6.02214076e23;
-            let atom_density = density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
-            
+            let atom_density =
+                density * AVOGADRO / average_molar_mass * normalized_fraction * 1.0e-24;
+
             atoms_per_bcm.insert(nuclide.clone(), atom_density);
         }
-        
+
         atoms_per_bcm
     }
 
@@ -601,16 +595,19 @@ impl Material {
         };
 
         // Get the isotopes for this element
-    let element_isotopes = crate::element::Element::all_nuclides_map();
-
-        // Check if the element exists in our database
-        let isotopes = element_isotopes.get(element_sym.as_str()).ok_or_else(|| {
-            format!("Element '{}' not found in the natural abundance database", element_sym)
-        })?;
+        // Use the static ELEMENT_NUCLIDES map directly to avoid rebuilding a full map each call.
+        let isotopes_vec = crate::data::ELEMENT_NUCLIDES
+            .get(element_sym.as_str())
+            .ok_or_else(|| {
+                format!(
+                    "Element '{}' not found in the natural abundance database",
+                    element_sym
+                )
+            })?;
 
         // Add each isotope with its natural abundance
-        for isotope in isotopes.iter() {
-            if let Some(abundance) = crate::data::NATURAL_ABUNDANCE.get(isotope.as_str()) {
+        for &isotope in isotopes_vec.iter() {
+            if let Some(abundance) = crate::data::NATURAL_ABUNDANCE.get(isotope) {
                 let isotope_fraction = fraction * abundance;
                 if isotope_fraction > 0.0 {
                     self.add_nuclide(isotope, isotope_fraction)?;
@@ -619,7 +616,7 @@ impl Material {
         }
         Ok(())
     }
-    
+
     /// Returns a sorted list of all unique MT numbers available in this material (across all nuclides).
     /// Ensures all nuclide JSON data is loaded.
     pub fn reaction_mts(&mut self) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
@@ -640,8 +637,12 @@ impl Material {
 
     /// Sample which nuclide a neutron interacts with at a given energy, using per-nuclide macroscopic total xs
     /// Returns the nuclide name as a String, or None if not possible
-    pub fn sample_interacting_nuclide<R: rand::Rng + ?Sized>(&self, energy: f64, rng: &mut R) -> String {
-        let by_nuclide = self.macroscopic_total_xs_by_nuclide.as_ref().expect("macroscopic_total_xs_by_nuclide is None: call calculate_macroscopic_xs_neutron with by_nuclide=true first");
+    pub fn sample_interacting_nuclide<R: rand::Rng + ?Sized>(
+        &self,
+        energy: f64,
+        rng: &mut R,
+    ) -> String {
+        let by_nuclide = self.macroscopic_xs_neutron_total_by_nuclide.as_ref().expect("macroscopic_xs_neutron_total_by_nuclide is None: call calculate_macroscopic_xs_neutron with by_nuclide=true first");
         let mut xs_by_nuclide = Vec::new();
         let mut total = 0.0;
         let mut debug_info = String::new();
@@ -650,7 +651,11 @@ impl Material {
                 debug_info.push_str(&format!("{}: EMPTY\n", nuclide));
                 continue;
             }
-            let xs = crate::utilities::interpolate_linear(&self.unified_energy_grid_neutron, xs_vec, energy);
+            let xs = crate::utilities::interpolate_linear(
+                &self.unified_energy_grid_neutron,
+                xs_vec,
+                energy,
+            );
             debug_info.push_str(&format!("{}: xs = {}\n", nuclide, xs));
             if xs > 0.0 {
                 xs_by_nuclide.push((nuclide, xs));
@@ -658,7 +663,10 @@ impl Material {
             }
         }
         if xs_by_nuclide.is_empty() || total <= 0.0 {
-            panic!("No nuclide has nonzero macroscopic total cross section at energy {}. Details:\n{}", energy, debug_info);
+            panic!(
+                "No nuclide has nonzero macroscopic total cross section at energy {}. Details:\n{}",
+                energy, debug_info
+            );
         }
         let xi = rng.gen_range(0.0..total);
         let mut accum = 0.0;
@@ -673,34 +681,41 @@ impl Material {
 }
 //... (The rest of the file, including tests, remains unchanged)
 #[cfg(test)]
-    #[test]
-    fn test_sample_distance_to_collision() {
-        use rand::SeedableRng;
-        use rand::rngs::StdRng;
-        let mut material = Material::new();
-        // Set up a mock total cross section and energy grid
-        material.unified_energy_grid_neutron = vec![1.0, 10.0, 100.0];
-        material.macroscopic_xs_neutron.insert(1, vec![2.0, 2.0, 2.0]);
-        let mut rng = StdRng::seed_from_u64(42);
-        let energy = 5.0;
-        // Sample 200 times and check the average is close to expected mean
-        let mut samples = Vec::with_capacity(200);
-        for _ in 0..200 {
-            let distance = material.sample_distance_to_collision(energy, &mut rng);
-            assert!(distance.is_some());
-            samples.push(distance.unwrap());
-        }
-        // For sigma_t = 2.0, mean = 1/sigma_t = 0.5
-        let avg: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
-        let expected_mean = 0.5;
-        let tolerance = 0.05; // 10% tolerance
-        assert!((avg - expected_mean).abs() < tolerance, "Average sampled distance incorrect: got {}, expected {}", avg, expected_mean);
+#[test]
+fn test_sample_distance_to_collision() {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let mut material = Material::new();
+    // Set up a mock total cross section and energy grid
+    material.unified_energy_grid_neutron = vec![1.0, 10.0, 100.0];
+    material
+        .macroscopic_xs_neutron
+        .insert(1, vec![2.0, 2.0, 2.0]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let energy = 5.0;
+    // Sample 200 times and check the average is close to expected mean
+    let mut samples = Vec::with_capacity(200);
+    for _ in 0..200 {
+        let distance = material.sample_distance_to_collision(energy, &mut rng);
+        assert!(distance.is_some());
+        samples.push(distance.unwrap());
     }
+    // For sigma_t = 2.0, mean = 1/sigma_t = 0.5
+    let avg: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
+    let expected_mean = 0.5;
+    let tolerance = 0.05; // 10% tolerance
+    assert!(
+        (avg - expected_mean).abs() < tolerance,
+        "Average sampled distance incorrect: got {}, expected {}",
+        avg,
+        expected_mean
+    );
+}
 mod tests {
     #[allow(unused_imports)]
     use super::Material;
     #[test]
-    fn test_macroscopic_total_xs_by_nuclide_li6_li7() {
+    fn test_macroscopic_xs_neutron_total_by_nuclide_li6_li7() {
         use std::collections::HashMap;
         let mut material = Material::new();
         material.add_nuclide("Li6", 0.5).unwrap();
@@ -709,18 +724,37 @@ mod tests {
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // Call with by_nuclide = true
         let mt_filter = vec![1];
         let (_grid, _macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, true);
-        // Check that macroscopic_total_xs_by_nuclide is Some and contains both nuclides
-        let by_nuclide = material.macroscopic_total_xs_by_nuclide.as_ref().expect("macroscopic_total_xs_by_nuclide should be Some");
-        assert!(by_nuclide.contains_key("Li6"), "macroscopic_total_xs_by_nuclide should contain Li6");
-        assert!(by_nuclide.contains_key("Li7"), "macroscopic_total_xs_by_nuclide should contain Li7");
+        // Check that macroscopic_xs_neutron_total_by_nuclide is Some and contains both nuclides
+        let by_nuclide = material
+            .macroscopic_xs_neutron_total_by_nuclide
+            .as_ref()
+            .expect("macroscopic_xs_neutron_total_by_nuclide should be Some");
+        assert!(
+            by_nuclide.contains_key("Li6"),
+            "macroscopic_xs_neutron_total_by_nuclide should contain Li6"
+        );
+        assert!(
+            by_nuclide.contains_key("Li7"),
+            "macroscopic_xs_neutron_total_by_nuclide should contain Li7"
+        );
         // Optionally, check that the vectors are non-empty and same length as energy grid
         let grid_len = material.unified_energy_grid_neutron.len();
-        assert_eq!(by_nuclide["Li6"].len(), grid_len, "Li6 xs vector should match grid length");
-        assert_eq!(by_nuclide["Li7"].len(), grid_len, "Li7 xs vector should match grid length");
+        assert_eq!(
+            by_nuclide["Li6"].len(),
+            grid_len,
+            "Li6 xs vector should match grid length"
+        );
+        assert_eq!(
+            by_nuclide["Li7"].len(),
+            grid_len,
+            "Li7 xs vector should match grid length"
+        );
     }
 
     #[test]
@@ -731,10 +765,15 @@ mod tests {
         material.set_density("g/cm3", 0.534).unwrap();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         let mt_filter = vec![3];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
-        assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=3 is requested");
+        assert!(
+            !macro_xs.contains_key(&1),
+            "MT=1 should NOT be present when only MT=3 is requested"
+        );
     }
 
     #[test]
@@ -745,10 +784,15 @@ mod tests {
         material.set_density("g/cm3", 0.534).unwrap();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         let mt_filter = vec![24];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
-        assert!(!macro_xs.contains_key(&1), "MT=1 should NOT be present when only MT=24 is requested");
+        assert!(
+            !macro_xs.contains_key(&1),
+            "MT=1 should NOT be present when only MT=24 is requested"
+        );
     }
     #[test]
     fn test_hierarchical_mt3_generated_for_li6() {
@@ -758,14 +802,22 @@ mod tests {
         material.set_density("g/cm3", 0.534).unwrap();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // Request only MT=3 (now present in JSON)
         let mt_filter = vec![3];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
-        assert!(macro_xs.contains_key(&3), "MT=3 should be present in macro_xs for Li6");
+        assert!(
+            macro_xs.contains_key(&3),
+            "MT=3 should be present in macro_xs for Li6"
+        );
         // Just check that the cross section is nonzero and matches the JSON
         let xs = &macro_xs[&3];
-        assert!(xs.iter().any(|&v| v > 0.0), "MT=3 cross section should have nonzero values");
+        assert!(
+            xs.iter().any(|&v| v > 0.0),
+            "MT=3 cross section should have nonzero values"
+        );
     }
     // Removed unused `use super::*;` (all required items referenced explicitly)
 
@@ -897,117 +949,137 @@ mod tests {
     #[test]
     fn test_get_nuclides() {
         let mut material = Material::new();
-        
+
         // Empty material should return empty vector
         assert!(material.get_nuclides().is_empty());
-        
+
         // Add some nuclides
         material.add_nuclide("U235", 0.05).unwrap();
         material.add_nuclide("U238", 0.95).unwrap();
         material.add_nuclide("O16", 2.0).unwrap();
-        
+
         // Check the result is sorted
         let nuclides = material.get_nuclides();
-        assert_eq!(nuclides, vec!["O16".to_string(), "U235".to_string(), "U238".to_string()]);
+        assert_eq!(
+            nuclides,
+            vec!["O16".to_string(), "U235".to_string(), "U238".to_string()]
+        );
     }
 
     #[test]
     fn test_get_atoms_per_barn_cm() {
         let material = Material::new();
-        
+
         // Test with no density set - should panic
-        let result = std::panic::catch_unwind(|| {
-            material.get_atoms_per_barn_cm()
-        });
+        let result = std::panic::catch_unwind(|| material.get_atoms_per_barn_cm());
         assert!(result.is_err(), "Should panic when density is not set");
-        
+
         // Test with single nuclide case
         let mut material_single = Material::new();
         material_single.add_nuclide("Li6", 2.5).unwrap();
         material_single.set_density("g/cm3", 1.0).unwrap();
-        
+
         let atoms_single = material_single.get_atoms_per_barn_cm();
-        assert_eq!(atoms_single.len(), 1, "Should have 1 nuclide in the HashMap");
-        
+        assert_eq!(
+            atoms_single.len(),
+            1,
+            "Should have 1 nuclide in the HashMap"
+        );
+
         // For a single nuclide, we normalize the fraction to 1.0
         let avogadro = 6.02214076e23;
         let li6_mass = 6.01512288742;
         let li6_expected = 1.0 * avogadro / li6_mass * 1.0e-24; // Fraction is normalized to 1.0
-        
+
         let li6_actual = atoms_single.get("Li6").unwrap();
         let tolerance = 0.01; // 1%
-        
-        assert!((li6_actual - li6_expected).abs() / li6_expected < tolerance, 
-            "Li6 atoms/cc calculation (single nuclide) is incorrect: got {}, expected {}", 
-            li6_actual, li6_expected);
-        
+
+        assert!(
+            (li6_actual - li6_expected).abs() / li6_expected < tolerance,
+            "Li6 atoms/cc calculation (single nuclide) is incorrect: got {}, expected {}",
+            li6_actual,
+            li6_expected
+        );
+
         // Test with multiple nuclides
         let mut material_multi = Material::new();
         material_multi.add_nuclide("Li6", 0.5).unwrap();
         material_multi.add_nuclide("Li7", 0.5).unwrap();
         material_multi.set_density("g/cm3", 1.0).unwrap();
-        
+
         let atoms_multi = material_multi.get_atoms_per_barn_cm();
-        assert_eq!(atoms_multi.len(), 2, "Should have 2 nuclides in the HashMap");
-        
+        assert_eq!(
+            atoms_multi.len(),
+            2,
+            "Should have 2 nuclides in the HashMap"
+        );
+
         // For multiple nuclides, the fractions are normalized and used with average molar mass
         let li7_mass = 7.016004;
         let avg_mass = (0.5 * li6_mass + 0.5 * li7_mass) / 1.0; // weighted average
-        
+
         let li6_expected_multi = 1.0 * avogadro / avg_mass * (0.5 / 1.0) * 1.0e-24;
         let li7_expected_multi = 1.0 * avogadro / avg_mass * (0.5 / 1.0) * 1.0e-24;
-        
+
         let li6_actual_multi = atoms_multi.get("Li6").unwrap();
         let li7_actual_multi = atoms_multi.get("Li7").unwrap();
-        
-        assert!((li6_actual_multi - li6_expected_multi).abs() / li6_expected_multi < tolerance, 
-            "Li6 atoms/cc calculation (multiple nuclides) is incorrect: got {}, expected {}", 
-            li6_actual_multi, li6_expected_multi);
-        assert!((li7_actual_multi - li7_expected_multi).abs() / li7_expected_multi < tolerance, 
-            "Li7 atoms/cc calculation (multiple nuclides) is incorrect: got {}, expected {}", 
-            li7_actual_multi, li7_expected_multi);
-        
+
+        assert!(
+            (li6_actual_multi - li6_expected_multi).abs() / li6_expected_multi < tolerance,
+            "Li6 atoms/cc calculation (multiple nuclides) is incorrect: got {}, expected {}",
+            li6_actual_multi,
+            li6_expected_multi
+        );
+        assert!(
+            (li7_actual_multi - li7_expected_multi).abs() / li7_expected_multi < tolerance,
+            "Li7 atoms/cc calculation (multiple nuclides) is incorrect: got {}, expected {}",
+            li7_actual_multi,
+            li7_expected_multi
+        );
+
         // Test with non-normalized fractions
         let mut material_non_norm = Material::new();
         material_non_norm.add_nuclide("Li6", 1.0).unwrap();
         material_non_norm.add_nuclide("Li7", 1.0).unwrap(); // Total fractions = 2.0
         material_non_norm.set_density("g/cm3", 1.0).unwrap();
-        
+
         let atoms_non_norm = material_non_norm.get_atoms_per_barn_cm();
-        
+
         // Fractions should be normalized to 0.5 each (1.0/2.0)
         let avg_mass_non_norm = (1.0 * li6_mass + 1.0 * li7_mass) / 2.0;
         let li6_expected_non_norm = 1.0 * avogadro / avg_mass_non_norm * (1.0 / 2.0) * 1.0e-24;
         let li7_expected_non_norm = 1.0 * avogadro / avg_mass_non_norm * (1.0 / 2.0) * 1.0e-24;
-        
+
         let li6_actual_non_norm = atoms_non_norm.get("Li6").unwrap();
         let li7_actual_non_norm = atoms_non_norm.get("Li7").unwrap();
-        
-        assert!((li6_actual_non_norm - li6_expected_non_norm).abs() / li6_expected_non_norm < tolerance, 
-            "Li6 normalized atoms/cc calculation is incorrect: got {}, expected {}", 
-            li6_actual_non_norm, li6_expected_non_norm);
-        assert!((li7_actual_non_norm - li7_expected_non_norm).abs() / li7_expected_non_norm < tolerance, 
-            "Li7 normalized atoms/cc calculation is incorrect: got {}, expected {}", 
-            li7_actual_non_norm, li7_expected_non_norm);
+
+        assert!(
+            (li6_actual_non_norm - li6_expected_non_norm).abs() / li6_expected_non_norm < tolerance,
+            "Li6 normalized atoms/cc calculation is incorrect: got {}, expected {}",
+            li6_actual_non_norm,
+            li6_expected_non_norm
+        );
+        assert!(
+            (li7_actual_non_norm - li7_expected_non_norm).abs() / li7_expected_non_norm < tolerance,
+            "Li7 normalized atoms/cc calculation is incorrect: got {}, expected {}",
+            li7_actual_non_norm,
+            li7_expected_non_norm
+        );
     }
 
     #[test]
     fn test_get_atoms_per_barn_cm_no_density() {
         let material = Material::new();
-        
+
         // Should panic when density is not set
-        let result = std::panic::catch_unwind(|| {
-            material.get_atoms_per_barn_cm()
-        });
+        let result = std::panic::catch_unwind(|| material.get_atoms_per_barn_cm());
         assert!(result.is_err(), "Should panic when density is not set");
-        
+
         // Should also panic when nuclides are not added
         let mut material_with_density = Material::new();
         material_with_density.set_density("g/cm3", 1.0).unwrap();
-        
-        let result = std::panic::catch_unwind(|| {
-            material_with_density.get_atoms_per_barn_cm()
-        });
+
+        let result = std::panic::catch_unwind(|| material_with_density.get_atoms_per_barn_cm());
         assert!(result.is_err(), "Should panic when no nuclides are defined");
     }
 
@@ -1015,38 +1087,54 @@ mod tests {
     fn test_mean_free_path_neutron() {
         // Create a properly set up material
         let mut material = Material::new();
-        
+
         // Test with empty material - should return None
         // We can't use catch_unwind easily with &mut material, so we'll bypass the part that panics
         // by directly setting up the test with mock data
-        
+
         // Skip the initial test with empty material that would cause a panic
-        
+
         // Add a nuclide and set density
         material.add_nuclide("Li6", 1.0).unwrap();
         material.set_density("g/cm3", 1.0).unwrap();
-        
+
         // Create mock cross sections directly (bypassing the normal calculation path)
-        let energy_grid = vec![1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0, 100000000.0];
+        let energy_grid = vec![
+            1.0,
+            10.0,
+            100.0,
+            1000.0,
+            10000.0,
+            100000.0,
+            1000000.0,
+            10000000.0,
+            100000000.0,
+        ];
         material.unified_energy_grid_neutron = energy_grid.clone();
-        
+
         // Set total cross section (in barns * atoms/cm³, which gives cm⁻¹)
         // Intentionally using a simple pattern that's easy to verify
-        let total_xs = vec![1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625];
+        let total_xs = vec![
+            1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625,
+        ];
         material.macroscopic_xs_neutron.insert(1, total_xs.clone());
-        
+
         // Test exact values from our mock data
         assert_eq!(material.mean_free_path_neutron(1.0), Some(1.0));
         assert_eq!(material.mean_free_path_neutron(10.0), Some(2.0));
         assert_eq!(material.mean_free_path_neutron(100.0), Some(4.0));
-        
+
         // Test interpolated value
         // At energy = 3.0, we're using linear interpolation between 1.0 and 10.0
         // Cross section should be about 0.889 (linearly interpolated between 1.0 and 0.5)
         // Mean free path should be about 1.125
         let mfp_3ev = material.mean_free_path_neutron(3.0).unwrap();
-        assert!((mfp_3ev - 1.125).abs() < 0.01, "Expected ~1.125, got {}", mfp_3ev);
-        
+        assert!(
+            (mfp_3ev - 1.125).abs() < 0.01,
+            "Expected ~1.125, got {}",
+            mfp_3ev
+        );
+
         // Test outside of range (should use endpoint value)
         assert_eq!(material.mean_free_path_neutron(0.1), Some(1.0)); // Below range
         assert_eq!(material.mean_free_path_neutron(1e9), Some(256.0)); // Above range
@@ -1057,8 +1145,8 @@ mod tests {
         let mut material = Material::new();
         material.add_element("Li", 1.0).unwrap();
         material.set_density("g/cm3", 0.534).unwrap(); // lithium density
-        // Set up mock cross section data for 14 MeV (1.4e7 eV)
-        // We'll use a simple grid and cross section for demonstration
+                                                       // Set up mock cross section data for 14 MeV (1.4e7 eV)
+                                                       // We'll use a simple grid and cross section for demonstration
         let energy_grid = vec![1e6, 1.4e7, 1e8]; // eV
         let total_xs = vec![1.0, 0.5, 0.2]; // barns * atoms/cm³, so cm⁻¹
         material.unified_energy_grid_neutron = energy_grid.clone();
@@ -1068,7 +1156,11 @@ mod tests {
         assert!(mfp.is_some());
         let mfp_val = mfp.unwrap();
         // At 14 MeV, total_xs = 0.5, so mean free path = 1/0.5 = 2.0 cm
-        assert!((mfp_val - 2.0).abs() < 1e-6, "Expected 2.0 cm, got {}", mfp_val);
+        assert!(
+            (mfp_val - 2.0).abs() < 1e-6,
+            "Expected 2.0 cm, got {}",
+            mfp_val
+        );
     }
 
     #[test]
@@ -1159,17 +1251,27 @@ mod tests {
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
         // Read in the nuclear data
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // This will load Li6 and Li7, so the MTs should be the union of both, including hierarchical MTs
         let mts = material.reaction_mts().expect("Failed to get reaction MTs");
         // The expected list should match the actual list from the JSON, including hierarchical MTs
-        let expected = vec![1, 2, 3, 4, 5, 16, 24, 25, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203, 204, 205, 206, 207, 301, 444];
-        assert_eq!(mts, expected, "Material lithium MT list does not match expected. Got {:?}", mts);
+        let expected = vec![
+            1, 2, 3, 4, 5, 16, 24, 25, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+            65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103,
+            104, 105, 203, 204, 205, 206, 207, 301, 444,
+        ];
+        assert_eq!(
+            mts, expected,
+            "Material lithium MT list does not match expected. Got {:?}",
+            mts
+        );
     }
 
     #[test]
     fn test_selective_temperature_load_be9_300() {
-    crate::nuclide::clear_nuclide_cache();
+        crate::nuclide::clear_nuclide_cache();
         let mut mat = Material::new();
         mat.add_nuclide("Be9", 1.0).unwrap();
         mat.set_temperature("300");
@@ -1177,13 +1279,20 @@ mod tests {
         map.insert("Be9".to_string(), "tests/Be9.json".to_string());
         mat.read_nuclides_from_json(&map).unwrap();
         let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
-        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
-        assert_eq!(be9.loaded_temperatures, vec!["300".to_string()], "Should only load 300K data");
+        assert_eq!(
+            be9.available_temperatures,
+            vec!["294".to_string(), "300".to_string()]
+        );
+        assert_eq!(
+            be9.loaded_temperatures,
+            vec!["300".to_string()],
+            "Should only load 300K data"
+        );
     }
 
     #[test]
     fn test_selective_temperature_load_be9_294() {
-    crate::nuclide::clear_nuclide_cache();
+        crate::nuclide::clear_nuclide_cache();
         let mut mat = Material::new();
         mat.add_nuclide("Be9", 1.0).unwrap();
         mat.set_temperature("294");
@@ -1191,8 +1300,15 @@ mod tests {
         map.insert("Be9".to_string(), "tests/Be9.json".to_string());
         mat.read_nuclides_from_json(&map).unwrap();
         let be9 = mat.nuclide_data.get("Be9").expect("Be9 not loaded");
-        assert_eq!(be9.available_temperatures, vec!["294".to_string(), "300".to_string()]);
-        assert_eq!(be9.loaded_temperatures, vec!["294".to_string()], "Should only load 294K data");
+        assert_eq!(
+            be9.available_temperatures,
+            vec!["294".to_string(), "300".to_string()]
+        );
+        assert_eq!(
+            be9.loaded_temperatures,
+            vec!["294".to_string()],
+            "Should only load 294K data"
+        );
     }
 
     #[test]
@@ -1205,9 +1321,11 @@ mod tests {
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
         // Read in the nuclear data
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-    let grid = material.unified_energy_grid_neutron();
+        let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections
         let micro_xs = material.calculate_microscopic_xs_neutron(None);
         // Check that both Li6 and Li7 are present
@@ -1218,34 +1336,38 @@ mod tests {
         assert!(micro_xs["Li6"].contains_key(&mt), "Li6 missing MT=2");
         assert!(micro_xs["Li7"].contains_key(&mt), "Li7 missing MT=2");
         // Check that the cross section arrays are the same length as the grid
-    assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
-    assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
+        assert_eq!(micro_xs["Li6"][&mt].len(), grid.len());
+        assert_eq!(micro_xs["Li7"][&mt].len(), grid.len());
     }
 
     #[test]
     fn test_material_vs_nuclide_microscopic_xs_li6() {
+        use crate::nuclide::get_or_load_nuclide;
         use std::collections::HashMap;
-        use crate::nuclide::{get_or_load_nuclide};
         let mut material = Material::new();
         material.add_nuclide("Li6", 1.0).unwrap();
         // Prepare the nuclide JSON map for Li6
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         // Read in the nuclear data
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // Build the unified energy grid
-    let grid = material.unified_energy_grid_neutron();
+        let grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for the material
         let micro_xs_mat = material.calculate_microscopic_xs_neutron(None);
         // Get the nuclide directly
-    let nuclide = get_or_load_nuclide("Li6", &nuclide_json_map, None).expect("Failed to load Li6");
+        let nuclide =
+            get_or_load_nuclide("Li6", &nuclide_json_map, None).expect("Failed to load Li6");
         let temperature = &material.temperature;
         // Get reactions and energy grid for nuclide
-        let reactions = nuclide.reactions.get(temperature)
+        let reactions = nuclide
+            .reactions
+            .get(temperature)
             .expect("No reactions for Li6");
         let energy_map = nuclide.energy.as_ref().expect("No energy map for Li6");
-        let energy_grid = energy_map.get(temperature)
-            .expect("No energy grid for Li6");
+        let energy_grid = energy_map.get(temperature).expect("No energy grid for Li6");
         // For each MT in the material, compare the cross sections
         for (mt, xs_mat) in micro_xs_mat["Li6"].iter() {
             // Only compare if MT exists in nuclide
@@ -1263,14 +1385,21 @@ mod tests {
                     if g < nuclide_energy[0] {
                         xs_nuclide_interp.push(0.0);
                     } else {
-                        let xs = crate::utilities::interpolate_linear(nuclide_energy, xs_nuclide, g);
+                        let xs =
+                            crate::utilities::interpolate_linear(nuclide_energy, xs_nuclide, g);
                         xs_nuclide_interp.push(xs);
                     }
                 }
                 // Compare arrays (allow small tolerance)
                 let tol = 1e-10;
                 for (a, b) in xs_mat.iter().zip(xs_nuclide_interp.iter()) {
-                    assert!((a - b).abs() < tol, "Mismatch for MT {}: {} vs {}", mt, a, b);
+                    assert!(
+                        (a - b).abs() < tol,
+                        "Mismatch for MT {}: {} vs {}",
+                        mt,
+                        a,
+                        b
+                    );
                 }
             }
         }
@@ -1286,7 +1415,9 @@ mod tests {
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
         // Read in the nuclear data
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         // Build the unified energy grid
         let _grid = material.unified_energy_grid_neutron();
         // Calculate microscopic cross sections for all MTs
@@ -1296,15 +1427,33 @@ mod tests {
         let micro_xs_mt2 = material.calculate_microscopic_xs_neutron(Some(&mt_filter));
         // For each nuclide, only MT=2 should be present
         for nuclide in &["Li6", "Li7"] {
-            assert!(micro_xs_mt2.contains_key(*nuclide), "{} missing in filtered result", nuclide);
+            assert!(
+                micro_xs_mt2.contains_key(*nuclide),
+                "{} missing in filtered result",
+                nuclide
+            );
             let xs_map = &micro_xs_mt2[*nuclide];
             // Assert that only the requested MT is present
-            assert!(xs_map.keys().all(|k| *k == 2), "Filtered result for {} contains non-filtered MTs: {:?}", nuclide, xs_map.keys());
-            assert_eq!(xs_map.len(), 1, "Filtered result for {} should have only one MT", nuclide);
+            assert!(
+                xs_map.keys().all(|k| *k == 2),
+                "Filtered result for {} contains non-filtered MTs: {:?}",
+                nuclide,
+                xs_map.keys()
+            );
+            assert_eq!(
+                xs_map.len(),
+                1,
+                "Filtered result for {} should have only one MT",
+                nuclide
+            );
             // The cross section array for MT=2 should match the unfiltered result
             let xs_all = &micro_xs_all[*nuclide][&2];
             let xs_filtered = &xs_map[&2];
-            assert_eq!(xs_all, xs_filtered, "Filtered and unfiltered MT=2 xs do not match for {}", nuclide);
+            assert_eq!(
+                xs_all, xs_filtered,
+                "Filtered and unfiltered MT=2 xs do not match for {}",
+                nuclide
+            );
         }
     }
 
@@ -1317,8 +1466,14 @@ mod tests {
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
-        let mt_filter = vec![2, 16, 24, 25, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203, 204, 205, 206, 207, 301, 444];
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
+        let mt_filter = vec![
+            2, 16, 24, 25, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+            69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203,
+            204, 205, 206, 207, 301, 444,
+        ];
         let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
         for mt in &mt_filter {
             match macro_xs.get(mt) {
@@ -1336,7 +1491,9 @@ mod tests {
         // Prepare the nuclide JSON map for Li6
         let mut nuclide_json_map = std::collections::HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         let _grid = material.unified_energy_grid_neutron();
 
         // Should panic when calculating macroscopic cross sections with no density
@@ -1344,14 +1501,19 @@ mod tests {
             let mut material = material;
             material.calculate_macroscopic_xs_neutron(&vec![1], false);
         });
-        assert!(result.is_err(), "Should panic if density is not set for calculate_macroscopic_xs_neutron");
+        assert!(
+            result.is_err(),
+            "Should panic if density is not set for calculate_macroscopic_xs_neutron"
+        );
 
         // Re-create material for the next test
         let mut material = Material::new();
         material.add_nuclide("Li6", 1.0).unwrap();
         let mut nuclide_json_map = std::collections::HashMap::new();
         nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
         material.unified_energy_grid_neutron();
 
         // Should panic when calculating mean free path with no density
@@ -1359,7 +1521,10 @@ mod tests {
             let mut material = material;
             material.mean_free_path_neutron(1e6);
         });
-        assert!(result.is_err(), "Should panic if density is not set for mean_free_path_neutron");
+        assert!(
+            result.is_err(),
+            "Should panic if density is not set for mean_free_path_neutron"
+        );
     }
 
     #[test]
@@ -1375,7 +1540,9 @@ mod tests {
         nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
 
         // Read in the nuclear data
-        material.read_nuclides_from_json(&nuclide_json_map).expect("Failed to read nuclide JSON");
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
 
         // Calculate the mean free path at 14 MeV (1.4e7 eV)
         let mfp = material.mean_free_path_neutron(1.4e7);
@@ -1419,19 +1586,24 @@ mod tests {
         use rand::SeedableRng; // Needed for seed_from_u64
         for seed in 0..n_samples {
             let mut rng = StdRng::seed_from_u64(seed as u64);
-            let dist = mat.sample_distance_to_collision(14_000_000.0, &mut rng)
+            let dist = mat
+                .sample_distance_to_collision(14_000_000.0, &mut rng)
                 .unwrap_or_else(|| panic!("sample_distance_to_collision returned None at 14 MeV!"));
             sum += dist;
         }
         let avg = sum / n_samples as f64;
         println!("Average distance: {}", avg);
-        assert!((avg - 6.9).abs() < 0.1, "Average {} not within 0.2 of 6.9", avg);
+        assert!(
+            (avg - 6.9).abs() < 0.1,
+            "Average {} not within 0.2 of 6.9",
+            avg
+        );
     }
 
     #[test]
     fn test_sample_interacting_nuclide_li6_li7() {
-        use rand::SeedableRng;
         use rand::rngs::StdRng;
+        use rand::SeedableRng;
         use std::collections::HashMap;
 
         let mut material = Material::new();
@@ -1450,11 +1622,17 @@ mod tests {
         // For this test, calculate per-nuclide macroscopic total xs as well
         material.calculate_macroscopic_xs_neutron(&vec![1], true);
 
-        // Check that macroscopic_total_xs_by_nuclide is present and not empty
-        let by_nuclide = material.macroscopic_total_xs_by_nuclide.as_ref();
-        assert!(by_nuclide.is_some(), "macroscopic_total_xs_by_nuclide should be Some after calculation");
+        // Check that macroscopic_xs_neutron_total_by_nuclide is present and not empty
+        let by_nuclide = material.macroscopic_xs_neutron_total_by_nuclide.as_ref();
+        assert!(
+            by_nuclide.is_some(),
+            "macroscopic_xs_neutron_total_by_nuclide should be Some after calculation"
+        );
         let by_nuclide = by_nuclide.unwrap();
-        assert!(!by_nuclide.is_empty(), "macroscopic_total_xs_by_nuclide should not be empty");
+        assert!(
+            !by_nuclide.is_empty(),
+            "macroscopic_xs_neutron_total_by_nuclide should not be empty"
+        );
 
         // Sample the interacting nuclide many times at 14 MeV
         let energy = 14_000_000.0;
@@ -1477,11 +1655,19 @@ mod tests {
         // The sampled fractions should be close to the expected probability
         // (proportional to macroscopic total xs for each nuclide at this energy)
         // For a rough test, just check both are nonzero and sum to 1
-        assert!(frac_li6 > 0.0 && frac_li7 > 0.0, "Both nuclides should be sampled");
-        assert!((frac_li6 + frac_li7 - 1.0).abs() < 1e-6, "Fractions should sum to 1");
+        assert!(
+            frac_li6 > 0.0 && frac_li7 > 0.0,
+            "Both nuclides should be sampled"
+        );
+        assert!(
+            (frac_li6 + frac_li7 - 1.0).abs() < 1e-6,
+            "Fractions should sum to 1"
+        );
 
         // Optionally, check that Li7 is sampled much more often than Li6 (since its fraction is higher)
-        assert!(frac_li7 > frac_li6, "Li7 should be sampled more often than Li6");
+        assert!(
+            frac_li7 > frac_li6,
+            "Li7 should be sampled more often than Li6"
+        );
     }
-
 } // close mod tests

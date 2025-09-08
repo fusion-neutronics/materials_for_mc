@@ -1,10 +1,13 @@
-use wasm_bindgen::prelude::*;
+use crate::data::{ATOMIC_MASSES, ELEMENT_NAMES, ELEMENT_NUCLIDES, NATURAL_ABUNDANCE};
 use serde_wasm_bindgen::to_value;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, ELEMENT_NAMES, ATOMIC_MASSES};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn natural_abundance() -> JsValue {
-    let map: std::collections::HashMap<String, f64> = NATURAL_ABUNDANCE.iter().map(|(k, v)| ((*k).to_string(), *v)).collect();
+    let map: std::collections::HashMap<String, f64> = NATURAL_ABUNDANCE
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), *v))
+        .collect();
     to_value(&map).unwrap()
 }
 
@@ -21,12 +24,18 @@ pub fn element_nuclides() -> JsValue {
 
 #[wasm_bindgen]
 pub fn element_names() -> JsValue {
-    let map: std::collections::HashMap<String, String> = ELEMENT_NAMES.iter().map(|(symbol, name)| ((*symbol).to_string(), (*name).to_string())).collect();
+    let map: std::collections::HashMap<String, String> = ELEMENT_NAMES
+        .iter()
+        .map(|(symbol, name)| ((*symbol).to_string(), (*name).to_string()))
+        .collect();
     to_value(&map).unwrap()
 }
 
 #[wasm_bindgen]
 pub fn atomic_masses() -> JsValue {
-    let map: std::collections::HashMap<String, f64> = ATOMIC_MASSES.iter().map(|(nuclide, mass)| ((*nuclide).to_string(), *mass)).collect();
+    let map: std::collections::HashMap<String, f64> = ATOMIC_MASSES
+        .iter()
+        .map(|(nuclide, mass)| ((*nuclide).to_string(), *mass))
+        .collect();
     to_value(&map).unwrap()
 }

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
-
+use std::collections::HashMap;
 
 /// Map from element symbol to sorted vector of nuclide (isotope) identifiers.
 ///
@@ -13,11 +12,11 @@ pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = La
     let mut map: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
     for &nuclide in NATURAL_ABUNDANCE.keys() {
         // Find the index where the first digit occurs
-        let idx = nuclide.find(|c: char| c.is_ascii_digit()).unwrap_or(nuclide.len());
+        let idx = nuclide
+            .find(|c: char| c.is_ascii_digit())
+            .unwrap_or(nuclide.len());
         let element = &nuclide[..idx]; // This is a &'static str slice
-        map.entry(element)
-            .or_insert_with(Vec::new)
-            .push(nuclide);
+        map.entry(element).or_insert_with(Vec::new).push(nuclide);
     }
     // Sort nuclides for each element
     for nuclides in map.values_mut() {
@@ -29,7 +28,6 @@ pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = La
 // This module contains large static data tables for the materials library.
 // The volume of data is significant; doc comments summarize the intent of
 // each table while the literals provide the canonical numeric values.
-
 
 /// Natural terrestrial isotopic abundances (fractional, summing to ~1.0 per
 /// element) for stable isotopes.
@@ -48,62 +46,62 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     // Hydrogen
     m.insert("H1", 0.99984426);
     m.insert("H2", 0.00015574);
-    
+
     // Helium
     m.insert("He3", 0.000002);
     m.insert("He4", 0.999998);
-    
+
     // Lithium
     m.insert("Li6", 0.07589);
     m.insert("Li7", 0.92411);
-    
+
     // Beryllium
     m.insert("Be9", 1.0);
-    
+
     // Boron
     m.insert("B10", 0.1982);
     m.insert("B11", 0.8018);
-    
+
     // Carbon
     m.insert("C12", 0.988922);
     m.insert("C13", 0.011078);
-    
+
     // Nitrogen
     m.insert("N14", 0.996337);
     m.insert("N15", 0.003663);
-    
+
     // Oxygen
     m.insert("O16", 0.9976206);
     m.insert("O17", 0.000379);
     m.insert("O18", 0.0020004);
-    
+
     // Fluorine
     m.insert("F19", 1.0);
-    
+
     // Neon
     m.insert("Ne20", 0.9048);
     m.insert("Ne21", 0.0027);
     m.insert("Ne22", 0.0925);
-    
+
     // Sodium
     m.insert("Na23", 1.0);
-    
+
     // Magnesium
     m.insert("Mg24", 0.78951);
     m.insert("Mg25", 0.1002);
     m.insert("Mg26", 0.11029);
-    
+
     // Aluminum
     m.insert("Al27", 1.0);
-    
+
     // Silicon
     m.insert("Si28", 0.9222968);
     m.insert("Si29", 0.0468316);
     m.insert("Si30", 0.0308716);
-    
+
     // Phosphorus
     m.insert("P31", 1.0);
-    
+
     // Sulfur
     m.insert("S32", 0.9504074);
     m.insert("S33", 0.0074869);
@@ -154,7 +152,7 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
 
     // Manganese
     m.insert("Mn55", 1.0);
-    
+
     // Iron
     m.insert("Fe54", 0.05845);
     m.insert("Fe56", 0.91754);
@@ -247,7 +245,7 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m.insert("Mo97", 0.09582);
     m.insert("Mo98", 0.24292);
     m.insert("Mo100", 0.09744);
-    
+
     // Ruthenium
     m.insert("Ru96", 0.0554);
     m.insert("Ru98", 0.0187);
@@ -420,7 +418,7 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     // Lutetium
     m.insert("Lu175", 0.97401);
     m.insert("Lu176", 0.02599);
-    
+
     // Hafnium
     m.insert("Hf174", 0.0016);
     m.insert("Hf176", 0.0526);
@@ -4188,7 +4186,6 @@ pub static ATOMIC_MASSES: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m
 });
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4197,9 +4194,21 @@ mod tests {
         let li6 = NATURAL_ABUNDANCE.get("Li6").copied().unwrap_or(0.0);
         let li7 = NATURAL_ABUNDANCE.get("Li7").copied().unwrap_or(0.0);
         let sum = li6 + li7;
-        assert!((li6 - 0.0759).abs() < 1e-4, "Li6 abundance incorrect: {}", li6);
-        assert!((li7 - 0.9241).abs() < 1e-4, "Li7 abundance incorrect: {}", li7);
-        assert!((sum - 1.0).abs() < 1e-3, "Li6 + Li7 should sum to 1, got {}", sum);
+        assert!(
+            (li6 - 0.0759).abs() < 1e-4,
+            "Li6 abundance incorrect: {}",
+            li6
+        );
+        assert!(
+            (li7 - 0.9241).abs() < 1e-4,
+            "Li7 abundance incorrect: {}",
+            li7
+        );
+        assert!(
+            (sum - 1.0).abs() < 1e-3,
+            "Li6 + Li7 should sum to 1, got {}",
+            sum
+        );
     }
 
     #[test]

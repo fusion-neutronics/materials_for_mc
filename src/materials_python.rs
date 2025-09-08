@@ -1,10 +1,10 @@
-use pyo3::prelude::*;
-use pyo3::exceptions::PyIndexError;
-use pyo3::types::PyList;
-use pyo3::types::PyDict;
-use std::collections::HashMap;
-use crate::materials::Materials;
 use crate::material_python::PyMaterial;
+use crate::materials::Materials;
+use pyo3::exceptions::PyIndexError;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pyo3::types::PyList;
+use std::collections::HashMap;
 
 /// Python wrapper for the Rust Materials struct
 #[pyclass(name = "Materials")]
@@ -21,7 +21,7 @@ impl PyMaterials {
         let mut result = PyMaterials {
             internal: Materials::new(),
         };
-        
+
         // If materials were provided, add them to the collection
         if let Some(mat_list) = materials {
             for item in mat_list.iter() {
@@ -30,34 +30,40 @@ impl PyMaterials {
                 result.internal.append(material.get_internal().clone());
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Append a material to the collection
     fn append(&mut self, material: &PyMaterial) -> PyResult<()> {
         // Use get_internal() method instead of directly accessing the field
         self.internal.append(material.get_internal().clone());
         Ok(())
     }
-    
+
     /// Get a material by index
     fn get(&self, index: usize) -> PyResult<PyMaterial> {
         match self.internal.get(index) {
             Some(m) => Ok(PyMaterial::from_material(m.clone())),
-            None => Err(PyIndexError::new_err(format!("Index {} out of range", index)))
+            None => Err(PyIndexError::new_err(format!(
+                "Index {} out of range",
+                index
+            ))),
         }
     }
-    
+
     /// Remove a material at the specified index
     fn remove(&mut self, index: usize) -> PyResult<PyMaterial> {
         if index < self.internal.len() {
             Ok(PyMaterial::from_material(self.internal.remove(index)))
         } else {
-            Err(PyIndexError::new_err(format!("Index {} out of range", index)))
+            Err(PyIndexError::new_err(format!(
+                "Index {} out of range",
+                index
+            )))
         }
     }
-    
+
     /// Get the number of materials in the collection
     fn len(&self) -> usize {
         self.internal.len()
@@ -72,12 +78,12 @@ impl PyMaterials {
     fn is_empty(&self) -> bool {
         self.internal.is_empty()
     }
-    
+
     /// Return a string representation of the Materials object
     fn __repr__(&self) -> String {
         format!("Materials with {} entries", self.internal.len())
     }
-    
+
     /// Make the Materials object behave like a sequence in Python
     fn __getitem__(&self, index: usize) -> PyResult<PyMaterial> {
         self.get(index)
@@ -85,16 +91,22 @@ impl PyMaterials {
 
     /// Read nuclides from a JSON-like Python dictionary (delegates to Materials::read_nuclides)
     #[pyo3(name = "read_nuclides_from_json", signature = (nuclide_json_map=None))]
-    fn read_nuclides_from_json(&mut self, py: Python, nuclide_json_map: Option<&PyDict>) -> PyResult<()> {
+    fn read_nuclides_from_json(
+        &mut self,
+        py: Python,
+        nuclide_json_map: Option<&PyDict>,
+    ) -> PyResult<()> {
         let mut rust_map = HashMap::new();
-        if let Some(d) = nuclide_json_map { // build only if provided
+        if let Some(d) = nuclide_json_map {
+            // build only if provided
             for (k, v) in d.iter() {
                 let key: String = k.extract()?;
                 let val: String = v.extract()?;
                 rust_map.insert(key, val);
             }
         }
-        self.internal.read_nuclides_from_json(&rust_map)
+        self.internal
+            .read_nuclides_from_json(&rust_map)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 }

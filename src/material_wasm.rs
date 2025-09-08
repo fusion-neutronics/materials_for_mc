@@ -1,8 +1,8 @@
-use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use crate::material::Material;
 use js_sys::{Array, Map, JSON};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct WasmMaterial {
@@ -26,7 +26,8 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn add_nuclide(&mut self, nuclide: &str, fraction: f64) -> Result<(), JsValue> {
-        self.inner.add_nuclide(nuclide, fraction)
+        self.inner
+            .add_nuclide(nuclide, fraction)
             .map_err(|e| JsValue::from_str(&e))
     }
 
@@ -39,13 +40,15 @@ impl WasmMaterial {
 
     #[wasm_bindgen]
     pub fn set_density(&mut self, unit: &str, value: f64) -> Result<(), JsValue> {
-        self.inner.set_density(unit, value)
+        self.inner
+            .set_density(unit, value)
             .map_err(|e| JsValue::from_str(&e))
     }
 
     #[wasm_bindgen]
     pub fn set_volume(&mut self, value: f64) -> Result<(), JsValue> {
-        self.inner.volume(Some(value))
+        self.inner
+            .volume(Some(value))
             .map_err(|e| JsValue::from_str(&e))
             .map(|_| ())
     }
@@ -58,7 +61,8 @@ impl WasmMaterial {
     #[wasm_bindgen]
     pub fn get_nuclides(&self) -> Array {
         let nuclides = self.inner.get_nuclides();
-        nuclides.into_iter()
+        nuclides
+            .into_iter()
             .map(|n| JsValue::from_str(&n))
             .collect::<Array>()
     }
@@ -67,13 +71,17 @@ impl WasmMaterial {
     pub fn get_atoms_per_barn_cm(&self) -> Result<JsValue, JsValue> {
         // Safe to use try-catch pattern with WASM since panics will be converted to JS exceptions
         if self.inner.density.is_none() {
-            return Err(JsValue::from_str("Cannot calculate atoms per cc: Material has no density defined"));
+            return Err(JsValue::from_str(
+                "Cannot calculate atoms per cc: Material has no density defined",
+            ));
         }
-        
+
         if self.inner.nuclides.is_empty() {
-            return Err(JsValue::from_str("Cannot calculate atoms per cc: Material has no nuclides defined"));
+            return Err(JsValue::from_str(
+                "Cannot calculate atoms per cc: Material has no nuclides defined",
+            ));
         }
-        
+
         // Now it's safe to call get_atoms_per_barn_cm without risk of panic
         let atoms_per_barn_cm = self.inner.get_atoms_per_barn_cm();
 
@@ -85,13 +93,21 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
-    pub fn calculate_macroscopic_xs_neutron(&mut self, mt_filter: Option<Array>, by_nuclide: Option<bool>) -> Result<JsValue, JsValue> {
+    pub fn calculate_macroscopic_xs_neutron(
+        &mut self,
+        mt_filter: Option<Array>,
+        by_nuclide: Option<bool>,
+    ) -> Result<JsValue, JsValue> {
         // Check preconditions to avoid panics
         if self.inner.density.is_none() {
-            return Err(JsValue::from_str("Cannot calculate macroscopic cross sections: Material has no density defined"));
+            return Err(JsValue::from_str(
+                "Cannot calculate macroscopic cross sections: Material has no density defined",
+            ));
         }
         if self.inner.nuclides.is_empty() {
-            return Err(JsValue::from_str("Cannot calculate macroscopic cross sections: Material has no nuclides defined"));
+            return Err(JsValue::from_str(
+                "Cannot calculate macroscopic cross sections: Material has no nuclides defined",
+            ));
         }
         // First ensure nuclides are loaded using our WASM-specific function
         if let Err(e) = self.ensure_nuclides_loaded() {
@@ -99,11 +115,16 @@ impl WasmMaterial {
         }
         // Convert JS Array to Option<Vec<i32>>
         let mt_vec: Vec<i32> = match mt_filter {
-            Some(arr) => arr.iter().filter_map(|v| v.as_f64().map(|num| num as i32)).collect(),
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_f64().map(|num| num as i32))
+                .collect(),
             None => vec![1],
         };
         let by_nuclide = by_nuclide.unwrap_or(false);
-        let (energy_grid, xs) = self.inner.calculate_macroscopic_xs_neutron(&mt_vec, by_nuclide);
+        let (energy_grid, xs) = self
+            .inner
+            .calculate_macroscopic_xs_neutron(&mt_vec, by_nuclide);
         let data = MacroscopicXsResult {
             energy_grid,
             cross_sections: xs,
@@ -119,7 +140,10 @@ impl WasmMaterial {
         // Use core implementation now that in-memory nuclides are directly inserted
         match self.inner.reaction_mts() {
             Ok(mts) => Ok(mts.into_iter().map(JsValue::from).collect::<Array>()),
-            Err(e) => Err(JsValue::from_str(&format!("Failed to get MT numbers: {}", e)))
+            Err(e) => Err(JsValue::from_str(&format!(
+                "Failed to get MT numbers: {}",
+                e
+            ))),
         }
     }
 
@@ -132,19 +156,24 @@ impl WasmMaterial {
     pub fn sample_distance_to_collision(&mut self, energy: f64) -> Option<f64> {
         // Use a random number generator compatible with WASM
         use rand::rngs::StdRng;
-        use rand::SeedableRng;
         use rand::Rng;
+        use rand::SeedableRng;
         // For reproducibility, you may want to allow passing a seed, but here we use a random seed
         let mut rng = StdRng::from_entropy();
         self.inner.sample_distance_to_collision(energy, &mut rng)
     }
 
     #[wasm_bindgen]
-    pub fn load_nuclide_data(&mut self, nuclide_name: &str, json_content: &str) -> Result<(), JsValue> {
-        self.inner.load_nuclide_from_json_str(nuclide_name, json_content)
+    pub fn load_nuclide_data(
+        &mut self,
+        nuclide_name: &str,
+        json_content: &str,
+    ) -> Result<(), JsValue> {
+        self.inner
+            .load_nuclide_from_json_str(nuclide_name, json_content)
             .map_err(|e| JsValue::from_str(&format!("Failed to load nuclide data: {}", e)))
     }
-    
+
     #[wasm_bindgen]
     pub fn to_string(&self) -> String {
         format!("{:?}", self.inner)
@@ -153,7 +182,9 @@ impl WasmMaterial {
 
 // Remove custom ensure_nuclides_loaded override since core handles file based loading; keep thin wrapper for WASM inserted data
 impl WasmMaterial {
-    pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+    pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -162,8 +193,8 @@ impl WasmMaterial {
     /// Returns the nuclide name as a String. If seed is provided, uses it for reproducibility.
     #[wasm_bindgen(js_name = sampleInteractingNuclide)]
     pub fn sample_interacting_nuclide_wasm(&self, energy: f64, seed: Option<u64>) -> String {
-        use rand::SeedableRng;
         use rand::rngs::StdRng;
+        use rand::SeedableRng;
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::seed_from_u64(12345),

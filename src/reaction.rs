@@ -17,12 +17,10 @@ pub struct Reaction {
     pub interpolation: Vec<i32>,
     /// Reaction‑specific energy grid (may be empty until synthesized).
     #[serde(skip, default)]
-    pub energy: Vec<f64>,  // Reaction-specific energy grid
+    pub energy: Vec<f64>, // Reaction-specific energy grid
     /// ENDF/MT reaction identifier.
-    pub mt_number: i32,  // The MT number for this reaction
+    pub mt_number: i32, // The MT number for this reaction
 }
-
-
 
 impl Reaction {
     /// Returns the cross section value for a given neutron energy.
@@ -33,7 +31,10 @@ impl Reaction {
         if self.energy.is_empty() || self.cross_section.is_empty() {
             return None;
         }
-        match self.energy.binary_search_by(|e| e.partial_cmp(&energy).unwrap()) {
+        match self
+            .energy
+            .binary_search_by(|e| e.partial_cmp(&energy).unwrap())
+        {
             Ok(idx) => self.cross_section.get(idx).copied(),
             Err(idx) => {
                 if idx == 0 {

@@ -1,6 +1,6 @@
+use crate::data::{ATOMIC_MASSES, ELEMENT_NAMES, ELEMENT_NUCLIDES, NATURAL_ABUNDANCE};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::data::{NATURAL_ABUNDANCE, ELEMENT_NUCLIDES, ELEMENT_NAMES, ATOMIC_MASSES};
 
 #[pyfunction]
 pub fn element_nuclides(py: Python) -> PyObject {

@@ -1,7 +1,7 @@
+use crate::config::{Config, CONFIG};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use std::collections::HashMap;
-use crate::config::{Config, CONFIG};
 
 /// Python wrapper for the Config struct
 #[pyclass(name = "Config")]
@@ -21,11 +21,11 @@ impl PyConfig {
     fn get_cross_sections(cls: &PyType, py: Python<'_>) -> PyResult<PyObject> {
         let config = CONFIG.lock().unwrap();
         let dict = PyDict::new(py);
-        
+
         for (nuclide, path) in &config.cross_sections {
             dict.set_item(nuclide, path)?;
         }
-        
+
         Ok(dict.into())
     }
 
@@ -39,7 +39,7 @@ impl PyConfig {
             let val: String = v.extract()?;
             rust_map.insert(key, val);
         }
-        
+
         let mut config = CONFIG.lock().unwrap();
         config.set_cross_sections(rust_map);
         Ok(())

@@ -1,14 +1,12 @@
 // Global configuration for the materials library
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
 
-// Global configuration for file paths and other settings
-pub static CONFIG: Lazy<Mutex<Config>> = Lazy::new(|| {
-    Mutex::new(Config::new())
-});
+// Global configuration for nuclear data file paths
+pub static CONFIG: Lazy<Mutex<Config>> = Lazy::new(|| Mutex::new(Config::new()));
 
-/// Global configuration container for the library.
+/// Global configuration container for the nuclear data library.
 ///
 /// The configuration is primarily a mapping from nuclide names (e.g. "Li6")
 /// to the file system path of the JSON file that stores the reaction / energy
@@ -35,7 +33,8 @@ impl Config {
 
     /// Set a cross section file path for a nuclide
     pub fn set_cross_section(&mut self, nuclide: &str, path: &str) {
-        self.cross_sections.insert(nuclide.to_string(), path.to_string());
+        self.cross_sections
+            .insert(nuclide.to_string(), path.to_string());
     }
 
     /// Get a cross section file path for a nuclide
