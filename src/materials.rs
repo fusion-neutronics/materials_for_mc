@@ -4,12 +4,19 @@ use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
 use std::sync::Arc;
 
-/// A collection of materials that behaves like a list/vector
+/// Container for many [`Material`] instances with shared nuclide caching.
+///
+/// `Materials` behaves like a simple growable list while coordinating
+/// temperature‑aware loading of nuclide JSON data. A shared `nuclide_data`
+/// map holds one `Arc<Nuclide>` per unique nuclide across all contained
+/// materials (minimizing memory and parse cost). Methods that load nuclides
+/// compute the union of temperature requests per nuclide so subsequent loads
+/// can expand (but never shrink) the `loaded_temperatures` set.
 #[derive(Debug, Clone)]
 pub struct Materials {
     /// Storage for materials in a vector
     materials: Vec<Material>,
-    /// Loaded nuclide data (name -> Arc<Nuclide>)
+    /// Shared cache: nuclide name -> `Arc<Nuclide>` (union of all material needs)
     pub nuclide_data: HashMap<String, Arc<Nuclide>>,
 }
 

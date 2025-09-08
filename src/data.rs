@@ -1,59 +1,14 @@
-/// Recursively collect all descendant MT numbers for a given parent MT number using sum rules, returning a sorted Vec<i32>
-pub fn get_all_mt_descendants(mt_num: i32) -> Vec<i32> {
-    fn collect(mt_num: i32, out: &mut std::collections::HashSet<i32>) {
-        if let Some(children) = crate::data::SUM_RULES.get(&mt_num) {
-            for &child in children {
-                if out.insert(child) {
-                    collect(child, out);
-                }
-            }
-        }
-    }
-    let mut out = std::collections::HashSet::new();
-    out.insert(mt_num); // Always include mt_num itself
-    collect(mt_num, &mut out);
-    let mut v: Vec<i32> = out.into_iter().collect();
-    v.sort();
-    v
-}
-/// Returns true if the given MT string is a hierarchical MT (i.e., present in SUM_RULES)
-pub fn is_hierarchical_mt(mt: &str) -> bool {
-    mt.parse::<i32>().map_or(false, |mt_num| SUM_RULES.contains_key(&mt_num))
-}
-pub static SUM_RULES: Lazy<HashMap<i32, Vec<i32>>> = Lazy::new(|| {
-    HashMap::from([
-        // 1: total
-        (1, vec![2, 3]), // elastic (2)
-        // 3: nonelastic
-        (3, vec![4, 5, 11, 16, 17, 22, 23, 24, 25, 27, 28, 29, 30, 32, 33, 34, 35,
-               36, 37, 41, 42, 44, 45, 152, 153, 154, 156, 157, 158, 159, 160,
-               161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
-               173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 185,
-               186, 187, 188, 189, 190, 194, 195, 196, 198, 199, 200]),
-        // inelastic
-        (4, (50..92).collect()),
-        // n,n2
-        (16, (875..892).collect()),
-        // 18: fission
-        (18, vec![19, 20, 21, 38]),
-        // 27: absorption/capture including fission
-        (27, vec![18, 101]),
-        // 101: absorption/disappearance
-        (101, vec![102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 113, 114,
-                 115, 116, 117, 155, 182, 191, 192, 193, 197]),
-        // 103: proton production
-        (103, (600..650).collect()),
-        // 104: deuteron production
-        (104, (650..700).collect()),
-        // 105: tritium production
-        (105, (700..750).collect()),
-        // 106: production of He3
-        (106, (750..800).collect()),
-        // 107: production of He4
-        (107, (800..850).collect())
-    ])
-});
-/// Map from element symbol to sorted Vec of nuclide names (e.g. "Li" -> ["Li6", "Li7"])
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
+
+
+/// Map from element symbol to sorted vector of nuclide (isotope) identifiers.
+///
+/// Keys are element symbols (e.g. `"Li"`) and values are the sorted list of
+/// nuclide names for naturally occurring isotopes of that element (e.g.
+/// `["Li6", "Li7"]`). The mapping is derived automatically from
+/// [`NATURAL_ABUNDANCE`] so it stays consistent with the set of isotopes for
+/// which natural abundances are defined.
 pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy::new(|| {
     let mut map: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
     for &nuclide in NATURAL_ABUNDANCE.keys() {
@@ -72,11 +27,17 @@ pub static ELEMENT_NUCLIDES: Lazy<HashMap<&'static str, Vec<&'static str>>> = La
 });
 // src/data.rs
 // This module contains large static data tables for the materials library.
-// NATURAL_ABUNDANCE: canonical natural     m for all stable isotopes.
+// The volume of data is significant; doc comments summarize the intent of
+// each table while the literals provide the canonical numeric values.
 
-use std::collections::HashMap;
-use once_cell::sync::Lazy;
 
+/// Natural terrestrial isotopic abundances (fractional, summing to ~1.0 per
+/// element) for stable isotopes.
+///
+/// Each key is a nuclide name (e.g. `"Fe56"`) and the value is its natural
+/// abundance by atom fraction. Values are sourced from standard reference
+/// compilations (rounded as needed). Elements with a single stable isotope are
+/// assigned 1.0.
 pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     let mut m = HashMap::new();
     // ...existing NATURAL_ABUNDANCE data from element.rs...
@@ -543,6 +504,11 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m
 });
 
+/// Mapping from element symbol to its lowercase English name.
+///
+/// Provided for convenience when presenting user‑facing descriptions and for
+/// validating element inputs (case sensitive symbol keys matching the raw
+/// nuclear data tables).
 pub static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut names = HashMap::new();
     names.insert("H", "hydrogen");
@@ -651,6 +617,14 @@ pub static ELEMENT_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(
     names
 });
 
+/// Atomic (nuclidic) masses in atomic mass units (u) for a broad set of
+/// isotopes.
+///
+/// Keys follow the same nuclide naming convention used throughout the crate
+/// (e.g. `"U235"`). Values are taken from mass evaluation data (truncated to
+/// available precision here) and can be used for number density conversions or
+/// other mass‑dependent calculations. This table may include short‑lived or
+/// synthetic isotopes beyond those appearing in [`NATURAL_ABUNDANCE`].
 pub static ATOMIC_MASSES: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert("N1", 1.0086649159);

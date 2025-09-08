@@ -27,3 +27,5 @@ Cargo.lock
 tests/__pycache__/
 *.html
 *.png
+
+docs/build/

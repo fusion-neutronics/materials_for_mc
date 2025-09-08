@@ -23,21 +23,33 @@ fn element_isotopes_map() -> HashMap<&'static str, Vec<&'static str>> {
     map
 }
 
-/// Public convenience: full mapping element -> isotopes (owned Strings)
+/// (Deprecated external) Full mapping element -> isotopes (owned Strings).
+///
+/// This free function is now superseded by `Element::all_nuclides_map()` and
+/// will be removed in a future release.
 pub fn all_element_isotopes() -> HashMap<String, Vec<String>> {
-    element_isotopes_map().into_iter()
-        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
-        .collect()
+    Element::all_nuclides_map()
 }
 
-/// Element structure representing a chemical element with helper methods.
+/// Represents a chemical element identified by its symbol (e.g. `"Fe"`).
+///
+/// Provides helper methods to enumerate naturally occurring isotopes (nuclides)
+/// using the internally defined natural abundance database.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Element {
+    /// Chemical symbol of the element (case sensitive, e.g. "Fe").
     pub name: String,
 }
 
 impl Element {
     pub fn new<S: Into<String>>(name: S) -> Self { Self { name: name.into() } }
+
+    /// Return a mapping of element symbol -> sorted list of isotope names for all elements.
+    pub fn all_nuclides_map() -> HashMap<String, Vec<String>> {
+        element_isotopes_map().into_iter()
+            .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+            .collect()
+    }
 
     /// Return the list of nuclide (isotope) names (e.g. ["Fe54", "Fe56", ...]) for this element.
     pub fn get_nuclides(&self) -> Vec<String> {
@@ -64,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_all_element_isotopes_map() {
-        let map = all_element_isotopes();
+    let map = Element::all_nuclides_map();
         assert!(map.get("Li").unwrap().contains(&"Li6".to_string()));
         assert!(map.get("Li").unwrap().contains(&"Li7".to_string()));
     }

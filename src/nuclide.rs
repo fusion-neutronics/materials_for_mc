@@ -21,23 +21,49 @@ pub fn clear_nuclide_cache() {
 }
 
 
+/// Core data model for a single nuclide and its reaction cross section data.
+///
+/// A `Nuclide` mirrors (and is deserialized from) a JSON schema containing
+/// metadata plus reaction channel data at one or more temperatures. Reaction
+/// data are organized by temperature key (e.g. "294") and then by ENDF/MT
+/// number. Each [`Reaction`] holds its own threshold information and (possibly
+/// truncated) energy grid relative to the top‑level temperature energy grid.
+///
+/// Temperatures:
+/// * `available_temperatures` always lists every temperature present in the
+///   source JSON file – even if a filtered load only materialized a subset.
+/// * `loaded_temperatures` tracks the subset actually parsed into `reactions`
+///   and `energy` according to caller filtering semantics.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nuclide {
+    /// Canonical nuclide name (e.g. "Li6"). May be derived when absent.
     pub name: Option<String>,
+    /// Optional human readable element name (legacy field; may be absent).
     pub element: Option<String>,
+    /// Element symbol, e.g. "Li".
     pub atomic_symbol: Option<String>,
+    /// Atomic (proton) number Z.
     pub atomic_number: Option<u32>,
+    /// Neutron number N (may be computed from A - Z if missing).
     pub neutron_number: Option<u32>,
+    /// Mass number A.
     pub mass_number: Option<u32>,
+    /// Origin / library identifier (e.g. JEFF, ENDF, custom tag).
     pub library: Option<String>,
+    /// Top‑level energy grid per temperature (full grid; per‑reaction grids may be threshold‑truncated).
     pub energy: Option<HashMap<String, Vec<f64>>>,
+    /// temperature -> MT number -> reaction data.
     #[serde(default)]
     pub reactions: HashMap<String, HashMap<i32, Reaction>>, // temperature -> mt (i32) -> Reaction
+    /// True if any fission MT channel is present.
     pub fissionable: bool,
+    /// All temperatures present in the JSON file regardless of filtering.
     #[serde(skip, default)]
     pub available_temperatures: Vec<String>, // All temps listed in the JSON (even if not loaded)
+    /// Subset of temperatures actually loaded into `reactions` / `energy`.
     #[serde(skip, default)]
     pub loaded_temperatures: Vec<String>, // Subset actually loaded into reactions/energy
+    /// Optional path the JSON was read from (None for in‑memory sources / WASM).
     #[serde(skip, default)]
     pub data_path: Option<String>, // Path JSON was loaded from (for potential future extension)
 }
