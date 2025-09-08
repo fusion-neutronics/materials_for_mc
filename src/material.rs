@@ -601,16 +601,14 @@ impl Material {
         };
 
         // Get the isotopes for this element
-    let element_isotopes = crate::element::Element::all_nuclides_map();
-
-        // Check if the element exists in our database
-        let isotopes = element_isotopes.get(element_sym.as_str()).ok_or_else(|| {
+        // Use the static ELEMENT_NUCLIDES map directly to avoid rebuilding a full map each call.
+        let isotopes_vec = crate::data::ELEMENT_NUCLIDES.get(element_sym.as_str()).ok_or_else(|| {
             format!("Element '{}' not found in the natural abundance database", element_sym)
         })?;
 
         // Add each isotope with its natural abundance
-        for isotope in isotopes.iter() {
-            if let Some(abundance) = crate::data::NATURAL_ABUNDANCE.get(isotope.as_str()) {
+        for &isotope in isotopes_vec.iter() {
+            if let Some(abundance) = crate::data::NATURAL_ABUNDANCE.get(isotope) {
                 let isotope_fraction = fraction * abundance;
                 if isotope_fraction > 0.0 {
                     self.add_nuclide(isotope, isotope_fraction)?;
