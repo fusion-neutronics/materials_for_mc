@@ -1,7 +1,7 @@
-use crate::material::Material;
-use std::collections::HashMap;
-use crate::nuclide::{Nuclide, get_or_load_nuclide};
 use crate::config::CONFIG;
+use crate::material::Material;
+use crate::nuclide::{get_or_load_nuclide, Nuclide};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Container for many [`Material`] instances with shared nuclide caching.
@@ -30,7 +30,7 @@ impl Materials {
     }
 
     /// Append a material to the collection (like a list)
-    /// 
+    ///
     /// # Arguments
     /// * `material` - The material to append
     pub fn append(&mut self, material: Material) {
@@ -38,7 +38,7 @@ impl Materials {
     }
 
     /// Get a reference to a material by index
-    /// 
+    ///
     /// # Returns
     /// * `Some(&Material)` if index is valid
     /// * `None` if index is out of bounds
@@ -47,53 +47,64 @@ impl Materials {
     }
 
     /// Get a mutable reference to a material by index
-    /// 
+    ///
     /// # Returns
     /// * `Some(&mut Material)` if index is valid
     /// * `None` if index is out of bounds
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Material> {
         self.materials.get_mut(index)
     }
-    
+
     /// Remove a material at the specified index
-    /// 
+    ///
     /// # Returns
     /// * The removed material, or panics if index is out of bounds
     pub fn remove(&mut self, index: usize) -> Material {
         self.materials.remove(index)
     }
-    
+
     /// Get the number of materials in the collection
     pub fn len(&self) -> usize {
         self.materials.len()
     }
-    
+
     /// Check if the collection is empty
     pub fn is_empty(&self) -> bool {
         self.materials.is_empty()
     }
-    
+
     /// Get an iterator over the materials
     pub fn iter(&self) -> impl Iterator<Item = &Material> {
         self.materials.iter()
     }
-    
+
     /// Get a mutable iterator over the materials
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Material> {
         self.materials.iter_mut()
     }
 
     /// Read (and cache) all nuclides needed by materials from JSON paths, loading only the union of requested temperatures per nuclide.
-    pub fn read_nuclides_from_json(&mut self, nuclide_json_map: &HashMap<String, String>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn read_nuclides_from_json(
+        &mut self,
+        nuclide_json_map: &HashMap<String, String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         use std::collections::{HashMap as StdHashMap, HashSet};
         // Collect all nuclide names across materials
-        let mut merged: HashMap<String,String> = HashMap::new();
+        let mut merged: HashMap<String, String> = HashMap::new();
         let cfg = CONFIG.lock().unwrap();
-        for mat in &self.materials { for n in mat.nuclides.keys() { if let Some(p) = cfg.cross_sections.get(n) { merged.insert(n.clone(), p.clone()); } } }
+        for mat in &self.materials {
+            for n in mat.nuclides.keys() {
+                if let Some(p) = cfg.cross_sections.get(n) {
+                    merged.insert(n.clone(), p.clone());
+                }
+            }
+        }
         drop(cfg);
         // Override with provided explicit mappings
-        for (k,v) in nuclide_json_map { merged.insert(k.clone(), v.clone()); }
-        let source_map: &HashMap<String,String> = &merged;
+        for (k, v) in nuclide_json_map {
+            merged.insert(k.clone(), v.clone());
+        }
+        let source_map: &HashMap<String, String> = &merged;
         // Map nuclide -> set of requested temperatures
         let mut requests: StdHashMap<String, HashSet<String>> = StdHashMap::new();
         for mat in &self.materials {
@@ -109,7 +120,8 @@ impl Materials {
         for nuclide_name in request_keys {
             if let Some(temps) = requests.get(&nuclide_name) {
                 let arc = get_or_load_nuclide(&nuclide_name, source_map, Some(temps))?;
-                self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&arc));
+                self.nuclide_data
+                    .insert(nuclide_name.clone(), Arc::clone(&arc));
             }
         }
         // Distribute arcs to materials
@@ -117,7 +129,8 @@ impl Materials {
             mat.nuclide_data.clear();
             for nuclide_name in mat.nuclides.keys() {
                 if let Some(shared_arc) = self.nuclide_data.get::<str>(nuclide_name) {
-                    mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
+                    mat.nuclide_data
+                        .insert(nuclide_name.clone(), Arc::clone(shared_arc));
                 }
             }
         }
@@ -135,31 +148,33 @@ impl Materials {
                 }
             }
         }
-        
+
         if needed.is_empty() {
             return Ok(());
         }
-        
+
         // Get the global configuration
         let config = CONFIG.lock().unwrap();
-        
+
         // Load each missing nuclide
         for nuclide_name in &needed {
             let nuclide = get_or_load_nuclide(nuclide_name, &config.cross_sections, None)?;
-            self.nuclide_data.insert(nuclide_name.clone(), Arc::clone(&nuclide));
+            self.nuclide_data
+                .insert(nuclide_name.clone(), Arc::clone(&nuclide));
         }
-        
+
         // Ensure all materials reference the shared Arc<Nuclide> from self.nuclide_data
         for mat in &mut self.materials {
             for nuclide_name in mat.nuclides.keys() {
                 if !mat.nuclide_data.contains_key(nuclide_name) {
                     if let Some(shared_arc) = self.nuclide_data.get::<str>(nuclide_name) {
-                        mat.nuclide_data.insert(nuclide_name.clone(), Arc::clone(shared_arc));
+                        mat.nuclide_data
+                            .insert(nuclide_name.clone(), Arc::clone(shared_arc));
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -186,7 +201,7 @@ mod tests {
     fn test_append_material() {
         let mut materials = Materials::new();
         let material = Material::new();
-        
+
         materials.append(material);
         assert_eq!(materials.len(), 1);
     }
@@ -196,10 +211,10 @@ mod tests {
         let mut materials = Materials::new();
         let mut material = Material::new();
         material.set_density("g/cm3", 10.5).unwrap();
-        
+
         materials.append(material);
         let retrieved = materials.get(0);
-        
+
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().density, Some(10.5));
     }
@@ -208,10 +223,10 @@ mod tests {
     fn test_remove_material() {
         let mut materials = Materials::new();
         let material = Material::new();
-        
+
         materials.append(material);
         let _removed = materials.remove(0);
-        
+
         assert!(materials.is_empty());
     }
 
@@ -219,22 +234,22 @@ mod tests {
     fn test_get_mut_material() {
         let mut materials = Materials::new();
         let material = Material::new();
-        
+
         materials.append(material);
-        
+
         // Modify the material through the mutable reference
         let material = materials.get_mut(0).unwrap();
         material.set_density("g/cm3", 10.5).unwrap();
-        
+
         // Verify the modification was successful
         assert_eq!(materials.get(0).unwrap().density, Some(10.5));
     }
 
     #[test]
     fn test_materials_nuclide_arc_sharing() {
+        use crate::nuclide::Nuclide;
         use std::collections::HashMap;
         use std::sync::Arc;
-        use crate::nuclide::Nuclide;
 
         // Prepare nuclide JSON map (adjust path as needed)
         let mut nuclide_json_map = HashMap::new();
@@ -248,7 +263,9 @@ mod tests {
             materials.append(mat);
         }
         // Load nuclide data (should only load once and share Arc<Nuclide>)
-    materials.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        materials
+            .read_nuclides_from_json(&nuclide_json_map)
+            .unwrap();
 
         // Collect all Arc pointers for Li6 from each material
         let mut arcs: Vec<Arc<Nuclide>> = Vec::new();
@@ -259,13 +276,16 @@ mod tests {
         }
         // All Arc pointers should point to the same allocation
         for i in 1..arcs.len() {
-            assert!(Arc::ptr_eq(&arcs[0], &arcs[i]), "Nuclide Arc is not shared!");
+            assert!(
+                Arc::ptr_eq(&arcs[0], &arcs[i]),
+                "Nuclide Arc is not shared!"
+            );
         }
     }
 
     #[test]
     fn test_union_temperature_loading_subset_then_union() {
-    crate::nuclide::clear_nuclide_cache();
+        crate::nuclide::clear_nuclide_cache();
         // Prepare map for Be9 which has 294 and 300 temps
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
@@ -275,17 +295,21 @@ mod tests {
         m1.add_nuclide("Be9", 1.0).unwrap();
         m1.set_temperature("294");
         mats.append(m1);
-    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc1 = mats.nuclide_data.get("Be9").unwrap();
-    // With only one material requesting 294K, eager union over requests should load only 294 initially
-    assert_eq!(arc1.loaded_temperatures, vec!["294".to_string()], "Should load only the requested temperature (294) on first union load");
+        // With only one material requesting 294K, eager union over requests should load only 294 initially
+        assert_eq!(
+            arc1.loaded_temperatures,
+            vec!["294".to_string()],
+            "Should load only the requested temperature (294) on first union load"
+        );
         // Add second material needing 300
         let mut m2 = crate::material::Material::new();
         m2.add_nuclide("Be9", 1.0).unwrap();
         m2.set_temperature("300");
         mats.append(m2);
         // Reload with union (should reuse existing or reload). After this, loaded_temperatures must contain 300.
-    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc2 = mats.nuclide_data.get("Be9").unwrap();
         assert!(arc2.loaded_temperatures.iter().any(|t| t == "300"));
         // Pointer may have changed due to reload strategy; ensure at least temps present.
@@ -293,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_union_temperature_loading_both_at_once() {
-    crate::nuclide::clear_nuclide_cache();
+        crate::nuclide::clear_nuclide_cache();
         let mut nuclide_json_map = HashMap::new();
         nuclide_json_map.insert("Be9".to_string(), "tests/Be9.json".to_string());
         let mut mats = Materials::new();
@@ -305,8 +329,12 @@ mod tests {
         m2.set_temperature("300");
         mats.append(m1);
         mats.append(m2);
-    mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
+        mats.read_nuclides_from_json(&nuclide_json_map).unwrap();
         let arc = mats.nuclide_data.get("Be9").unwrap();
-        assert_eq!(arc.loaded_temperatures, vec!["294".to_string(), "300".to_string()], "Union load with both temps requested simultaneously should load both temps");
+        assert_eq!(
+            arc.loaded_temperatures,
+            vec!["294".to_string(), "300".to_string()],
+            "Union load with both temps requested simultaneously should load both temps"
+        );
     }
 }

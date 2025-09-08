@@ -36,6 +36,10 @@ impl PyReaction {
     #[pyo3(text_signature = "(reactants, products, energy)")]
     #[new]
     pub fn new(reactants: Vec<String>, products: Vec<String>, energy: f64) -> Self {
-        PyReaction { reactants, products, energy }
+        PyReaction {
+            reactants,
+            products,
+            energy,
+        }
     }
 }

@@ -1,7 +1,6 @@
 // Provides functionality for working with natural elements and their isotopic abundances
 use crate::data::ELEMENT_NUCLIDES;
 
-
 /// Represents a chemical element identified by its symbol (e.g. `"Fe"`).
 ///
 /// Provides helper methods to enumerate naturally occurring isotopes (nuclides)
@@ -13,7 +12,9 @@ pub struct Element {
 }
 
 impl Element {
-    pub fn new<S: Into<String>>(name: S) -> Self { Self { name: name.into() } }
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self { name: name.into() }
+    }
 
     /// Return the list of nuclide (isotope) names (e.g. ["Fe54", "Fe56", ...]) for this element.
     pub fn get_nuclides(&self) -> Vec<String> {
@@ -31,7 +32,7 @@ mod tests {
     #[test]
     fn test_element_struct_isotopes() {
         let fe = Element::new("Fe");
-    let list = fe.get_nuclides();
+        let list = fe.get_nuclides();
         assert!(list.contains(&"Fe54".to_string()));
         assert!(list.contains(&"Fe56".to_string()));
         assert!(list.contains(&"Fe57".to_string()));
@@ -41,7 +42,7 @@ mod tests {
     #[test]
     fn test_unknown_element() {
         let fake = Element::new("Xx");
-    assert!(fake.get_nuclides().is_empty());
+        assert!(fake.get_nuclides().is_empty());
     }
 
     #[test]
@@ -49,8 +50,16 @@ mod tests {
         let fe = Element::new("Fe");
         let list = fe.get_nuclides();
         let expected = vec!["Fe54", "Fe56", "Fe57", "Fe58"];
-        assert_eq!(list.len(), expected.len(), "Unexpected number of Fe isotopes: {:?}", list);
-        assert_eq!(list, expected.iter().map(|s| s.to_string()).collect::<Vec<_>>(), "Fe isotope list mismatch");
+        assert_eq!(
+            list.len(),
+            expected.len(),
+            "Unexpected number of Fe isotopes: {:?}",
+            list
+        );
+        assert_eq!(
+            list,
+            expected.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            "Fe isotope list mismatch"
+        );
     }
 }
-
