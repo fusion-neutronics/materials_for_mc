@@ -22,7 +22,7 @@ Cargo.lock
 
 # python env
 .materials_for_mc_env/
-
+.venv/
 
 tests/__pycache__/
 *.html

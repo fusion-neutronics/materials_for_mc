@@ -1,6 +1,6 @@
 # Developer Info
 
-This guide shows how to clone, build, test, and generate documentation for the project.
+This guide shows how to clone, build, test, and generate documentation for the project. Instructions are written for Linux but equivilent commands should be possible in Windows and Mac OS.
 
 ## 1. Clone the Repository
 ```bash
@@ -15,6 +15,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 Windows https://forge.rust-lang.org/infra/other-installation-methods.html
 
+Install a C compiler
+```
+sudo apt update && sudo apt install build-essential
+```
 
 Build Rust Package:
 ```bash
@@ -29,7 +33,8 @@ cargo test
 
 (Optional) Create a Python virtual environment:
 ```bash
-python -m venv .venv
+sudo apt install python3-venv
+python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
 
