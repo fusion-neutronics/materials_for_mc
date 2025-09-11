@@ -29,3 +29,5 @@ tests/__pycache__/
 *.png
 
 docs/build/
+wheelhouse/
+dist/
