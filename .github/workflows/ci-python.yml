@@ -130,11 +130,11 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          args: --release --features pyo3 --out wheelhouse
+          args: --release --features pyo3 --out wheelhouse --interpreter 3.8 3.9 3.10 3.11 3.12 3.13
           manylinux: auto
 
       - name: Build wheels (Other)  
-        run: maturin build --release --features pyo3 --out wheelhouse
+        run: maturin build --release --features pyo3 --out wheelhouse --interpreter python3.8 python3.9 python3.10 python3.11 python3.12 python3.13
         if: runner.os != 'Linux'
 
       - name: Upload wheels
