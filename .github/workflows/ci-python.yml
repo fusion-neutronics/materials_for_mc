@@ -6,10 +6,8 @@ on:
   pull_request:
     branches: [ main ]
   release:
-    types: [publi        run: maturin build --release --features pyo3 --out wheelhouse
-        if: runner.os != 'Linux'
-
-      - name: Upload wheelsrkflow_dispatch:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
   test:
