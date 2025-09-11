@@ -92,6 +92,10 @@ if importlib.util.find_spec('pydata_sphinx_theme') is not None:
         "show_toc_level": 2,
         # Top navbar behavior
         "navbar_center": ["navbar-nav"],
+        # Remove theme credit footer
+        "footer_start": [],
+        # Remove the copyright footer
+        "footer_end": [],
         # Color / style toggles (leave light/dark to theme defaults)
         "icon_links": [
             {
@@ -138,3 +142,5 @@ napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
 
 # No rustdoc configuration needed - we'll link directly to the HTML files
+
+html_show_sphinx = False
