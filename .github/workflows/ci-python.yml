@@ -130,7 +130,7 @@ jobs:
 
       - name: Build wheel
         run: |
-          maturin build --release --features pyo3 --out wheelhouse -i python${{ matrix.python-version }} --manylinux auto
+          maturin build --release --features pyo3 --out wheelhouse -i python${{ matrix.python-version }} --compatibility manylinux_2_28
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4

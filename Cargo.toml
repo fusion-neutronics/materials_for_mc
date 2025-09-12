@@ -1,6 +1,6 @@
 [package]
 name = "materials_for_mc"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2021"
 description = "Material builder for Monte Carlo simulations"
 license = "MIT"
