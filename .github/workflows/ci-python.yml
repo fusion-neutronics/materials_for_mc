@@ -128,9 +128,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install maturin
 
-      - name: Build wheel
+      - name: Build wheel (Linux manylinux 2_17)
+        if: runner.os == 'Linux'
         run: |
-          maturin build --release --features pyo3 --out wheelhouse -i python${{ matrix.python-version }} --compatibility manylinux_2_28
+          maturin build --release --features pyo3 -i python${{ matrix.python-version }} --manylinux 2_17 --out wheelhouse
+
+      - name: Build wheel (non-Linux)
+        if: runner.os != 'Linux'
+        run: |
+          maturin build --release --features pyo3 -i python${{ matrix.python-version }} --out wheelhouse
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
