@@ -1,0 +1,1196 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Python API &#8212; materials_for_mc API</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="_static/documentation_options.js?v=01f34227"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'python_api';</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Rust API" href="rust_api.html" />
+    <link rel="prev" title="Documentation" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">materials_for_mc API</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Python API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="rust_api.html">
+    Rust API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="developer_info.html">
+    Developer Info
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/fusion-neutronics/materials_for_mc" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Python API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="rust_api.html">
+    Rust API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="developer_info.html">
+    Developer Info
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/fusion-neutronics/materials_for_mc" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Python API</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="python-api">
+<h1>Python API<a class="headerlink" href="#python-api" title="Link to this heading">#</a></h1>
+<section id="nuclide">
+<h2>Nuclide<a class="headerlink" href="#nuclide" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Nuclide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Nuclide data container exposed to Python.</p>
+<p>Create a new (optionally named) nuclide instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Optional nuclide identifier (e.g. “Li6”, “Fe56”). If not
+supplied you must pass <cite>path</cite> to <cite>read_nuclide_from_json</cite> later.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Individual fields (e.g. <cite>name</cite>, <cite>atomic_number</cite>, <cite>available_temperatures</cite>,
+<cite>loaded_temperatures</cite>) are exposed as read-only attributes via PyO3 getters.
+Detailed descriptions appear once each in the generated documentation—this
+summary omits a full per-attribute list to avoid duplication.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.atomic_number">
+<span class="sig-name descname"><span class="pre">atomic_number</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.atomic_number" title="Link to this definition">#</a></dt>
+<dd><p>Proton number Z.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Atomic number.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.atomic_symbol">
+<span class="sig-name descname"><span class="pre">atomic_symbol</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.atomic_symbol" title="Link to this definition">#</a></dt>
+<dd><p>Atomic symbol (currently same as element symbol).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Atomic symbol string.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.available_temperatures">
+<span class="sig-name descname"><span class="pre">available_temperatures</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.available_temperatures" title="Link to this definition">#</a></dt>
+<dd><p>All temperatures present in the source data file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Temperature labels (e.g. [“293K”]).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.data_path">
+<span class="sig-name descname"><span class="pre">data_path</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.data_path" title="Link to this definition">#</a></dt>
+<dd><p>Path to the data file used to populate this nuclide (if known).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Filesystem path or None.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.element">
+<span class="sig-name descname"><span class="pre">element</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.element" title="Link to this definition">#</a></dt>
+<dd><p>Chemical element symbol (e.g. “Fe”).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Element symbol or None if data not loaded.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.energy">
+<span class="sig-name descname"><span class="pre">energy</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.energy" title="Link to this definition">#</a></dt>
+<dd><p>Energy grids by temperature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Map of temperature key to energy grid
+or None if no energy data loaded.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[Dict[str, List[float]]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.energy_grid">
+<span class="sig-name descname"><span class="pre">energy_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.energy_grid" title="Link to this definition">#</a></dt>
+<dd><p>Get the energy grid for a specific temperature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>temperature</strong> (<em>str</em>) – Temperature key (e.g. “293K”).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The energy grid or None if not present.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[List[float]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.fissionable">
+<span class="sig-name descname"><span class="pre">fissionable</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.fissionable" title="Link to this definition">#</a></dt>
+<dd><p>Whether the nuclide is fissionable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if fissionable.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.get_reaction_energy_grid">
+<span class="sig-name descname"><span class="pre">get_reaction_energy_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.get_reaction_energy_grid" title="Link to this definition">#</a></dt>
+<dd><p>Get the reaction-specific energy grid for a given MT at a temperature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>temperature</strong> (<em>str</em>) – Temperature key (e.g. “293K”).</p></li>
+<li><p><strong>mt</strong> (<em>int</em>) – ENDF MT reaction number.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reaction energy grid if present.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[List[float]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.library">
+<span class="sig-name descname"><span class="pre">library</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.library" title="Link to this definition">#</a></dt>
+<dd><p>Originating nuclear data library identifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Library name/code.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.loaded_temperatures">
+<span class="sig-name descname"><span class="pre">loaded_temperatures</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.loaded_temperatures" title="Link to this definition">#</a></dt>
+<dd><p>Temperatures actually loaded into memory (subset of available_temperatures).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Loaded temperatures.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.mass_number">
+<span class="sig-name descname"><span class="pre">mass_number</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.mass_number" title="Link to this definition">#</a></dt>
+<dd><p>Mass number A = Z + N.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Mass number.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.name" title="Link to this definition">#</a></dt>
+<dd><p>Name / identifier for the nuclide (e.g. “Li6”, “Fe56”).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Nuclide name or None if not yet set.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.neutron_number">
+<span class="sig-name descname"><span class="pre">neutron_number</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.neutron_number" title="Link to this definition">#</a></dt>
+<dd><p>Neutron number N.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Neutron count.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.reaction_mts">
+<span class="sig-name descname"><span class="pre">reaction_mts</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.reaction_mts" title="Link to this definition">#</a></dt>
+<dd><p>List of MT numbers available for the (first) loaded temperature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of MT identifiers or None if no data.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional[List[int]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.reactions">
+<span class="sig-name descname"><span class="pre">reactions</span></span><a class="headerlink" href="#materials_for_mc.Nuclide.reactions" title="Link to this definition">#</a></dt>
+<dd><p>Mapping of temperature -&gt; MT number -&gt; reaction data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p>Nested dictionary. The innermost
+dictionary has these keys:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>cross_section (List[float])</p></li>
+<li><p>threshold_idx (int)</p></li>
+<li><p>interpolation (List[int])</p></li>
+<li><p>energy (Optional[List[float]]): Present when reaction has its own grid</p></li>
+</ul>
+</div></blockquote>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, Dict[int, Dict[str, Any]]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.read_nuclide_from_json">
+<span class="sig-name descname"><span class="pre">read_nuclide_from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperatures</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.read_nuclide_from_json" title="Link to this definition">#</a></dt>
+<dd><p>Load nuclear data from a JSON file.</p>
+<p>You can either provide a JSON file path explicitly via <cite>path</cite> or rely on
+the <cite>name</cite> given at construction if your application resolves it.</p>
+<p>When <cite>temperatures</cite> is provided only those temperatures are loaded while
+<cite>available_temperatures</cite> always lists every temperature present in the
+file. The subset actually loaded is stored in <cite>loaded_temperatures</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Optional path to the nuclide JSON file. If omitted the
+constructor <cite>name</cite> must have been set and is used as the path / key.</p></li>
+<li><p><strong>temperatures</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em>) – Temperature strings (e.g. [“293K”]).
+If given only these temperatures are loaded.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If neither <cite>path</cite> nor <cite>name</cite> is available, or if the
+    JSON cannot be read / parsed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="element">
+<h2>Element<a class="headerlink" href="#element" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="materials_for_mc.Element">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Element</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Element" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Chemical element container providing isotope helper methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<em>str</em>) – Element symbol (e.g. “Fe”, “U”, “H”).</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Element.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#materials_for_mc.Element.name" title="Link to this definition">#</a></dt>
+<dd><p>Element symbol provided at construction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Element.get_nuclides">
+<span class="sig-name descname"><span class="pre">get_nuclides</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Element.get_nuclides" title="Link to this definition">#</a></dt>
+<dd><p>Return list of isotope (nuclide) identifiers for this element.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Isotope names sorted by mass number (e.g. [“Fe54”, “Fe56”]).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#id0" title="Link to this definition">#</a></dt>
+<dd><p>Element symbol.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="reaction">
+<h2>Reaction<a class="headerlink" href="#reaction" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="materials_for_mc.Reaction">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Reaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reactants</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">products</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Reaction" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Lightweight reaction summary exposed to Python.</p>
+<p>Represents a single nuclear reaction channel with reactants, products and an
+associated energy (e.g. Q-value or representative energy in MeV).</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Reaction.reactants">
+<span class="sig-name descname"><span class="pre">reactants</span></span><a class="headerlink" href="#materials_for_mc.Reaction.reactants" title="Link to this definition">#</a></dt>
+<dd><p>Names / symbols of incoming particles or nuclei.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Reaction.products">
+<span class="sig-name descname"><span class="pre">products</span></span><a class="headerlink" href="#materials_for_mc.Reaction.products" title="Link to this definition">#</a></dt>
+<dd><p>Names / symbols of outgoing particles or nuclei.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Reaction.energy">
+<span class="sig-name descname"><span class="pre">energy</span></span><a class="headerlink" href="#materials_for_mc.Reaction.energy" title="Link to this definition">#</a></dt>
+<dd><p>Reaction energy value (units depend on source data, typically MeV).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">energy</span></span><a class="headerlink" href="#id1" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">products</span></span><a class="headerlink" href="#id2" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">reactants</span></span><a class="headerlink" href="#id3" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="material">
+<h2>Material<a class="headerlink" href="#material" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="materials_for_mc.Material">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Material</span></span><a class="headerlink" href="#materials_for_mc.Material" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.add_element">
+<span class="sig-name descname"><span class="pre">add_element</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fraction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.add_element" title="Link to this definition">#</a></dt>
+<dd><p>Add a natural element by atomic fraction (expands to isotopes internally).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>element</strong> (<em>str</em>) – Element symbol (e.g. “Fe”).</p></li>
+<li><p><strong>fraction</strong> (<em>float</em>) – Atomic fraction for the element.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.add_nuclide">
+<span class="sig-name descname"><span class="pre">add_nuclide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fraction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.add_nuclide" title="Link to this definition">#</a></dt>
+<dd><p>Add (or update) a nuclide number fraction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nuclide</strong> (<em>str</em>) – Nuclide name (e.g. “Fe56”).</p></li>
+<li><p><strong>fraction</strong> (<em>float</em>) – Number fraction (will be normalized with others later).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – On invalid fraction or name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.calculate_macroscopic_xs_neutron">
+<span class="sig-name descname"><span class="pre">calculate_macroscopic_xs_neutron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mt_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_nuclide</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.calculate_macroscopic_xs_neutron" title="Link to this definition">#</a></dt>
+<dd><p>Calculate macroscopic neutron cross sections (total or subset of MTs).</p>
+<p>Builds the unified energy grid if not already present.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mt_filter</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em>) – MT numbers to include (default [1] total).</p></li>
+<li><p><strong>by_nuclide</strong> (<em>bool</em>) – If True, store per-nuclide macroscopic XS internally.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(energy grid, MT -&gt; Σ array)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[List[float], Dict[int, List[float]]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.calculate_microscopic_xs_neutron">
+<span class="sig-name descname"><span class="pre">calculate_microscopic_xs_neutron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mt_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.calculate_microscopic_xs_neutron" title="Link to this definition">#</a></dt>
+<dd><p>Calculate microscopic neutron cross sections on the unified energy grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mt_filter</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em>) – Restrict to these MT numbers.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>nuclide -&gt; MT -&gt; xs array</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict[str, Dict[int, List[float]]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.density">
+<span class="sig-name descname"><span class="pre">density</span></span><a class="headerlink" href="#materials_for_mc.Material.density" title="Link to this definition">#</a></dt>
+<dd><p>Density value (in current units) or None.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.density_units">
+<span class="sig-name descname"><span class="pre">density_units</span></span><a class="headerlink" href="#materials_for_mc.Material.density_units" title="Link to this definition">#</a></dt>
+<dd><p>Density units string.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.get_atoms_per_barn_cm">
+<span class="sig-name descname"><span class="pre">get_atoms_per_barn_cm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.get_atoms_per_barn_cm" title="Link to this definition">#</a></dt>
+<dd><p>Number density (atoms / barn-cm) per nuclide.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>nuclide -&gt; atoms / b-cm</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.get_nuclide_names">
+<span class="sig-name descname"><span class="pre">get_nuclide_names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.get_nuclide_names" title="Link to this definition">#</a></dt>
+<dd><p>Return a list of nuclide names currently present in the material.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.macroscopic_xs_neutron">
+<span class="sig-name descname"><span class="pre">macroscopic_xs_neutron</span></span><a class="headerlink" href="#materials_for_mc.Material.macroscopic_xs_neutron" title="Link to this definition">#</a></dt>
+<dd><p>Cached macroscopic neutron cross sections (MT -&gt; Σ(E)).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.mean_free_path_neutron">
+<span class="sig-name descname"><span class="pre">mean_free_path_neutron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.mean_free_path_neutron" title="Link to this definition">#</a></dt>
+<dd><p>Compute neutron mean free path at a given energy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>energy</strong> (<em>float</em>) – Neutron energy in eV.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Mean free path (cm) or None if total XS unavailable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.nuclide_ptr_addr">
+<span class="sig-name descname"><span class="pre">nuclide_ptr_addr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.nuclide_ptr_addr" title="Link to this definition">#</a></dt>
+<dd><p>Return raw pointer address of an internal shared Nuclide (debug only).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>nuclide</strong> (<em>str</em>) – Nuclide name.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Address value (process-local) or None if not present.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.nuclides">
+<span class="sig-name descname"><span class="pre">nuclides</span></span><a class="headerlink" href="#materials_for_mc.Material.nuclides" title="Link to this definition">#</a></dt>
+<dd><p>Get the material nuclides as a tuple of (name, fraction) pairs</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.reaction_mts">
+<span class="sig-name descname"><span class="pre">reaction_mts</span></span><a class="headerlink" href="#materials_for_mc.Material.reaction_mts" title="Link to this definition">#</a></dt>
+<dd><p>Sorted list of all unique MT reaction numbers present.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.read_nuclides_from_json">
+<span class="sig-name descname"><span class="pre">read_nuclides_from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nuclide_json_map</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.read_nuclides_from_json" title="Link to this definition">#</a></dt>
+<dd><p>Bulk load nuclide data from a mapping of nuclide -&gt; JSON path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>nuclide_json_map</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>,</em><em>str</em><em>]</em><em>]</em>) – Mapping of nuclide names to JSON file paths.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If any JSON file cannot be read / parsed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.sample_distance_to_collision">
+<span class="sig-name descname"><span class="pre">sample_distance_to_collision</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.sample_distance_to_collision" title="Link to this definition">#</a></dt>
+<dd><p>Sample a distance to the next neutron collision.</p>
+<p>Uses the macroscopic total cross section (calculating it first if missing)
+and an exponential distribution to sample a path length. A deterministic
+RNG seed can be supplied for reproducibility.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy</strong> (<em>float</em>) – Neutron energy in eV.</p></li>
+<li><p><strong>seed</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – RNG seed; if omitted a fixed internal seed is used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sampled distance in cm, or None if total XS unavailable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.sample_interacting_nuclide">
+<span class="sig-name descname"><span class="pre">sample_interacting_nuclide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.sample_interacting_nuclide" title="Link to this definition">#</a></dt>
+<dd><p>Sample which nuclide undergoes an interaction at a given energy.</p>
+<p>Uses per-nuclide macroscopic total cross sections as weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy</strong> (<em>float</em>) – Neutron energy in eV.</p></li>
+<li><p><strong>seed</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – RNG seed for reproducibility.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Selected nuclide name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.set_density">
+<span class="sig-name descname"><span class="pre">set_density</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">unit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.set_density" title="Link to this definition">#</a></dt>
+<dd><p>Set material density.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>unit</strong> (<em>str</em>) – Density unit (e.g. “g/cm3”, “atoms/b-cm”).</p></li>
+<li><p><strong>value</strong> (<em>float</em>) – Density value.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If unit not supported.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.temperature">
+<span class="sig-name descname"><span class="pre">temperature</span></span><a class="headerlink" href="#materials_for_mc.Material.temperature" title="Link to this definition">#</a></dt>
+<dd><p>Temperature label (e.g. “293K”).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.unified_energy_grid_neutron">
+<span class="sig-name descname"><span class="pre">unified_energy_grid_neutron</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.unified_energy_grid_neutron" title="Link to this definition">#</a></dt>
+<dd><p>Return (and build if needed) the unified neutron energy grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Energy grid in eV.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.volume">
+<span class="sig-name descname"><span class="pre">volume</span></span><a class="headerlink" href="#materials_for_mc.Material.volume" title="Link to this definition">#</a></dt>
+<dd><p>Material volume in cm^3, if set.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="config">
+<h2>Config<a class="headerlink" href="#config" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="materials_for_mc.Config">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Config</span></span><a class="headerlink" href="#materials_for_mc.Config" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Python wrapper for the Config struct</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Config.get_cross_section">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.get_cross_section" title="Link to this definition">#</a></dt>
+<dd><p>Get a cross section file path for a nuclide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Config.get_cross_sections">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cross_sections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.get_cross_sections" title="Link to this definition">#</a></dt>
+<dd><p>Get the cross sections dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Config.set_cross_section">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.set_cross_section" title="Link to this definition">#</a></dt>
+<dd><p>Set a cross section file path for a nuclide</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Config.set_cross_sections">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_cross_sections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.set_cross_sections" title="Link to this definition">#</a></dt>
+<dd><p>Set the cross sections dictionary</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h2>
+<p>This page lists the primary Python-facing classes exposed via the Rust core using PyO3. Docstrings originate from the Rust source where possible.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuclide">Nuclide</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide"><code class="docutils literal notranslate"><span class="pre">Nuclide</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.atomic_number"><code class="docutils literal notranslate"><span class="pre">Nuclide.atomic_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.atomic_symbol"><code class="docutils literal notranslate"><span class="pre">Nuclide.atomic_symbol</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.available_temperatures"><code class="docutils literal notranslate"><span class="pre">Nuclide.available_temperatures</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.data_path"><code class="docutils literal notranslate"><span class="pre">Nuclide.data_path</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.element"><code class="docutils literal notranslate"><span class="pre">Nuclide.element</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.energy"><code class="docutils literal notranslate"><span class="pre">Nuclide.energy</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.energy_grid"><code class="docutils literal notranslate"><span class="pre">Nuclide.energy_grid()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.fissionable"><code class="docutils literal notranslate"><span class="pre">Nuclide.fissionable</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.get_reaction_energy_grid"><code class="docutils literal notranslate"><span class="pre">Nuclide.get_reaction_energy_grid()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.library"><code class="docutils literal notranslate"><span class="pre">Nuclide.library</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.loaded_temperatures"><code class="docutils literal notranslate"><span class="pre">Nuclide.loaded_temperatures</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.mass_number"><code class="docutils literal notranslate"><span class="pre">Nuclide.mass_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.name"><code class="docutils literal notranslate"><span class="pre">Nuclide.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.neutron_number"><code class="docutils literal notranslate"><span class="pre">Nuclide.neutron_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.reaction_mts"><code class="docutils literal notranslate"><span class="pre">Nuclide.reaction_mts</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.reactions"><code class="docutils literal notranslate"><span class="pre">Nuclide.reactions</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.read_nuclide_from_json"><code class="docutils literal notranslate"><span class="pre">Nuclide.read_nuclide_from_json()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#element">Element</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Element"><code class="docutils literal notranslate"><span class="pre">Element</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Element.name"><code class="docutils literal notranslate"><span class="pre">Element.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Element.get_nuclides"><code class="docutils literal notranslate"><span class="pre">Element.get_nuclides()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id0"><code class="docutils literal notranslate"><span class="pre">Element.name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reaction">Reaction</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Reaction"><code class="docutils literal notranslate"><span class="pre">Reaction</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Reaction.reactants"><code class="docutils literal notranslate"><span class="pre">Reaction.reactants</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Reaction.products"><code class="docutils literal notranslate"><span class="pre">Reaction.products</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Reaction.energy"><code class="docutils literal notranslate"><span class="pre">Reaction.energy</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id1"><code class="docutils literal notranslate"><span class="pre">Reaction.energy</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id2"><code class="docutils literal notranslate"><span class="pre">Reaction.products</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id3"><code class="docutils literal notranslate"><span class="pre">Reaction.reactants</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#material">Material</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material"><code class="docutils literal notranslate"><span class="pre">Material</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.add_element"><code class="docutils literal notranslate"><span class="pre">Material.add_element()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.add_nuclide"><code class="docutils literal notranslate"><span class="pre">Material.add_nuclide()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.calculate_macroscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.calculate_macroscopic_xs_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.calculate_microscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.calculate_microscopic_xs_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.density"><code class="docutils literal notranslate"><span class="pre">Material.density</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.density_units"><code class="docutils literal notranslate"><span class="pre">Material.density_units</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.get_atoms_per_barn_cm"><code class="docutils literal notranslate"><span class="pre">Material.get_atoms_per_barn_cm()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.get_nuclide_names"><code class="docutils literal notranslate"><span class="pre">Material.get_nuclide_names()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.macroscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.macroscopic_xs_neutron</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.mean_free_path_neutron"><code class="docutils literal notranslate"><span class="pre">Material.mean_free_path_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.nuclide_ptr_addr"><code class="docutils literal notranslate"><span class="pre">Material.nuclide_ptr_addr()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.nuclides"><code class="docutils literal notranslate"><span class="pre">Material.nuclides</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.reaction_mts"><code class="docutils literal notranslate"><span class="pre">Material.reaction_mts</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.read_nuclides_from_json"><code class="docutils literal notranslate"><span class="pre">Material.read_nuclides_from_json()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.sample_distance_to_collision"><code class="docutils literal notranslate"><span class="pre">Material.sample_distance_to_collision()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.sample_interacting_nuclide"><code class="docutils literal notranslate"><span class="pre">Material.sample_interacting_nuclide()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.set_density"><code class="docutils literal notranslate"><span class="pre">Material.set_density()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.temperature"><code class="docutils literal notranslate"><span class="pre">Material.temperature</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.unified_energy_grid_neutron"><code class="docutils literal notranslate"><span class="pre">Material.unified_energy_grid_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.volume"><code class="docutils literal notranslate"><span class="pre">Material.volume</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#config">Config</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.get_cross_section"><code class="docutils literal notranslate"><span class="pre">Config.get_cross_section()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.get_cross_sections"><code class="docutils literal notranslate"><span class="pre">Config.get_cross_sections()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.set_cross_section"><code class="docutils literal notranslate"><span class="pre">Config.set_cross_section()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.set_cross_sections"><code class="docutils literal notranslate"><span class="pre">Config.set_cross_sections()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes">Notes</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/python_api.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
