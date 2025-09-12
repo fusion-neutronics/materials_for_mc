@@ -87,14 +87,19 @@ jobs:
           python -m pip install -r docs/requirements.txt
           sphinx-build -b html docs/source docs/build/html
 
-      - name: Upload docs artifact (only on ubuntu / py3.11)
-        if: runner.os == 'Linux' && matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
+      - name: Deploy docs to GitHub Pages
+        if: github.event_name == 'release' && runner.os == 'Linux' && matrix.python-version == '3.11'
+        uses: peaceiris/actions-gh-pages@v4
         with:
-            name: docs-html
-            path: docs/build/html
-            if-no-files-found: error
-            retention-days: 7
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/build/html
+          # with next rlease of actions-gh-pages
+          # issue to allow force_orphan will be fixed
+          # https://github.com/peaceiris/actions-gh-pages/issues/455
+          # force_orphan: true
+          keep_files: true
+
 
       # TODO: Commented out OpenMC-dependent examples
       # python -m pip install --extra-index-url https://shimwell.github.io/wheels openmc
