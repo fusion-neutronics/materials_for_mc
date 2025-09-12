@@ -135,7 +135,7 @@ jobs:
           manylinux: auto
 
       - name: Build wheels (Other)  
-        run: maturin build --release --features pyo3 --out wheelhouse
+        run: maturin build --release --features pyo3 --out wheelhouse -i python${{ matrix.python-version }}
         if: runner.os != 'Linux'
 
       - name: Upload wheels
