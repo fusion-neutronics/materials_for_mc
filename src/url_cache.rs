@@ -38,6 +38,7 @@ pub fn download_and_cache(url: &str) -> Result<PathBuf, Box<dyn std::error::Erro
     }
     
     // Download the file
+    println!("Downloading URL to cache: {} -> {:?}", url, local_path);
     let response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
         return Err(format!("Failed to download {}: {}", url, response.status()).into());

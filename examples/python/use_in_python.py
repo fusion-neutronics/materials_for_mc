@@ -1,16 +1,18 @@
 import materials_for_mc as m4mc
 m4mc.Config.set_cross_sections({
-    "Li6": "tests/Li6.json",
+    "Li6": "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json",
     "Li7": "tests/Li7.json"
 })
 
 mat1 = m4mc.Material()
-mat1.add_nuclide('Li6', 0.5)
+mat1.add_element('Li', 0.5)
 mat1.set_density('g/cm3', 2.0)
 mat1.volume = 4.2
+mat1.read_nuclides_from_json()
 print(mat1)
 
 nuc = m4mc.Nuclide('Li6')
-nuc.read_nuclide_from_json('tests/Li6.json')
-nuc.reaction_mts
-assert nuc.reaction_mts == [1, 2, 3, 4, 5, 24, 27, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 101, 102, 103, 105, 203, 204, 205, 206, 207, 301, 444]
+nuc.read_nuclide_from_json("tests/Li6.json")
+
+nuc = m4mc.Nuclide('Li7')
+nuc.read_nuclide_from_json("https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li7.json")
