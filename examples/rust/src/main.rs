@@ -4,9 +4,12 @@ use rand::rngs::StdRng;
 
 fn main() {
 
-    // Config::global().set_cross_section("Li6", "../../tests/Li6.json");
-    Config::global().set_cross_section("Li7", "../../tests/Li7.json");
-    Config::global().set_cross_section("Li6", "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json");
+    Config::global().set_cross_section("Fe56", "../../tests/Fe56.json");
+    let cross_sections = std::collections::HashMap::from([
+        ("Li7".to_string(), "../../tests/Li7.json".to_string()),
+        ("Li6".to_string(), "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json".to_string()),
+    ]);
+    Config::global().set_cross_sections(cross_sections);
 
     let mut mat = Material::new();
     mat.add_nuclide("Li6", 0.05).unwrap();
@@ -22,6 +25,7 @@ fn main() {
     // Create a second material and add element Li (lithium) with natural abundances
     let mut lithium_mat = Material::new();
     lithium_mat.add_element("Li", 1.0).unwrap();
+    lithium_mat.add_nuclide("Fe56", 1.0).unwrap();
     lithium_mat.set_density("g/cm3", 0.534).unwrap(); // Lithium density
     lithium_mat.volume(Some(50.0)).unwrap();
     // lithium_mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));

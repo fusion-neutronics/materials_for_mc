@@ -527,7 +527,7 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
         let cfg = crate::config::CONFIG.lock().unwrap();
         let path_or_url = cfg
             .cross_sections
-            .get(&candidate_str)
+            .get(candidate_str.as_ref())
             .ok_or_else(|| {
                 format!(
                     "Input '{}' is neither an existing file nor a key in Config cross_sections",
