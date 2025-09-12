@@ -118,20 +118,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }} (non-Linux only)
+        if: runner.os != 'Linux'
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install build dependencies
+      - name: Install build dependencies (non-Linux)
+        if: runner.os != 'Linux'
         run: |
           python -m pip install --upgrade pip
           python -m pip install maturin
 
-      - name: Build wheel (Linux manylinux 2_17)
+      - name: Build wheel (Linux manylinux 2_17 via action)
         if: runner.os == 'Linux'
-        run: |
-          maturin build --release --features pyo3 -i python${{ matrix.python-version }} --manylinux 2_17 --out wheelhouse
+        uses: PyO3/maturin-action@v1
+        with:
+          manylinux: 2_17
+          args: --release --features pyo3 -i python${{ matrix.python-version }} --out wheelhouse
 
       - name: Build wheel (non-Linux)
         if: runner.os != 'Linux'
