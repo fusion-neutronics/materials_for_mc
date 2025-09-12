@@ -506,7 +506,7 @@ fn parse_nuclide_from_json_value(
 
 /// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
 /// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
-/// Optional temperature filtering is supported.
+/// Optional temperature filtering is supported. URLs are automatically downloaded and cached.
 #[allow(dead_code)]
 pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
@@ -514,21 +514,29 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
     // Load the JSON file
     let candidate_ref = path_or_name.as_ref();
+    let candidate_str = candidate_ref.to_string_lossy();
+    
     let resolved_path = if candidate_ref.exists() {
+        // Direct file path exists
         candidate_ref.to_path_buf()
+    } else if crate::url_cache::is_url(&candidate_str) {
+        // It's a URL, download and cache it
+        crate::url_cache::resolve_path_or_url(&candidate_str)?
     } else {
-        // Treat as nuclide name
+        // Treat as nuclide name, look up in config
         let cfg = crate::config::CONFIG.lock().unwrap();
-        let p = cfg
+        let path_or_url = cfg
             .cross_sections
-            .get(candidate_ref.to_string_lossy().as_ref())
+            .get(&candidate_str)
             .ok_or_else(|| {
                 format!(
                     "Input '{}' is neither an existing file nor a key in Config cross_sections",
-                    candidate_ref.to_string_lossy()
+                    candidate_str
                 )
             })?;
-        Path::new(p).to_path_buf()
+        
+        // The config value might be a URL or local path
+        crate::url_cache::resolve_path_or_url(path_or_url)?
     };
 
     let file = File::open(&resolved_path)?;
@@ -602,15 +610,18 @@ pub fn get_or_load_nuclide(
         }
     }
     // Load directly with temperature filtering
-    let path = json_path_map.get(nuclide_name).ok_or_else(|| {
+    let path_or_url = json_path_map.get(nuclide_name).ok_or_else(|| {
         format!(
             "No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.",
             nuclide_name
         )
     })?;
 
+    // Resolve URL or local path - download and cache if it's a URL
+    let resolved_path = crate::url_cache::resolve_path_or_url(path_or_url)?;
+
     // Load the JSON file once
-    let file = File::open(path)?;
+    let file = File::open(&resolved_path)?;
     let reader = BufReader::new(file);
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
 
@@ -626,7 +637,7 @@ pub fn get_or_load_nuclide(
 
     // Now parse with the filter to get the loaded data
     let mut nuclide = parse_nuclide_from_json_value(json_value, filter_option)?;
-    nuclide.data_path = Some(path.to_string());
+    nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
 
     // Copy the available_temperatures from the unfiltered parse
     nuclide.available_temperatures = all_temps_nuclide.available_temperatures;
@@ -635,7 +646,7 @@ pub fn get_or_load_nuclide(
     let name_disp = nuclide.name.as_deref().unwrap_or(nuclide_name);
     println!(
         "Reading {} for nuclide={}, found {} temperatures, loaded {}",
-        path,
+        resolved_path.to_string_lossy(),
         name_disp,
         nuclide.available_temperatures.len(),
         nuclide.loaded_temperatures.len()

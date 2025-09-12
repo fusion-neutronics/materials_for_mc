@@ -4,8 +4,9 @@ use rand::rngs::StdRng;
 
 fn main() {
 
-    Config::global().set_cross_section("Li6", "../../tests/Li6.json");
+    // Config::global().set_cross_section("Li6", "../../tests/Li6.json");
     Config::global().set_cross_section("Li7", "../../tests/Li7.json");
+    Config::global().set_cross_section("Li6", "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json");
 
     let mut mat = Material::new();
     mat.add_nuclide("Li6", 0.05).unwrap();
