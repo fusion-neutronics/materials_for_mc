@@ -984,4 +984,70 @@ mod tests {
             "Cache should be empty after calling clear_nuclide_cache"
         );
     }
+
+    #[test]
+    fn test_nuclide_from_url_energy_grid_positive() {
+        // Clear the config to start fresh
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.clear();
+        }
+
+        // Add Li6 from URL to config
+        let li6_url = "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json";
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Li6", li6_url);
+        }
+
+        // Load the nuclide from the URL
+        let nuclide = super::read_nuclide_from_json("Li6", None)
+            .expect("Failed to load Li6 from URL");
+
+        // Get available temperatures
+        let temps = nuclide.temperatures()
+            .expect("Nuclide should have temperatures available");
+        assert!(
+            !temps.is_empty(),
+            "Nuclide should have at least one temperature"
+        );
+
+        // Use the first available temperature to get the energy grid
+        let temp = &temps[0];
+        let energy_grid = nuclide.energy_grid(temp)
+            .expect("Energy grid should be available for the temperature");
+
+        // Check that the energy grid exists and contains positive numbers
+        assert!(
+            !energy_grid.is_empty(),
+            "Energy grid should not be empty"
+        );
+
+        for (i, &energy) in energy_grid.iter().enumerate() {
+            assert!(
+                energy > 0.0,
+                "Energy at index {} should be positive, but got {}",
+                i,
+                energy
+            );
+        }
+
+        // Additional check: energy grid should be sorted in ascending order
+        for i in 1..energy_grid.len() {
+            assert!(
+                energy_grid[i] >= energy_grid[i - 1],
+                "Energy grid should be sorted: energy[{}] = {} < energy[{}] = {}",
+                i,
+                energy_grid[i],
+                i - 1,
+                energy_grid[i - 1]
+            );
+        }
+
+        println!(
+            "Successfully loaded Li6 from URL with {} energy points at temperature {}",
+            energy_grid.len(),
+            temp
+        );
+    }
 }
