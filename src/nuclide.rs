@@ -1000,6 +1000,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "download")]
     fn test_nuclide_from_url_energy_grid_positive() {
         // Clear the config to start fresh
         {
@@ -1007,16 +1008,15 @@ mod tests {
             cfg.cross_sections.clear();
         }
 
-        // Add Li6 from URL to config
-        let li6_url = "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json";
+        // Add Li6 using keyword to config
         {
             let mut cfg = crate::config::CONFIG.lock().unwrap();
-            cfg.set_cross_section("Li6", li6_url);
+            cfg.set_cross_section("Li6", "tendl-21");
         }
 
-        // Load the nuclide from the URL
+        // Load the nuclide using the keyword
         let nuclide = super::read_nuclide_from_json("Li6", None)
-            .expect("Failed to load Li6 from URL");
+            .expect("Failed to load Li6 from keyword");
 
         // Get available temperatures
         let temps = nuclide.temperatures()
