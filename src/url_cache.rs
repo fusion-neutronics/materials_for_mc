@@ -56,7 +56,6 @@ pub fn download_and_cache(url: &str, source: &str, nuclide_name: &str) -> Result
     
     // If file already exists in cache, return the path
     if local_path.exists() {
-        println!("Using cached file: {:?}", local_path);
         return Ok(local_path);
     }
     

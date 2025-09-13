@@ -659,9 +659,9 @@ pub fn get_or_load_nuclide(
     // Print loading info
     let name_disp = nuclide.name.as_deref().unwrap_or(nuclide_name);
     println!(
-        "Reading {} for nuclide={}, found {} temperatures, loaded {}",
-        resolved_path.to_string_lossy(),
+        "Reading {} from {}, available temperatures: {}, loaded temperatures: {}",
         name_disp,
+        resolved_path.to_string_lossy(),
         nuclide.available_temperatures.len(),
         nuclide.loaded_temperatures.len()
     );

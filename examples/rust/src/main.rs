@@ -20,8 +20,6 @@ fn main() {
     // mat.calculate_microscopic_xs_neutron(None);
     // mat.calculate_macroscopic_xs_neutron(None);
 
-    // println!("{:?}", mat);
-
     // Create a second material and add element Li (lithium) with natural abundances
     let mut lithium_mat = Material::new();
     lithium_mat.add_element("Li", 1.0).unwrap();
@@ -32,14 +30,7 @@ fn main() {
     // lithium_mat.calculate_macroscopic_xs_neutron(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_microscopic_xs_neutron(None);
     // Print available MT numbers for each nuclide at temperature "294"
-    for (nuclide, nuclide_data) in &lithium_mat.nuclide_data {
-        if let Some(reactions) = nuclide_data.reactions.get("294") {
-            let mt_keys: Vec<_> = reactions.keys().collect();
-            println!("[DEBUG] Nuclide {} MT keys at 294: {:?}", nuclide, mt_keys);
-        } else {
-            println!("[DEBUG] Nuclide {} has no reactions for temperature 294", nuclide);
-        }
-    }
+
     lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], true);
 
 
@@ -55,7 +46,6 @@ fn main() {
     }
 
     // Print the per-nuclide macroscopic total cross sections for lithium_mat
-    // println!("lithium_mat.macroscopic_total_xs_by_nuclide: {:#?}", lithium_mat.macroscopic_total_xs_by_nuclide);
 
     // ------------------------------------------------------------
     // Performance timing: mean free path sampling across energies
