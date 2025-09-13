@@ -4,8 +4,12 @@ use rand::rngs::StdRng;
 
 fn main() {
 
-    Config::global().set_cross_section("Li6", "../../tests/Li6.json");
-    Config::global().set_cross_section("Li7", "../../tests/Li7.json");
+    Config::global().set_cross_section("Fe56", "../../tests/Fe56.json");
+    let cross_sections = std::collections::HashMap::from([
+        ("Li7".to_string(), "../../tests/Li7.json".to_string()),
+        ("Li6".to_string(), "tendl-21".to_string()),
+    ]);
+    Config::global().set_cross_sections(cross_sections);
 
     let mut mat = Material::new();
     mat.add_nuclide("Li6", 0.05).unwrap();
@@ -16,25 +20,17 @@ fn main() {
     // mat.calculate_microscopic_xs_neutron(None);
     // mat.calculate_macroscopic_xs_neutron(None);
 
-    // println!("{:?}", mat);
-
     // Create a second material and add element Li (lithium) with natural abundances
     let mut lithium_mat = Material::new();
     lithium_mat.add_element("Li", 1.0).unwrap();
+    lithium_mat.add_nuclide("Fe56", 1.0).unwrap();
     lithium_mat.set_density("g/cm3", 0.534).unwrap(); // Lithium density
     lithium_mat.volume(Some(50.0)).unwrap();
     // lithium_mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_macroscopic_xs_neutron(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_microscopic_xs_neutron(None);
     // Print available MT numbers for each nuclide at temperature "294"
-    for (nuclide, nuclide_data) in &lithium_mat.nuclide_data {
-        if let Some(reactions) = nuclide_data.reactions.get("294") {
-            let mt_keys: Vec<_> = reactions.keys().collect();
-            println!("[DEBUG] Nuclide {} MT keys at 294: {:?}", nuclide, mt_keys);
-        } else {
-            println!("[DEBUG] Nuclide {} has no reactions for temperature 294", nuclide);
-        }
-    }
+
     lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], true);
 
 
@@ -50,7 +46,6 @@ fn main() {
     }
 
     // Print the per-nuclide macroscopic total cross sections for lithium_mat
-    // println!("lithium_mat.macroscopic_total_xs_by_nuclide: {:#?}", lithium_mat.macroscopic_total_xs_by_nuclide);
 
     // ------------------------------------------------------------
     // Performance timing: mean free path sampling across energies

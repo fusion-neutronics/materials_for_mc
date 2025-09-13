@@ -6,6 +6,7 @@ mod materials;
 mod nuclide;
 mod reaction;
 mod utilities;
+mod url_cache;
 
 pub use config::Config;
 pub use element::Element;
