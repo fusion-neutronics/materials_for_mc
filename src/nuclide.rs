@@ -506,7 +506,7 @@ fn parse_nuclide_from_json_value(
 
 /// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
 /// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
-/// Optional temperature filtering is supported.
+/// Optional temperature filtering is supported. URLs are automatically downloaded and cached.
 #[allow(dead_code)]
 pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
@@ -514,21 +514,29 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
     // Load the JSON file
     let candidate_ref = path_or_name.as_ref();
+    let candidate_str = candidate_ref.to_string_lossy();
+    
     let resolved_path = if candidate_ref.exists() {
+        // Direct file path exists
         candidate_ref.to_path_buf()
+    } else if crate::url_cache::is_url(&candidate_str) {
+        // It's a URL, download and cache it
+        crate::url_cache::resolve_path_or_url(&candidate_str)?
     } else {
-        // Treat as nuclide name
+        // Treat as nuclide name, look up in config
         let cfg = crate::config::CONFIG.lock().unwrap();
-        let p = cfg
+        let path_or_url = cfg
             .cross_sections
-            .get(candidate_ref.to_string_lossy().as_ref())
+            .get(candidate_str.as_ref())
             .ok_or_else(|| {
                 format!(
                     "Input '{}' is neither an existing file nor a key in Config cross_sections",
-                    candidate_ref.to_string_lossy()
+                    candidate_str
                 )
             })?;
-        Path::new(p).to_path_buf()
+        
+        // The config value might be a URL or local path
+        crate::url_cache::resolve_path_or_url(path_or_url)?
     };
 
     let file = File::open(&resolved_path)?;
@@ -602,15 +610,18 @@ pub fn get_or_load_nuclide(
         }
     }
     // Load directly with temperature filtering
-    let path = json_path_map.get(nuclide_name).ok_or_else(|| {
+    let path_or_url = json_path_map.get(nuclide_name).ok_or_else(|| {
         format!(
             "No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.",
             nuclide_name
         )
     })?;
 
+    // Resolve URL or local path - download and cache if it's a URL
+    let resolved_path = crate::url_cache::resolve_path_or_url(path_or_url)?;
+
     // Load the JSON file once
-    let file = File::open(path)?;
+    let file = File::open(&resolved_path)?;
     let reader = BufReader::new(file);
     let json_value: serde_json::Value = serde_json::from_reader(reader)?;
 
@@ -626,7 +637,7 @@ pub fn get_or_load_nuclide(
 
     // Now parse with the filter to get the loaded data
     let mut nuclide = parse_nuclide_from_json_value(json_value, filter_option)?;
-    nuclide.data_path = Some(path.to_string());
+    nuclide.data_path = Some(resolved_path.to_string_lossy().to_string());
 
     // Copy the available_temperatures from the unfiltered parse
     nuclide.available_temperatures = all_temps_nuclide.available_temperatures;
@@ -635,7 +646,7 @@ pub fn get_or_load_nuclide(
     let name_disp = nuclide.name.as_deref().unwrap_or(nuclide_name);
     println!(
         "Reading {} for nuclide={}, found {} temperatures, loaded {}",
-        path,
+        resolved_path.to_string_lossy(),
         name_disp,
         nuclide.available_temperatures.len(),
         nuclide.loaded_temperatures.len()
@@ -971,6 +982,72 @@ mod tests {
         assert!(
             cache.is_empty(),
             "Cache should be empty after calling clear_nuclide_cache"
+        );
+    }
+
+    #[test]
+    fn test_nuclide_from_url_energy_grid_positive() {
+        // Clear the config to start fresh
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.clear();
+        }
+
+        // Add Li6 from URL to config
+        let li6_url = "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json";
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Li6", li6_url);
+        }
+
+        // Load the nuclide from the URL
+        let nuclide = super::read_nuclide_from_json("Li6", None)
+            .expect("Failed to load Li6 from URL");
+
+        // Get available temperatures
+        let temps = nuclide.temperatures()
+            .expect("Nuclide should have temperatures available");
+        assert!(
+            !temps.is_empty(),
+            "Nuclide should have at least one temperature"
+        );
+
+        // Use the first available temperature to get the energy grid
+        let temp = &temps[0];
+        let energy_grid = nuclide.energy_grid(temp)
+            .expect("Energy grid should be available for the temperature");
+
+        // Check that the energy grid exists and contains positive numbers
+        assert!(
+            !energy_grid.is_empty(),
+            "Energy grid should not be empty"
+        );
+
+        for (i, &energy) in energy_grid.iter().enumerate() {
+            assert!(
+                energy > 0.0,
+                "Energy at index {} should be positive, but got {}",
+                i,
+                energy
+            );
+        }
+
+        // Additional check: energy grid should be sorted in ascending order
+        for i in 1..energy_grid.len() {
+            assert!(
+                energy_grid[i] >= energy_grid[i - 1],
+                "Energy grid should be sorted: energy[{}] = {} < energy[{}] = {}",
+                i,
+                energy_grid[i],
+                i - 1,
+                energy_grid[i - 1]
+            );
+        }
+
+        println!(
+            "Successfully loaded Li6 from URL with {} energy points at temperature {}",
+            energy_grid.len(),
+            temp
         );
     }
 }
