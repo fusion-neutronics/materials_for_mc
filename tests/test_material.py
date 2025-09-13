@@ -61,6 +61,15 @@ def test_get_nuclide_names():
     assert material.get_nuclide_names() == ["O16", "U235", "U238"]
 
 def test_material_data_xs_reading():
+def test_global_default_cross_section_keyword():
+    from materials_for_mc import Config, Material
+    import os
+    # Set global default cross section keyword
+    Config.set_cross_section("tests/Li6.json")
+    mat = Material()
+    mat.add_nuclide("Li6", 1.0)
+    grid = mat.unified_energy_grid_neutron()
+    assert len(grid) > 0, "Energy grid should not be empty when using global default cross section keyword"
     # Import Config locally to avoid module-level import issues
     from materials_for_mc import Config
     import os

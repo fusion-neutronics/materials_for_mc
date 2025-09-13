@@ -45,12 +45,12 @@ impl PyConfig {
         Ok(())
     }
 
-    /// Set a cross section file path for a nuclide
+    /// Set a cross section file path for a nuclide, or set a global default if only a keyword is provided
     #[classmethod]
-    #[pyo3(text_signature = "(cls, nuclide, path)")]
-    fn set_cross_section(_cls: &PyType, nuclide: &str, path: &str) -> PyResult<()> {
+    #[pyo3(text_signature = "(cls, keyword_or_nuclide, path=None)")]
+    fn set_cross_section(_cls: &PyType, keyword_or_nuclide: &str, path: Option<&str>) -> PyResult<()> {
         let mut config = CONFIG.lock().unwrap();
-        config.set_cross_section(nuclide, path);
+        config.set_cross_section(keyword_or_nuclide, path);
         Ok(())
     }
 

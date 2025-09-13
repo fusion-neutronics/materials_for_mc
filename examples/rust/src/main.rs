@@ -4,12 +4,20 @@ use rand::rngs::StdRng;
 
 fn main() {
 
-    Config::global().set_cross_section("Fe56", "../../tests/Fe56.json");
-    let cross_sections = std::collections::HashMap::from([
-        ("Li7".to_string(), "../../tests/Li7.json".to_string()),
-        ("Li6".to_string(), "tendl-21".to_string()),
-    ]);
-    Config::global().set_cross_sections(cross_sections);
+    // Set the path to the cross section data one nuclide at a time using a json file
+    // Config::global().set_cross_section("Fe56", "../../tests/Fe56.json");
+    // Set the path to the cross section data one nuclide at a time using a library name as the keyword
+    // Config::global().set_cross_section("Fe56", "tendl-21");
+
+    // set the path to the cross section data multiple nuclides at once and using either paths or libary keywords
+    // let cross_sections = std::collections::HashMap::from([
+    //     ("Li7".to_string(), "../../tests/Li7.json".to_string()),
+    //     ("Li6".to_string(), "tendl-21".to_string()),
+    // ]);
+    // Config::global().set_cross_sections(cross_sections);
+
+    // set the corss sections of every isotopes to use the keyword
+    Config::global().set_cross_section("tendl-21", None);
 
     let mut mat = Material::new();
     mat.add_nuclide("Li6", 0.05).unwrap();
