@@ -7,7 +7,7 @@ fn main() {
     Config::global().set_cross_section("Fe56", "../../tests/Fe56.json");
     let cross_sections = std::collections::HashMap::from([
         ("Li7".to_string(), "../../tests/Li7.json".to_string()),
-        ("Li6".to_string(), "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/Li6.json".to_string()),
+        ("Li6".to_string(), "tendl-21".to_string()),
     ]);
     Config::global().set_cross_sections(cross_sections);
 

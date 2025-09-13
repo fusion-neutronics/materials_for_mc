@@ -205,13 +205,24 @@ impl PyNuclide {
         let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
 
         // First load without temperature filtering to get all available temperatures
-        let full_nuclide = crate::nuclide::read_nuclide_from_json(identifier, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        let full_nuclide = if path.is_some() && self.name.is_some() {
+            // We have both a path and a nuclide name, use the new function with name hint
+            crate::nuclide::read_nuclide_from_json_with_name(identifier, None, self.name.as_deref())
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+        } else {
+            crate::nuclide::read_nuclide_from_json(identifier, None)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+        };
 
         // Now load with temperature filtering if specified
         let nuclide = if temps_set.is_some() {
-            crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+            if path.is_some() && self.name.is_some() {
+                crate::nuclide::read_nuclide_from_json_with_name(identifier, temps_set.as_ref(), self.name.as_deref())
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+            } else {
+                crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+            }
         } else {
             full_nuclide.clone()
         };

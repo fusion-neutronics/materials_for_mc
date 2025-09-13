@@ -512,6 +512,16 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    read_nuclide_from_json_with_name(path_or_name, temps, None)
+}
+
+/// Read a single nuclide with an optional nuclide name hint for URL caching
+#[allow(dead_code)]
+pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
+    path_or_name: P,
+    temps: Option<&std::collections::HashSet<String>>,
+    nuclide_name_hint: Option<&str>,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
     // Load the JSON file
     let candidate_ref = path_or_name.as_ref();
     let candidate_str = candidate_ref.to_string_lossy();
@@ -521,7 +531,11 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
         candidate_ref.to_path_buf()
     } else if crate::url_cache::is_url(&candidate_str) {
         // It's a URL, download and cache it
-        crate::url_cache::resolve_path_or_url(&candidate_str)?
+        if let Some(name) = nuclide_name_hint {
+            crate::url_cache::resolve_path_or_url(&candidate_str, name)?
+        } else {
+            return Err("Direct URL loading without nuclide name not yet supported. Use config approach instead.".into());
+        }
     } else {
         // Treat as nuclide name, look up in config
         let cfg = crate::config::CONFIG.lock().unwrap();
@@ -536,7 +550,7 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
             })?;
         
         // The config value might be a URL or local path
-        crate::url_cache::resolve_path_or_url(path_or_url)?
+        crate::url_cache::resolve_path_or_url(path_or_url, candidate_str.as_ref())?
     };
 
     let file = File::open(&resolved_path)?;
@@ -618,7 +632,7 @@ pub fn get_or_load_nuclide(
     })?;
 
     // Resolve URL or local path - download and cache if it's a URL
-    let resolved_path = crate::url_cache::resolve_path_or_url(path_or_url)?;
+    let resolved_path = crate::url_cache::resolve_path_or_url(path_or_url, nuclide_name)?;
 
     // Load the JSON file once
     let file = File::open(&resolved_path)?;
