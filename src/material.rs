@@ -144,7 +144,7 @@ impl Material {
         // Start with global config entries for required nuclides, with proper error handling
         let cfg = crate::config::CONFIG
             .lock()
-            .map_err(|e| format!("Failed to acquire lock on CONFIG: {}", e))?;
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         for n in &nuclide_names {
             if let Some(p) = cfg.get_cross_section(n) {
@@ -200,7 +200,7 @@ impl Material {
         // Get the global configuration with proper error handling
         let config = CONFIG
             .lock()
-            .map_err(|e| format!("Failed to acquire lock on CONFIG: poisoned mutex - {}", e))?;
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Load any missing nuclides
         for nuclide_name in nuclide_names {

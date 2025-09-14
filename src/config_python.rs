@@ -19,7 +19,9 @@ impl PyConfig {
     #[classmethod]
     #[pyo3(text_signature = "(cls)")]
     fn get_cross_sections(cls: &PyType, py: Python<'_>) -> PyResult<PyObject> {
-        let config = CONFIG.lock().unwrap();
+        let config = CONFIG.lock().unwrap_or_else(|poisoned| {
+            poisoned.into_inner()
+        });
         let dict = PyDict::new(py);
 
         for (nuclide, path) in &config.cross_sections {
@@ -33,7 +35,9 @@ impl PyConfig {
     #[classmethod]
     #[pyo3(text_signature = "(cls, value)")]
     fn set_cross_sections(cls: &PyType, value: &PyAny) -> PyResult<()> {
-        let mut config = CONFIG.lock().unwrap();
+        let mut config = CONFIG.lock().unwrap_or_else(|poisoned| {
+            poisoned.into_inner()
+        });
         
         if let Ok(dict) = value.downcast::<PyDict>() {
             // Handle dictionary input
@@ -60,7 +64,9 @@ impl PyConfig {
     #[classmethod]
     #[pyo3(text_signature = "(cls, keyword_or_nuclide, path=None)")]
     fn set_cross_section(_cls: &PyType, keyword_or_nuclide: &str, path: Option<&str>) -> PyResult<()> {
-        let mut config = CONFIG.lock().unwrap();
+        let mut config = CONFIG.lock().unwrap_or_else(|poisoned| {
+            poisoned.into_inner()
+        });
         config.set_cross_section(keyword_or_nuclide, path);
         Ok(())
     }
@@ -69,7 +75,9 @@ impl PyConfig {
     #[classmethod]
     #[pyo3(text_signature = "(cls, nuclide)")]
     fn get_cross_section(_cls: &PyType, nuclide: &str) -> Option<String> {
-        let config = CONFIG.lock().unwrap();
+        let config = CONFIG.lock().unwrap_or_else(|poisoned| {
+            poisoned.into_inner()
+        });
         config.get_cross_section(nuclide)
     }
 }

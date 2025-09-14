@@ -106,7 +106,7 @@ impl IntoCrossSectionsInput for String {
 impl Config {
     /// Get the global configuration instance
     pub fn global() -> std::sync::MutexGuard<'static, Self> {
-        CONFIG.lock().unwrap()
+        CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
@@ -176,5 +176,35 @@ fn test_set_cross_section_global_keyword_for_all() {
     config.set_cross_section("tendl-21", None);
     assert_eq!(config.get_cross_section("Li6"), Some("tendl-21".to_string()));
     assert_eq!(config.get_cross_section("Fe56"), Some("tendl-21".to_string()));
+}
+
+#[test]
+fn test_set_cross_sections_with_string_keyword() {
+    let mut config = Config::new();
+    config.set_cross_sections("tendl-21");
+    assert_eq!(config.default_cross_section, Some("tendl-21".to_string()));
+    assert_eq!(config.get_cross_section("Li6"), Some("tendl-21".to_string()));
+    assert_eq!(config.get_cross_section("Fe56"), Some("tendl-21".to_string()));
+}
+
+#[test]
+fn test_set_cross_sections_with_hashmap() {
+    let mut config = Config::new();
+    let cross_sections = std::collections::HashMap::from([
+        ("Li6".to_string(), "../../tests/Li6.json".to_string()),
+        ("Fe56".to_string(), "tendl-21".to_string()),
+    ]);
+    config.set_cross_sections(cross_sections);
+    assert_eq!(config.get_cross_section("Li6"), Some("../../tests/Li6.json".to_string()));
+    assert_eq!(config.get_cross_section("Fe56"), Some("tendl-21".to_string()));
+    // When a keyword is in the hashmap, it should set the global default too
+    assert_eq!(config.default_cross_section, Some("tendl-21".to_string()));
+}
+
+#[test]
+#[should_panic(expected = "Invalid cross section keyword")]
+fn test_set_cross_sections_invalid_string_keyword() {
+    let mut config = Config::new();
+    config.set_cross_sections("invalid-keyword");
 }
 }

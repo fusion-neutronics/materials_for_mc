@@ -538,7 +538,7 @@ pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
         }
     } else {
         // Treat as nuclide name, look up in config
-        let cfg = crate::config::CONFIG.lock().unwrap();
+        let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let path_or_url = cfg
             .cross_sections
             .get(candidate_str.as_ref())
@@ -1004,13 +1004,13 @@ mod tests {
     fn test_nuclide_from_url_energy_grid_positive() {
         // Clear the config to start fresh
         {
-            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            let mut cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             cfg.cross_sections.clear();
         }
 
         // Add Li6 using keyword to config
         {
-            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            let mut cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             cfg.set_cross_section("Li6", "tendl-21");
         }
 
