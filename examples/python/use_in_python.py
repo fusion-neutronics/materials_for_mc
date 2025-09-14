@@ -3,7 +3,7 @@ import materials_for_mc as m4mc
 #     "Li6": "tendl-21",
 #     "Li7": "tendl-21"
 # })
-m4mc.Config.set_cross_section("tendl-21")
+m4mc.Config.set_cross_sections("tendl-21")
 
 mat1 = m4mc.Material()
 mat1.add_element('Li', 0.5)

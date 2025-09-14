@@ -16,8 +16,8 @@ fn main() {
     // ]);
     // Config::global().set_cross_sections(cross_sections);
 
-    // set the corss sections of every isotopes to use the keyword
-    Config::global().set_cross_section("tendl-21", None);
+    // Set the cross sections of every isotope to use the keyword
+    Config::global().set_cross_sections("tendl-21");
 
     let mut mat = Material::new();
     mat.add_nuclide("Li6", 0.05).unwrap();

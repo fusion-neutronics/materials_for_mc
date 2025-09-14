@@ -1,6 +1,6 @@
 use crate::config::{Config, CONFIG};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::{PyDict, PyType, PyString};
 use std::collections::HashMap;
 
 /// Python wrapper for the Config struct
@@ -29,19 +29,30 @@ impl PyConfig {
         Ok(dict.into())
     }
 
-    /// Set the cross sections dictionary
+    /// Set the cross sections dictionary or global keyword
     #[classmethod]
     #[pyo3(text_signature = "(cls, value)")]
-    fn set_cross_sections(cls: &PyType, value: &PyDict) -> PyResult<()> {
-        let mut rust_map = HashMap::new();
-        for (k, v) in value.iter() {
-            let key: String = k.extract()?;
-            let val: String = v.extract()?;
-            rust_map.insert(key, val);
-        }
-
+    fn set_cross_sections(cls: &PyType, value: &PyAny) -> PyResult<()> {
         let mut config = CONFIG.lock().unwrap();
-        config.set_cross_sections(rust_map);
+        
+        if let Ok(dict) = value.downcast::<PyDict>() {
+            // Handle dictionary input
+            let mut rust_map = HashMap::new();
+            for (k, v) in dict.iter() {
+                let key: String = k.extract()?;
+                let val: String = v.extract()?;
+                rust_map.insert(key, val);
+            }
+            config.set_cross_sections(rust_map);
+        } else if let Ok(string_val) = value.extract::<String>() {
+            // Handle string input (global keyword)
+            config.set_cross_sections(string_val);
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "value must be either a dictionary or a string"
+            ));
+        }
+        
         Ok(())
     }
 
