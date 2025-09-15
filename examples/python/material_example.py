@@ -18,4 +18,7 @@ mat1.set_density('g/cm3', 2.0)
 print(mat1)
 
 # Demonstrate partial override: provide only one mapping (others pulled from Config)
-mat1.read_nuclides_from_json({"Li7": "tests/Li7.json"})
+# mat1.read_nuclides_from_json({"Li7": "tests/Li7.json"})
+
+xs, energy = mat1.calculate_macroscopic_xs_neutron()
+print(xs)

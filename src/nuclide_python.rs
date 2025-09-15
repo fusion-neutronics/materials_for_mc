@@ -282,11 +282,11 @@ impl PyNuclide {
         nuclide.energy_grid(temperature).cloned()
     }
 
-    /// Get the reaction-specific energy grid for a given MT at a temperature.
+    /// Get energy grid for a specific temperature and MT number.
     ///
     /// Args:
-    ///     temperature (str): Temperature key (e.g. "293K").
-    ///     mt (int): ENDF MT reaction number.
+    ///     temperature (str): Temperature to use for reaction data.
+    ///     mt (int): ENDF/MT number for the reaction channel.
     ///
     /// Returns:
     ///     Optional[List[float]]: Reaction energy grid if present.
@@ -299,6 +299,33 @@ impl PyNuclide {
             }
         }
         None
+    }
+
+    /// Get microscopic cross section data for a specific MT number and temperature.
+    ///
+    /// Args:
+    ///     mt (int): ENDF/MT number for the reaction channel.
+    ///     temperature (Optional[str]): Temperature to use. If None, uses the single
+    ///         loaded temperature if only one is available.
+    ///
+    /// Returns:
+    ///     Tuple[List[float], List[float]]: A tuple of (cross_section_values, energy_grid).
+    ///
+    /// Raises:
+    ///     Exception: If temperature not found, MT not found, multiple temperatures loaded
+    ///         without specifying one, or no data available.
+    pub fn microscopic_cross_section(
+        &self,
+        mt: i32,
+        temperature: Option<&str>,
+    ) -> PyResult<(Vec<f64>, Vec<f64>)> {
+        // Convert to Nuclide and call the Rust function
+        let nuclide: Nuclide = self.clone().into();
+        
+        match nuclide.microscopic_cross_section(mt, temperature) {
+            Ok((cross_section, energy)) => Ok((cross_section, energy)),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())),
+        }
     }
 }
 
