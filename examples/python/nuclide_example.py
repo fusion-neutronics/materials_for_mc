@@ -12,4 +12,4 @@ m4mc.Config.set_cross_sections({
 nuc1 = m4mc.Nuclide('Li6')
 print(nuc1)
 
-nuc1.read_nuclide_from_json()
+nuc1.read_nuclide_from_json("tendl-21")

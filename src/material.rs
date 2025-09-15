@@ -168,6 +168,28 @@ impl Material {
             let nuclide = get_or_load_nuclide(&nuclide_name, source_map, Some(&temp_set))?;
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
+
+        Ok(())
+    }
+
+    /// Read nuclide data from either a JSON mapping or a keyword string
+    pub fn read_nuclides_from_json_or_keyword(
+        &mut self,
+        source: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if crate::url_cache::is_keyword(source) {
+            // It's a keyword - apply to all nuclides in this material
+            let mut keyword_map = HashMap::new();
+            for nuclide_name in self.nuclides.keys() {
+                keyword_map.insert(nuclide_name.clone(), source.to_string());
+            }
+            self.read_nuclides_from_json(&keyword_map)?;
+        } else {
+            // Treat as a single nuclide with a path (legacy behavior)
+            let mut single_map = HashMap::new();
+            single_map.insert(source.to_string(), source.to_string());
+            self.read_nuclides_from_json(&single_map)?;
+        }
         Ok(())
     }
 
