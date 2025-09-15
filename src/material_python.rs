@@ -161,25 +161,38 @@ impl PyMaterial {
         self.internal.density_units.clone()
     }
 
-    #[pyo3(signature = (nuclide_json_map=None))]
-    /// Bulk load nuclide data from a mapping of nuclide -> JSON path.
+    #[pyo3(name = "read_nuclides_from_json")]
+    /// Bulk load nuclide data from a mapping of nuclide -> JSON path or a keyword string.
     ///
     /// Args:
-    ///     nuclide_json_map (Optional[Dict[str,str]]): Mapping of nuclide names to JSON file paths.
+    ///     nuclide_json_map (Optional[Dict[str,str] | str]): Mapping of nuclide names to JSON file paths or a keyword string.
     ///
     /// Raises:
     ///     ValueError: If any JSON file cannot be read / parsed.
     fn read_nuclides_from_json(
         &mut self,
         py: Python,
-        nuclide_json_map: Option<&PyDict>,
+        nuclide_json_map: Option<&pyo3::types::PyAny>,
     ) -> PyResult<()> {
         let mut rust_map = HashMap::new();
-        if let Some(d) = nuclide_json_map {
-            for (k, v) in d.iter() {
-                let key: String = k.extract()?;
-                let val: String = v.extract()?;
-                rust_map.insert(key, val);
+        if let Some(obj) = nuclide_json_map {
+            if obj.is_instance_of::<pyo3::types::PyDict>() {
+                let d: &pyo3::types::PyDict = obj.downcast::<pyo3::types::PyDict>()?;
+                for (k, v) in d.iter() {
+                    let key: String = k.extract()?;
+                    let val: String = v.extract()?;
+                    rust_map.insert(key, val);
+                }
+            } else if obj.is_instance_of::<pyo3::types::PyString>() {
+                let keyword: String = obj.extract()?;
+                // Apply keyword to all nuclides in this material
+                for nuclide_name in self.internal.nuclides.keys() {
+                    rust_map.insert(nuclide_name.clone(), keyword.clone());
+                }
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "nuclide_json_map must be a dict or a str keyword"
+                ));
             }
         }
         self.internal

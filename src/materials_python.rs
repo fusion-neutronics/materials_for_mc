@@ -89,8 +89,8 @@ impl PyMaterials {
         self.get(index)
     }
 
-    /// Read nuclides from a JSON-like Python dictionary (delegates to Materials::read_nuclides)
-    #[pyo3(name = "read_nuclides_from_json", signature = (nuclide_json_map=None))]
+    /// Read nuclides from a JSON-like Python dictionary or a string keyword (delegates to Materials::read_nuclides)
+    #[pyo3(name = "read_nuclides_from_json")]
     fn read_nuclides_from_json(
         &mut self,
         py: Python,
