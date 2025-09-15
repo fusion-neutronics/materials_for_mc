@@ -517,7 +517,7 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
     let candidate_str = candidate_ref.to_string_lossy();
     if crate::url_cache::is_keyword(&candidate_str) {
         let mut cfg = crate::config::CONFIG.lock().unwrap();
-        cfg.set_cross_section(candidate_str.as_ref(), &candidate_str);
+        cfg.set_cross_section(candidate_str.as_ref(), Some(&candidate_str));
     }
     read_nuclide_from_json_with_name(path_or_name, temps, None)
 }
@@ -638,7 +638,7 @@ pub fn get_or_load_nuclide(
     let mut path_or_url = json_path_map.get(nuclide_name).cloned();
     if path_or_url.is_none() && crate::url_cache::is_keyword(nuclide_name) {
         let mut cfg = crate::config::CONFIG.lock().unwrap();
-        cfg.set_cross_section(nuclide_name, nuclide_name);
+        cfg.set_cross_section(nuclide_name, Some(nuclide_name));
         path_or_url = Some(nuclide_name.to_string());
     }
     let path_or_url = path_or_url.ok_or_else(|| {
