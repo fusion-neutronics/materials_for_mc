@@ -183,15 +183,15 @@ impl PyMaterial {
                     let val: String = v.extract()?;
                     rust_map.insert(key, val);
                 }
-                // Use the original method that merges with global config
+                // Use the original HashMap method
                 self.internal
                     .read_nuclides_from_json(&rust_map)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?;
             } else if obj.is_instance_of::<pyo3::types::PyString>() {
                 let keyword: String = obj.extract()?;
-                // Use the keyword method for string input
+                // Use the new keyword method
                 self.internal
-                    .read_nuclides_from_json_or_keyword(&keyword)
+                    .read_nuclides_from_json_keyword(&keyword)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?;
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(

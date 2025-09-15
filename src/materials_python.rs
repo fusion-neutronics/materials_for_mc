@@ -105,21 +105,15 @@ impl PyMaterials {
                     let val: String = v.extract()?;
                     rust_map.insert(key, val);
                 }
-                // Use the original method that merges with global config
+                // Use the original HashMap method
                 self.internal
                     .read_nuclides_from_json(&rust_map)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
             } else if obj.is_instance_of::<pyo3::types::PyString>() {
                 let keyword: String = obj.extract()?;
-                // Apply keyword to all nuclides in all materials
-                let mut keyword_map = HashMap::new();
-                for mat in self.internal.iter() {
-                    for nuclide_name in mat.nuclides.keys() {
-                        keyword_map.insert(nuclide_name.clone(), keyword.clone());
-                    }
-                }
+                // Use the new keyword method
                 self.internal
-                    .read_nuclides_from_json(&keyword_map)
+                    .read_nuclides_from_json_keyword(&keyword)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(

@@ -193,6 +193,14 @@ impl Material {
         Ok(())
     }
 
+    /// Read nuclides from a keyword string that will be applied to all nuclides in this material
+    pub fn read_nuclides_from_json_keyword(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json_or_keyword(keyword)
+    }
+
     /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.
     /// If the nuclide already exists it will be overwritten.
     pub fn load_nuclide_from_json_str(

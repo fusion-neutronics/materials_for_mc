@@ -137,6 +137,21 @@ impl Materials {
         Ok(())
     }
 
+    /// Read nuclides from a keyword string that will be applied to all nuclides across all materials
+    pub fn read_nuclides_from_json_keyword(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Apply keyword to all nuclides in all materials
+        let mut keyword_map = HashMap::new();
+        for mat in &self.materials {
+            for nuclide_name in mat.nuclides.keys() {
+                keyword_map.insert(nuclide_name.clone(), keyword.to_string());
+            }
+        }
+        self.read_nuclides_from_json(&keyword_map)
+    }
+
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
     pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Collect all unique nuclide names from all materials that aren't already loaded
