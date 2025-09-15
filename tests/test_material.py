@@ -372,5 +372,5 @@ def test_read_nuclides_from_json_dict():
     mat.add_element('Li', 1.0)
     mat.set_density('g/cm3', 2.0)
     mat.volume = 1.0
-    # Should not raise TypeError
-    mat.read_nuclides_from_json({"Li6": "tendl-21"})
+    # Should not raise TypeError - provide both Li6 and Li7 since element expansion creates both
+    mat.read_nuclides_from_json({"Li6": "tendl-21", "Li7": "tendl-21"})
