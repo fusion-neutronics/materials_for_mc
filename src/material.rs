@@ -193,25 +193,6 @@ impl Material {
         Ok(())
     }
 
-    /// Read nuclides from either a HashMap or a keyword string (for Python wrapper)
-    pub fn read_nuclides_from_json_or_keyword_or_map(
-        &mut self,
-        map_or_keyword: Option<&str>,
-        explicit_map: Option<&HashMap<String, String>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(map) = explicit_map {
-            // Direct HashMap provided - use it
-            self.read_nuclides_from_json(map)
-        } else if let Some(keyword) = map_or_keyword {
-            // String provided - could be keyword or single path
-            self.read_nuclides_from_json_or_keyword(keyword)
-        } else {
-            // Nothing provided - use empty map
-            let empty_map = HashMap::new();
-            self.read_nuclides_from_json(&empty_map)
-        }
-    }
-
     /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.
     /// If the nuclide already exists it will be overwritten.
     pub fn load_nuclide_from_json_str(

@@ -137,31 +137,6 @@ impl Materials {
         Ok(())
     }
 
-    /// Read nuclides from either a HashMap or a keyword string (for Python wrapper)
-    pub fn read_nuclides_from_json_or_keyword_or_map(
-        &mut self,
-        map_or_keyword: Option<&str>,
-        explicit_map: Option<&HashMap<String, String>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(map) = explicit_map {
-            // Direct HashMap provided - use it
-            self.read_nuclides_from_json(map)
-        } else if let Some(keyword) = map_or_keyword {
-            // String provided - apply keyword to all nuclides in all materials
-            let mut keyword_map = HashMap::new();
-            for mat in &self.materials {
-                for nuclide_name in mat.nuclides.keys() {
-                    keyword_map.insert(nuclide_name.clone(), keyword.to_string());
-                }
-            }
-            self.read_nuclides_from_json(&keyword_map)
-        } else {
-            // Nothing provided - use empty map
-            let empty_map = HashMap::new();
-            self.read_nuclides_from_json(&empty_map)
-        }
-    }
-
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
     pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Collect all unique nuclide names from all materials that aren't already loaded
