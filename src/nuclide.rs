@@ -601,9 +601,8 @@ fn parse_nuclide_from_json_value(
             .into());
         }
 
-        let mut temps: Vec<String> = reaction_temps.into_iter().collect();
-        temps.sort();
-        nuclide.available_temperatures = temps;
+        // Don't override available_temperatures here - it should preserve all temps from JSON
+        // available_temperatures was already set earlier from the full JSON parsing
     } else if !nuclide.reactions.is_empty() {
         // Reactions present but no energy map created (legacy / missing). Treat as error per requirement.
         let temps: Vec<String> = nuclide.reactions.keys().cloned().collect();
@@ -1482,5 +1481,162 @@ mod tests {
             assert!(result_without_k.is_ok() || result_with_k.is_ok(), 
                    "At least one temperature format should work");
         }
+    }
+
+    #[test]
+    fn test_auto_loading_from_config() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Set up config for auto-loading
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Be9", Some("tests/Be9.json"));
+        }
+
+        // Create empty nuclide with name but no data loaded
+        let mut nuclide = super::Nuclide {
+            name: Some("Be9".to_string()),
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Verify no data is loaded initially
+        assert!(nuclide.loaded_temperatures.is_empty(), "Should start with no loaded temperatures");
+        assert!(nuclide.reactions.is_empty(), "Should start with no reactions");
+
+        // Call microscopic_cross_section - should auto-load data
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_ok(), "Auto-loading should succeed: {:?}", result.err());
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Auto-loaded cross section data should not be empty");
+        assert!(!energy.is_empty(), "Auto-loaded energy data should not be empty");
+        
+        // Verify data was actually loaded into the nuclide
+        assert!(!nuclide.loaded_temperatures.is_empty(), "Should have loaded temperatures after auto-load");
+        assert!(!nuclide.reactions.is_empty(), "Should have reactions after auto-load");
+        assert!(nuclide.available_temperatures.contains(&"294".to_string()), "Should know 294 is available");
+        assert!(nuclide.available_temperatures.contains(&"300".to_string()), "Should know 300 is available");
+
+        // Clean up
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("Be9");
+        }
+    }
+
+    #[test]
+    fn test_auto_loading_additional_temperature() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Set up config for auto-loading
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Be9", Some("tests/Be9.json"));
+        }
+
+        // Load Be9 with only 294K initially
+        let temps_filter = std::collections::HashSet::from(["294".to_string()]);
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", Some(&temps_filter))
+            .expect("Failed to load Be9.json with temperature filter");
+        
+        // Verify only 294K is loaded initially
+        assert_eq!(nuclide.loaded_temperatures, vec!["294".to_string()], "Should only have 294K loaded");
+        assert!(nuclide.available_temperatures.contains(&"300".to_string()), "Should know 300K is available");
+        
+        // Request 300K data - should auto-load additional temperature
+        let result = nuclide.microscopic_cross_section(2, Some("300"));
+        assert!(result.is_ok(), "Auto-loading additional temperature should succeed: {:?}", result.err());
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Auto-loaded 300K cross section data should not be empty");
+        assert!(!energy.is_empty(), "Auto-loaded 300K energy data should not be empty");
+        
+        // Verify both temperatures are now loaded
+        assert!(nuclide.loaded_temperatures.contains(&"294".to_string()), "Should still have 294K");
+        assert!(nuclide.loaded_temperatures.contains(&"300".to_string()), "Should now have 300K");
+
+        // Clean up
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("Be9");
+        }
+    }
+
+    #[test]
+    fn test_auto_loading_without_config_fails() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Make sure no config exists for our test nuclide
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("TestNuclide");
+        }
+
+        // Create empty nuclide with name but no config
+        let mut nuclide = super::Nuclide {
+            name: Some("TestNuclide".to_string()),
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Call microscopic_cross_section - should fail with helpful error
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_err(), "Auto-loading without config should fail");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("No configuration found"), "Error should mention missing configuration");
+        assert!(error_msg.contains("TestNuclide"), "Error should mention the nuclide name");
+        assert!(error_msg.contains("Config.set_cross_sections"), "Error should suggest how to fix it");
+    }
+
+    #[test]
+    fn test_auto_loading_no_name_fails() {
+        // Create empty nuclide without name
+        let mut nuclide = super::Nuclide {
+            name: None,
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Call microscopic_cross_section - should fail because no name for auto-loading
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_err(), "Auto-loading without nuclide name should fail");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("no nuclide name available"), "Error should mention missing name");
     }
 }
