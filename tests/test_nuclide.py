@@ -161,7 +161,9 @@ def test_microscopic_cross_section_multiple_temperatures_error():
     # Should raise error when no temperature specified with multiple loaded
     with pytest.raises(Exception) as exc_info:
         nuc.microscopic_cross_section(mt=2)
-    assert "Multiple temperatures loaded" in str(exc_info.value)
+    error_msg = str(exc_info.value)
+    assert "Multiple temperatures loaded" in error_msg
+    assert "294" in error_msg and "300" in error_msg
 
 
 def test_microscopic_cross_section_invalid_temperature():
@@ -173,7 +175,10 @@ def test_microscopic_cross_section_invalid_temperature():
     # Should raise error for non-existent temperature
     with pytest.raises(Exception) as exc_info:
         nuc.microscopic_cross_section(mt=2, temperature='500')
-    assert "Temperature '500' not found" in str(exc_info.value)
+    error_msg = str(exc_info.value)
+    assert "Temperature '500' not found" in error_msg
+    assert "Available temperatures:" in error_msg
+    assert "294" in error_msg and "300" in error_msg
 
 
 def test_microscopic_cross_section_invalid_mt():
@@ -185,7 +190,9 @@ def test_microscopic_cross_section_invalid_mt():
     # Should raise error for non-existent MT
     with pytest.raises(Exception) as exc_info:
         nuc.microscopic_cross_section(mt=9999, temperature='294')
-    assert "MT 9999 not found" in str(exc_info.value)
+    error_msg = str(exc_info.value)
+    assert "MT 9999 not found" in error_msg
+    assert "Available MTs:" in error_msg
 
 
 def test_microscopic_cross_section_multiple_mt_numbers():

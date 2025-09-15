@@ -1267,6 +1267,8 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("Multiple temperatures loaded"), 
                "Error should mention multiple temperatures: {}", error_msg);
+        assert!(error_msg.contains("[294, 300]"), 
+               "Error should list the loaded temperatures: {}", error_msg);
     }
 
     #[test]
@@ -1281,6 +1283,10 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("Temperature '500' not found"), 
                "Error should mention temperature not found: {}", error_msg);
+        assert!(error_msg.contains("Available temperatures:"), 
+               "Error should list available temperatures: {}", error_msg);
+        assert!(error_msg.contains("294") && error_msg.contains("300"), 
+               "Error should list the actual available temperatures: {}", error_msg);
     }
 
     #[test]
@@ -1295,6 +1301,11 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("MT 9999 not found"), 
                "Error should mention MT not found: {}", error_msg);
+        assert!(error_msg.contains("Available MTs:"), 
+               "Error should list available MTs: {}", error_msg);
+        // Check that some common MTs are listed
+        assert!(error_msg.contains("1") && error_msg.contains("2"), 
+               "Error should list some actual available MTs: {}", error_msg);
     }
 
     #[test]
