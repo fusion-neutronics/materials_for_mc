@@ -1,5 +1,5 @@
 use crate::config::CONFIG;
-use crate::material::Material;
+use crate::material::{Material, UniversalInput};
 use crate::nuclide::{get_or_load_nuclide, Nuclide};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -150,6 +150,22 @@ impl Materials {
             }
         }
         self.read_nuclides_from_json(&keyword_map)
+    }
+
+    /// Universal function to read nuclides from any input type (for Python wrapper)
+    /// Handles: HashMap, keyword string, or None
+    pub fn read_nuclides_universal(
+        &mut self,
+        input: UniversalInput,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match input {
+            UniversalInput::Map(map) => self.read_nuclides_from_json(&map),
+            UniversalInput::Keyword(keyword) => self.read_nuclides_from_json_keyword(&keyword),
+            UniversalInput::None => {
+                let empty_map = HashMap::new();
+                self.read_nuclides_from_json(&empty_map)
+            }
+        }
     }
 
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed

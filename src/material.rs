@@ -5,6 +5,14 @@ use crate::utilities::interpolate_linear;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Input types for universal nuclide reading function
+#[derive(Debug)]
+pub enum UniversalInput {
+    Map(HashMap<String, String>),
+    Keyword(String),
+    None,
+}
+
 /// Represents a heterogeneous collection of nuclides (or elements expanded to
 /// their naturally abundant isotopes) along with the material density and
 /// nuclear data needed for transport / analysis.
@@ -193,12 +201,44 @@ impl Material {
         Ok(())
     }
 
+
+
     /// Read nuclides from a keyword string that will be applied to all nuclides in this material
     pub fn read_nuclides_from_json_keyword(
         &mut self,
         keyword: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.read_nuclides_from_json_or_keyword(keyword)
+    }
+
+    /// Read nuclides from either a HashMap or handle None case
+    pub fn read_nuclides_from_optional_map(
+        &mut self,
+        map: Option<&HashMap<String, String>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match map {
+            Some(m) => self.read_nuclides_from_json(m),
+            None => {
+                let empty_map = HashMap::new();
+                self.read_nuclides_from_json(&empty_map)
+            }
+        }
+    }
+
+    /// Universal function to read nuclides from any input type (for Python wrapper)
+    /// Handles: HashMap, keyword string, or None
+    pub fn read_nuclides_universal(
+        &mut self,
+        input: UniversalInput,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match input {
+            UniversalInput::Map(map) => self.read_nuclides_from_json(&map),
+            UniversalInput::Keyword(keyword) => self.read_nuclides_from_json_keyword(&keyword),
+            UniversalInput::None => {
+                let empty_map = HashMap::new();
+                self.read_nuclides_from_json(&empty_map)
+            }
+        }
     }
 
     /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.
