@@ -1,8 +1,6 @@
 use pyo3::prelude::*;
-// use pyo3::types::PyDict;
 use crate::material::Material;
 use pyo3::exceptions::PyValueError;
-use pyo3::types::PyDict;
 use std::collections::HashMap;
 
 #[pyclass(name = "Material")]
@@ -171,39 +169,33 @@ impl PyMaterial {
     ///     ValueError: If any JSON file cannot be read / parsed.
     fn read_nuclides_from_json(
         &mut self,
-        py: Python,
+        _py: Python,
         nuclide_json_map: Option<&pyo3::types::PyAny>,
     ) -> PyResult<()> {
-        if let Some(obj) = nuclide_json_map {
+        // Extract Python data to Rust types
+        let (dict_data, keyword_data) = if let Some(obj) = nuclide_json_map {
             if obj.is_instance_of::<pyo3::types::PyDict>() {
                 let d: &pyo3::types::PyDict = obj.downcast::<pyo3::types::PyDict>()?;
                 let mut rust_map = HashMap::new();
                 for (k, v) in d.iter() {
-                    let key: String = k.extract()?;
-                    let val: String = v.extract()?;
-                    rust_map.insert(key, val);
+                    rust_map.insert(k.extract::<String>()?, v.extract::<String>()?);
                 }
-                self.internal
-                    .read_nuclides_from_json(&rust_map)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+                (Some(rust_map), None)
             } else if obj.is_instance_of::<pyo3::types::PyString>() {
                 let keyword: String = obj.extract()?;
-                self.internal
-                    .read_nuclides_from_json_or_keyword(&keyword)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+                (None, Some(keyword))
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
                     "nuclide_json_map must be a dict or a str keyword"
                 ));
             }
         } else {
-            // No argument provided - use empty map
-            let rust_map = HashMap::new();
-            self.internal
-                .read_nuclides_from_json(&rust_map)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        }
-        Ok(())
+            (None, None)
+        };
+        
+        // Call pure Rust function
+        self.internal.load_nuclear_data_from_input(dict_data, keyword_data)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Return raw pointer address of an internal shared Nuclide (debug only).

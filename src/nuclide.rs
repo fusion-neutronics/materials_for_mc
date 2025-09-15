@@ -507,7 +507,6 @@ fn parse_nuclide_from_json_value(
 /// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
 /// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
 /// Optional temperature filtering is supported. URLs are automatically downloaded and cached.
-#[allow(dead_code)]
 pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
@@ -523,7 +522,6 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
 }
 
 /// Read a single nuclide with an optional nuclide name hint for URL caching
-#[allow(dead_code)]
 pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
@@ -688,6 +686,71 @@ pub fn get_or_load_nuclide(
         cache.insert(nuclide_name.to_string(), Arc::clone(&arc));
     }
     Ok(arc)
+}
+
+/// Load a nuclide with Python wrapper semantics - handles both path and name parameters
+/// and preserves available_temperatures when filtering. This method consolidates the logic
+/// previously scattered in the Python wrapper.
+#[allow(dead_code)]
+pub fn load_nuclide_for_python(
+    path_or_keyword: Option<&str>,
+    nuclide_name: Option<&str>,
+    temperatures: Option<&std::collections::HashSet<String>>,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Determine the identifier - path takes precedence, then name
+    let identifier = if let Some(p) = path_or_keyword {
+        p
+    } else if let Some(n) = nuclide_name {
+        n
+    } else {
+        return Err("Either path or nuclide name must be provided".into());
+    };
+
+    // Check if identifier is a keyword and set up config if needed
+    if crate::url_cache::is_keyword(identifier) {
+        let mut cfg = crate::config::CONFIG.lock().unwrap();
+        cfg.set_cross_section(identifier, Some(identifier));
+    }
+
+    // Load without temperature filtering first to get all available temperatures
+    let full_nuclide = if path_or_keyword.is_some() && nuclide_name.is_some() {
+        // We have both path and name - use the version with name hint
+        read_nuclide_from_json_with_name(identifier, None, nuclide_name)?
+    } else {
+        read_nuclide_from_json(identifier, None)?
+    };
+
+    // Now load with temperature filtering if specified
+    let mut filtered_nuclide = if temperatures.is_some() {
+        if path_or_keyword.is_some() && nuclide_name.is_some() {
+            read_nuclide_from_json_with_name(identifier, temperatures, nuclide_name)?
+        } else {
+            read_nuclide_from_json(identifier, temperatures)?
+        }
+    } else {
+        full_nuclide.clone()
+    };
+
+    // Always preserve the full available_temperatures from the unfiltered load
+    filtered_nuclide.available_temperatures = full_nuclide.available_temperatures;
+    
+    Ok(filtered_nuclide)
+}
+
+/// Load a nuclide from a path or keyword for the standalone Python function
+/// This handles keyword detection and resolution automatically
+#[allow(dead_code)]
+pub fn load_nuclide_from_path_or_keyword(
+    path_or_keyword: &str,
+) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // Check if it's a keyword and set up config if needed
+    if crate::url_cache::is_keyword(path_or_keyword) {
+        let mut cfg = crate::config::CONFIG.lock().unwrap();
+        cfg.set_cross_section(path_or_keyword, Some(path_or_keyword));
+    }
+    
+    // Load the nuclide with all temperatures
+    read_nuclide_from_json(path_or_keyword, None)
 }
 
 mod tests {

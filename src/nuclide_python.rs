@@ -195,51 +195,18 @@ impl PyNuclide {
         temperatures: Option<Vec<String>>,
     ) -> PyResult<()> {
         use std::collections::HashSet;
-        let identifier = if let Some(p) = &path {
-            p.as_str()
-        } else {
-            self.name.as_deref().ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("Nuclide name not set and no path provided")
-            })?
-        };
+        
         let temps_set: Option<HashSet<String>> = temperatures.map(|v| v.into_iter().collect());
-
-        // First load without temperature filtering to get all available temperatures
-        let full_nuclide = if path.is_some() && self.name.is_some() {
-            // We have both a path and a nuclide name, use the new function with name hint
-            crate::nuclide::read_nuclide_from_json_with_name(identifier, None, self.name.as_deref())
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
-        } else {
-            crate::nuclide::read_nuclide_from_json(identifier, None)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
-        };
-
-        // Now load with temperature filtering if specified
-        let nuclide = if temps_set.is_some() {
-            if path.is_some() && self.name.is_some() {
-                crate::nuclide::read_nuclide_from_json_with_name(identifier, temps_set.as_ref(), self.name.as_deref())
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
-            } else {
-                crate::nuclide::read_nuclide_from_json(identifier, temps_set.as_ref())
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
-            }
-        } else {
-            full_nuclide.clone()
-        };
-
-        self.name = nuclide.name;
-        self.element = nuclide.element;
-        self.atomic_symbol = nuclide.atomic_symbol;
-        self.atomic_number = nuclide.atomic_number;
-        self.neutron_number = nuclide.neutron_number;
-        self.mass_number = nuclide.mass_number;
-        self.library = nuclide.library;
-        self.energy = nuclide.energy;
-        self.reactions = nuclide.reactions;
-        // Always preserve full available_temperatures from the unfiltered load
-        self.available_temperatures = full_nuclide.available_temperatures;
-        self.loaded_temperatures = nuclide.loaded_temperatures;
-        self.data_path = nuclide.data_path;
+        
+        // Use the new Rust backend method that handles all the complex logic
+        let nuclide = crate::nuclide::load_nuclide_for_python(
+            path.as_deref(),
+            self.name.as_deref(),
+            temps_set.as_ref(),
+        ).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        
+        // Simple field assignment from the loaded nuclide
+        *self = PyNuclide::from(nuclide);
         Ok(())
     }
 
@@ -381,7 +348,7 @@ impl From<PyNuclide> for Nuclide {
 /// Read a nuclide JSON file and return a `Nuclide` instance.
 ///
 /// Args:
-///     path (str): Path to nuclide JSON file.
+///     path (str): Path to nuclide JSON file or keyword like "tendl-21".
 ///
 /// Returns:
 ///     Nuclide: A fully populated `Nuclide` object with all available temperatures loaded.
@@ -390,7 +357,7 @@ impl From<PyNuclide> for Nuclide {
 ///     OSError: If the file cannot be opened or parsed.
 #[pyo3(text_signature = "(path)")]
 pub fn py_read_nuclide_from_json(path: &str) -> PyResult<PyNuclide> {
-    let nuclide = crate::nuclide::read_nuclide_from_json(path, None)
+    let nuclide = crate::nuclide::load_nuclide_from_path_or_keyword(path)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     Ok(PyNuclide::from(nuclide))
 }

@@ -137,6 +137,61 @@ impl Materials {
         Ok(())
     }
 
+    /// Read nuclides from a keyword string that will be applied to all nuclides across all materials
+    pub fn read_nuclides_from_json_keyword(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Apply keyword to all nuclides in all materials
+        let mut keyword_map = HashMap::new();
+        for mat in &self.materials {
+            for nuclide_name in mat.nuclides.keys() {
+                keyword_map.insert(nuclide_name.clone(), keyword.to_string());
+            }
+        }
+        self.read_nuclides_from_json(&keyword_map)
+    }
+
+    /// Load nuclear data from extracted input data (pure Rust, no PyO3 dependencies)
+    pub fn load_nuclear_data_from_input(
+        &mut self,
+        dict_data: Option<HashMap<String, String>>,
+        keyword_data: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(map) = dict_data {
+            self.read_nuclides_from_json(&map)
+        } else if let Some(keyword) = keyword_data {
+            self.read_nuclides_from_json_keyword(&keyword)
+        } else {
+            let empty_map = HashMap::new();
+            self.read_nuclides_from_json(&empty_map)
+        }
+    }
+
+    /// Read nuclides from a string keyword (for Python wrapper)
+    pub fn read_nuclides_from_string(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json_keyword(keyword)
+    }
+
+    /// Read nuclides from a HashMap (for Python wrapper)
+    pub fn read_nuclides_from_map(
+        &mut self,
+        map: &HashMap<String, String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json(map)
+    }
+
+    /// Read nuclides with no input - use defaults (for Python wrapper)
+    pub fn read_nuclides_from_none(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let empty_map = HashMap::new();
+        self.read_nuclides_from_json(&empty_map)
+    }
+
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
     pub fn ensure_nuclides_loaded(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Collect all unique nuclide names from all materials that aren't already loaded
