@@ -31,7 +31,7 @@ impl WasmConfig {
         }
 
         // Access the global config and set the cross sections
-        let mut config = CONFIG.lock().unwrap();
+        let mut config = CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         config.set_cross_sections(cross_sections);
         Ok(())
     }
@@ -39,7 +39,7 @@ impl WasmConfig {
     #[wasm_bindgen]
     pub fn get_cross_sections() -> Result<JsValue, JsValue> {
         // Access the global config and get the cross sections
-        let config = CONFIG.lock().unwrap();
+        let config = CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let cross_sections = &config.cross_sections;
 
         let map = Map::new();
