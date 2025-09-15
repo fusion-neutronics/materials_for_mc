@@ -206,7 +206,11 @@ impl Nuclide {
             } else if self.reactions.contains_key(&format!("{}K", temp)) {
                 &format!("{}K", temp)
             } else {
-                return Err(format!("Temperature '{}' not found in loaded data", temp).into());
+                return Err(format!(
+                    "Temperature '{}' not found in loaded data. Available temperatures: [{}]", 
+                    temp, 
+                    self.loaded_temperatures.join(", ")
+                ).into());
             }
         } else {
             // No temperature provided - use single loaded temperature if available
@@ -216,7 +220,7 @@ impl Nuclide {
                 return Err("No temperatures loaded in nuclide data".into());
             } else {
                 return Err(format!(
-                    "Multiple temperatures loaded ({}), must specify which one to use",
+                    "Multiple temperatures loaded [{}], must specify which one to use",
                     self.loaded_temperatures.join(", ")
                 ).into());
             }
@@ -224,10 +228,25 @@ impl Nuclide {
 
         // Get the reaction data for this temperature and MT
         let temp_reactions = self.reactions.get(temp_key)
-            .ok_or_else(|| format!("Temperature '{}' not found in reactions", temp_key))?;
+            .ok_or_else(|| format!(
+                "Temperature '{}' not found in reactions. Available temperatures: [{}]", 
+                temp_key, 
+                self.loaded_temperatures.join(", ")
+            ))?;
         
         let reaction = temp_reactions.get(&mt)
-            .ok_or_else(|| format!("MT {} not found for temperature '{}'", mt, temp_key))?;
+            .ok_or_else(|| {
+                // Get available MTs for this temperature
+                let available_mts: Vec<String> = temp_reactions.keys()
+                    .map(|mt| mt.to_string())
+                    .collect();
+                format!(
+                    "MT {} not found for temperature '{}'. Available MTs: [{}]", 
+                    mt, 
+                    temp_key, 
+                    available_mts.join(", ")
+                )
+            })?;
 
         // Return the cross section and energy data
         if reaction.cross_section.is_empty() {

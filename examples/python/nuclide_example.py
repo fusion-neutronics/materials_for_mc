@@ -15,5 +15,5 @@ print(nuc1)
 nuc1.read_nuclide_from_json("tendl-21")
 
 
-micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3, temperature='293')
+micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3, temperature='294')
 micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3)
