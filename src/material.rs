@@ -5,14 +5,6 @@ use crate::utilities::interpolate_linear;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Input types for universal nuclide reading function
-#[derive(Debug)]
-pub enum UniversalInput {
-    Map(HashMap<String, String>),
-    Keyword(String),
-    None,
-}
-
 /// Represents a heterogeneous collection of nuclides (or elements expanded to
 /// their naturally abundant isotopes) along with the material density and
 /// nuclear data needed for transport / analysis.
@@ -225,20 +217,44 @@ impl Material {
         }
     }
 
-    /// Universal function to read nuclides from any input type (for Python wrapper)
-    /// Handles: HashMap, keyword string, or None
-    pub fn read_nuclides_universal(
+    /// Load nuclear data from extracted input data (pure Rust, no PyO3 dependencies)
+    pub fn load_nuclear_data_from_input(
         &mut self,
-        input: UniversalInput,
+        dict_data: Option<HashMap<String, String>>,
+        keyword_data: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match input {
-            UniversalInput::Map(map) => self.read_nuclides_from_json(&map),
-            UniversalInput::Keyword(keyword) => self.read_nuclides_from_json_keyword(&keyword),
-            UniversalInput::None => {
-                let empty_map = HashMap::new();
-                self.read_nuclides_from_json(&empty_map)
-            }
+        if let Some(map) = dict_data {
+            self.read_nuclides_from_json(&map)
+        } else if let Some(keyword) = keyword_data {
+            self.read_nuclides_from_json_keyword(&keyword)
+        } else {
+            let empty_map = HashMap::new();
+            self.read_nuclides_from_json(&empty_map)
         }
+    }
+
+    /// Read nuclides from a string keyword (for Python wrapper)
+    pub fn read_nuclides_from_string(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json_keyword(keyword)
+    }
+
+    /// Read nuclides from a HashMap (for Python wrapper)
+    pub fn read_nuclides_from_map(
+        &mut self,
+        map: &HashMap<String, String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json(map)
+    }
+
+    /// Read nuclides with no input - use defaults (for Python wrapper)
+    pub fn read_nuclides_from_none(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let empty_map = HashMap::new();
+        self.read_nuclides_from_json(&empty_map)
     }
 
     /// Directly load a nuclide from a JSON string (e.g., for WASM in-memory usage) and insert into nuclide_data.

@@ -8,9 +8,6 @@ mod reaction;
 mod utilities;
 mod url_cache;
 
-#[cfg(feature = "pyo3")]
-mod python_utils;
-
 pub use config::Config;
 pub use element::Element;
 pub use material::Material;

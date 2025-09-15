@@ -1,5 +1,5 @@
 use crate::config::CONFIG;
-use crate::material::{Material, UniversalInput};
+use crate::material::Material;
 use crate::nuclide::{get_or_load_nuclide, Nuclide};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -152,20 +152,44 @@ impl Materials {
         self.read_nuclides_from_json(&keyword_map)
     }
 
-    /// Universal function to read nuclides from any input type (for Python wrapper)
-    /// Handles: HashMap, keyword string, or None
-    pub fn read_nuclides_universal(
+    /// Load nuclear data from extracted input data (pure Rust, no PyO3 dependencies)
+    pub fn load_nuclear_data_from_input(
         &mut self,
-        input: UniversalInput,
+        dict_data: Option<HashMap<String, String>>,
+        keyword_data: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match input {
-            UniversalInput::Map(map) => self.read_nuclides_from_json(&map),
-            UniversalInput::Keyword(keyword) => self.read_nuclides_from_json_keyword(&keyword),
-            UniversalInput::None => {
-                let empty_map = HashMap::new();
-                self.read_nuclides_from_json(&empty_map)
-            }
+        if let Some(map) = dict_data {
+            self.read_nuclides_from_json(&map)
+        } else if let Some(keyword) = keyword_data {
+            self.read_nuclides_from_json_keyword(&keyword)
+        } else {
+            let empty_map = HashMap::new();
+            self.read_nuclides_from_json(&empty_map)
         }
+    }
+
+    /// Read nuclides from a string keyword (for Python wrapper)
+    pub fn read_nuclides_from_string(
+        &mut self,
+        keyword: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json_keyword(keyword)
+    }
+
+    /// Read nuclides from a HashMap (for Python wrapper)
+    pub fn read_nuclides_from_map(
+        &mut self,
+        map: &HashMap<String, String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.read_nuclides_from_json(map)
+    }
+
+    /// Read nuclides with no input - use defaults (for Python wrapper)
+    pub fn read_nuclides_from_none(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let empty_map = HashMap::new();
+        self.read_nuclides_from_json(&empty_map)
     }
 
     /// Ensure all nuclides for all materials are loaded, using the global configuration if needed
