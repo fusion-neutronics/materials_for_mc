@@ -1,3 +1,6 @@
+import pytest
+from materials_for_mc import Nuclide
+
 def test_be9_not_fissionable():
     nuc = Nuclide('Be9')
     nuc.read_nuclide_from_json('tests/Be9.json')
@@ -98,3 +101,15 @@ def test_read_be9_selective_single_temperature():
         1,2,3,16,27,101,102,103,104,105,107,203,204,205,207,301
     ])
     assert mts_300 == expected_300, f"Selective load 300K MT list mismatch: {mts_300}"
+
+
+def test_read_nuclide_from_json_keyword():
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json("tendl-21")
+
+def test_read_nuclide_from_json_local_path():
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Li6')
+    # Should not raise TypeError when passing local path
+    nuc.read_nuclide_from_json("tests/Li6.json")

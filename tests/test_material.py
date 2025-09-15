@@ -358,3 +358,19 @@ def test_material_be9_selective_temperature_load_294():
     mat.add_nuclide("Be9", 1.0)
     Config.set_cross_sections({"Be9": "tests/Be9.json"})
     mat.read_nuclides_from_json({"Be9": "tests/Be9.json"})
+
+def test_read_nuclides_from_json_keyword():
+    mat = Material()
+    mat.add_element('Li', 1.0)
+    mat.set_density('g/cm3', 2.0)
+    mat.volume = 1.0
+    # Should not raise TypeError
+    mat.read_nuclides_from_json("tendl-21")
+
+def test_read_nuclides_from_json_dict():
+    mat = Material()
+    mat.add_element('Li', 1.0)
+    mat.set_density('g/cm3', 2.0)
+    mat.volume = 1.0
+    # Should not raise TypeError
+    mat.read_nuclides_from_json({"Li6": "tendl-21"})
