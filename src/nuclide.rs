@@ -507,7 +507,6 @@ fn parse_nuclide_from_json_value(
 /// Read a single nuclide either from an explicit JSON file path, or if the input is not a file path,
 /// treat the argument as a nuclide name and look up the path in the global CONFIG.cross_sections map.
 /// Optional temperature filtering is supported. URLs are automatically downloaded and cached.
-#[allow(dead_code)]
 pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
@@ -523,7 +522,6 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
 }
 
 /// Read a single nuclide with an optional nuclide name hint for URL caching
-#[allow(dead_code)]
 pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
