@@ -144,10 +144,10 @@ impl Material {
         // Start with global config entries for required nuclides, with proper error handling
         let cfg = crate::config::CONFIG
             .lock()
-            .map_err(|e| format!("Failed to acquire lock on CONFIG: {}", e))?;
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         for n in &nuclide_names {
-            if let Some(p) = cfg.cross_sections.get(n) {
+            if let Some(p) = cfg.get_cross_section(n) {
                 merged.insert(n.clone(), p.clone());
             }
         }
@@ -200,14 +200,21 @@ impl Material {
         // Get the global configuration with proper error handling
         let config = CONFIG
             .lock()
-            .map_err(|e| format!("Failed to acquire lock on CONFIG: poisoned mutex - {}", e))?;
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Load any missing nuclides
         for nuclide_name in nuclide_names {
             use std::collections::HashSet;
             let mut temps = HashSet::new();
             temps.insert(self.temperature.clone());
-            match get_or_load_nuclide(&nuclide_name, &config.cross_sections, Some(&temps)) {
+            
+            // Build a temporary source map with the global default fallback
+            let mut source_map = HashMap::new();
+            if let Some(path) = config.get_cross_section(&nuclide_name) {
+                source_map.insert(nuclide_name.clone(), path);
+            }
+            
+            match get_or_load_nuclide(&nuclide_name, &source_map, Some(&temps)) {
                 Ok(nuclide) => {
                     self.nuclide_data.insert(nuclide_name.clone(), nuclide);
                 }

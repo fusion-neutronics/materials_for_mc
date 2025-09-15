@@ -91,7 +91,7 @@ impl Materials {
         use std::collections::{HashMap as StdHashMap, HashSet};
         // Collect all nuclide names across materials
         let mut merged: HashMap<String, String> = HashMap::new();
-        let cfg = CONFIG.lock().unwrap();
+        let cfg = CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         for mat in &self.materials {
             for n in mat.nuclides.keys() {
                 if let Some(p) = cfg.cross_sections.get(n) {
@@ -154,7 +154,7 @@ impl Materials {
         }
 
         // Get the global configuration
-        let config = CONFIG.lock().unwrap();
+        let config = CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Load each missing nuclide
         for nuclide_name in &needed {
