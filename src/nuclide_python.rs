@@ -320,7 +320,7 @@ impl PyNuclide {
         temperature: Option<&str>,
     ) -> PyResult<(Vec<f64>, Vec<f64>)> {
         // Convert to Nuclide and call the Rust function
-        let nuclide: Nuclide = self.clone().into();
+        let mut nuclide: Nuclide = self.clone().into();
         
         match nuclide.microscopic_cross_section(mt, temperature) {
             Ok((cross_section, energy)) => Ok((cross_section, energy)),

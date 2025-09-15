@@ -193,7 +193,111 @@ impl Nuclide {
     /// Get microscopic cross section data for a specific MT number and temperature.
     /// Returns a tuple of (cross_section_values, energy_grid).
     /// If temperature is None, uses the single loaded temperature if only one exists.
+    /// Automatically loads data if not already loaded, using the nuclide name and config.
     pub fn microscopic_cross_section(
+        &mut self,
+        mt: i32,
+        temperature: Option<&str>,
+    ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
+        // Check if we need to load data automatically
+        if self.loaded_temperatures.is_empty() {
+            // No data loaded yet - try to load it automatically
+            if let Some(name) = self.name.clone() {
+                self.auto_load_from_config(&name, temperature)?;
+            } else {
+                return Err("No data loaded and no nuclide name available for automatic loading".into());
+            }
+        }
+
+        // Check if we need to load additional temperature
+        if let Some(temp) = temperature {
+            let temp_normalized = format!("{}K", temp);
+            let temp_without_k = if temp.ends_with('K') { &temp[..temp.len()-1] } else { temp };
+            
+            // Check if the requested temperature is available but not loaded
+            let needs_temp_load = !self.loaded_temperatures.contains(&temp.to_string()) 
+                && !self.loaded_temperatures.contains(&temp_normalized)
+                && !self.loaded_temperatures.contains(&temp_without_k.to_string())
+                && (self.available_temperatures.contains(&temp.to_string()) 
+                    || self.available_temperatures.contains(&temp_normalized)
+                    || self.available_temperatures.contains(&temp_without_k.to_string()));
+            
+            if needs_temp_load {
+                if let Some(name) = self.name.clone() {
+                    self.auto_load_additional_temperature(&name, temp)?;
+                }
+            }
+        }
+
+        // Now proceed with the original logic
+        self.get_microscopic_cross_section_data(mt, temperature)
+    }
+
+    /// Helper method to automatically load data from config
+    fn auto_load_from_config(&mut self, nuclide_name: &str, temperature: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        // Try to load using the nuclide name and config
+        let path_or_url = {
+            let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            cfg.cross_sections.get(nuclide_name).cloned()
+        };
+        
+        if let Some(path_or_url) = path_or_url {
+            // Determine which temperatures to load
+            let temps_to_load = if let Some(temp) = temperature {
+                let mut temps = std::collections::HashSet::new();
+                temps.insert(temp.to_string());
+                Some(temps)
+            } else {
+                None // Load all temperatures
+            };
+            
+            // Load the data
+            let loaded_nuclide = if crate::url_cache::is_keyword(&path_or_url) {
+                load_nuclide_for_python(Some(&path_or_url), Some(nuclide_name), temps_to_load.as_ref())?
+            } else {
+                load_nuclide_for_python(Some(&path_or_url), None, temps_to_load.as_ref())?
+            };
+            
+            // Update self with the loaded data
+            *self = loaded_nuclide;
+            Ok(())
+        } else {
+            Err(format!("No configuration found for nuclide '{}'. Use Config.set_cross_sections() to configure data sources.", nuclide_name).into())
+        }
+    }
+
+    /// Helper method to load additional temperature
+    fn auto_load_additional_temperature(&mut self, nuclide_name: &str, temperature: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let path_or_url = {
+            let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            cfg.cross_sections.get(nuclide_name).cloned()
+        };
+        
+        if let Some(path_or_url) = path_or_url {
+            // Create union of current loaded temperatures plus the new one
+            let mut temps_to_load = std::collections::HashSet::new();
+            for temp in &self.loaded_temperatures {
+                temps_to_load.insert(temp.clone());
+            }
+            temps_to_load.insert(temperature.to_string());
+            
+            // Reload with the expanded temperature set
+            let loaded_nuclide = if crate::url_cache::is_keyword(&path_or_url) {
+                load_nuclide_for_python(Some(&path_or_url), Some(nuclide_name), Some(&temps_to_load))?
+            } else {
+                load_nuclide_for_python(Some(&path_or_url), None, Some(&temps_to_load))?
+            };
+            
+            // Update self with the reloaded data
+            *self = loaded_nuclide;
+            Ok(())
+        } else {
+            Err(format!("No configuration found for nuclide '{}' to load additional temperature", nuclide_name).into())
+        }
+    }
+
+    /// Core method that extracts the cross section data (unchanged logic)
+    fn get_microscopic_cross_section_data(
         &self,
         mt: i32,
         temperature: Option<&str>,
@@ -1217,7 +1321,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_with_temperature() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Test with specific temperature
@@ -1242,7 +1346,7 @@ mod tests {
     fn test_microscopic_cross_section_single_temperature() {
         // Load Be9 with only one temperature
         let temps_filter = std::collections::HashSet::from(["294".to_string()]);
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", Some(&temps_filter))
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", Some(&temps_filter))
             .expect("Failed to load Be9.json with temperature filter");
 
         // Should work without specifying temperature since only one is loaded
@@ -1257,7 +1361,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_multiple_temperatures_error() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Should fail when no temperature specified with multiple loaded
@@ -1273,7 +1377,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_invalid_temperature() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Should fail for non-existent temperature
@@ -1291,7 +1395,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_invalid_mt() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Should fail for non-existent MT
@@ -1310,7 +1414,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_multiple_mt_numbers() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Test common MT numbers that should exist in Be9
@@ -1338,7 +1442,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_lithium() {
-        let nuclide = super::read_nuclide_from_json("tests/Li6.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Li6.json", None)
             .expect("Failed to load Li6.json");
 
         // Li6 should have only one temperature, so no temperature needed
@@ -1360,7 +1464,7 @@ mod tests {
 
     #[test]
     fn test_microscopic_cross_section_temperature_with_k_suffix() {
-        let nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
             .expect("Failed to load Be9.json");
 
         // Test that temperature matching works with 'K' suffix
