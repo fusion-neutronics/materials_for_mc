@@ -512,6 +512,13 @@ pub fn read_nuclide_from_json<P: AsRef<Path>>(
     path_or_name: P,
     temps: Option<&std::collections::HashSet<String>>,
 ) -> Result<Nuclide, Box<dyn std::error::Error>> {
+    // If path_or_name is a keyword, set config mapping for this nuclide
+    let candidate_ref = path_or_name.as_ref();
+    let candidate_str = candidate_ref.to_string_lossy();
+    if crate::url_cache::is_keyword(&candidate_str) {
+        let mut cfg = crate::config::CONFIG.lock().unwrap();
+        cfg.set_cross_section(candidate_str.as_ref(), &candidate_str);
+    }
     read_nuclide_from_json_with_name(path_or_name, temps, None)
 }
 
@@ -536,6 +543,10 @@ pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
         } else {
             return Err("Direct URL loading without nuclide name not yet supported. Use config approach instead.".into());
         }
+    } else if crate::url_cache::is_keyword(&candidate_str) {
+        // It's a keyword: treat as data source for the nuclide name
+        let nuclide_name = nuclide_name_hint.unwrap_or(candidate_str.as_ref());
+        crate::url_cache::resolve_path_or_url(&candidate_str, nuclide_name)?
     } else {
         // Treat as nuclide name, look up in config
         let cfg = crate::config::CONFIG.lock().unwrap();
@@ -548,7 +559,6 @@ pub fn read_nuclide_from_json_with_name<P: AsRef<Path>>(
                     candidate_str
                 )
             })?;
-        
         // The config value might be a URL or local path
         crate::url_cache::resolve_path_or_url(path_or_url, candidate_str.as_ref())?
     };
@@ -624,7 +634,14 @@ pub fn get_or_load_nuclide(
         }
     }
     // Load directly with temperature filtering
-    let path_or_url = json_path_map.get(nuclide_name).ok_or_else(|| {
+    // If the mapping is missing but nuclide_name is a keyword, set config mapping
+    let mut path_or_url = json_path_map.get(nuclide_name).cloned();
+    if path_or_url.is_none() && crate::url_cache::is_keyword(nuclide_name) {
+        let mut cfg = crate::config::CONFIG.lock().unwrap();
+        cfg.set_cross_section(nuclide_name, nuclide_name);
+        path_or_url = Some(nuclide_name.to_string());
+    }
+    let path_or_url = path_or_url.ok_or_else(|| {
         format!(
             "No JSON file provided for nuclide '{}'. Please supply a path for all nuclides.",
             nuclide_name
@@ -632,7 +649,7 @@ pub fn get_or_load_nuclide(
     })?;
 
     // Resolve URL or local path - download and cache if it's a URL
-    let resolved_path = crate::url_cache::resolve_path_or_url(path_or_url, nuclide_name)?;
+    let resolved_path = crate::url_cache::resolve_path_or_url(&path_or_url, nuclide_name)?;
 
     // Load the JSON file once
     let file = File::open(&resolved_path)?;

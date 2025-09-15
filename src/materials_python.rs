@@ -94,15 +94,27 @@ impl PyMaterials {
     fn read_nuclides_from_json(
         &mut self,
         py: Python,
-        nuclide_json_map: Option<&PyDict>,
+        nuclide_json_map: Option<&pyo3::types::PyAny>,
     ) -> PyResult<()> {
         let mut rust_map = HashMap::new();
-        if let Some(d) = nuclide_json_map {
-            // build only if provided
-            for (k, v) in d.iter() {
-                let key: String = k.extract()?;
-                let val: String = v.extract()?;
-                rust_map.insert(key, val);
+        if let Some(obj) = nuclide_json_map {
+            if obj.is_instance_of::<PyDict>() {
+                let d: &PyDict = obj.downcast::<PyDict>()?;
+                for (k, v) in d.iter() {
+                    let key: String = k.extract()?;
+                    let val: String = v.extract()?;
+                    rust_map.insert(key, val);
+                }
+            } else if obj.is_instance_of::<pyo3::types::PyString>() {
+                let keyword: String = obj.extract()?;
+                // Apply keyword to all nuclides in this material
+                for nuclide in self.internal.iter().flat_map(|m| m.nuclides.keys()) {
+                    rust_map.insert(nuclide.clone(), keyword.clone());
+                }
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "nuclide_json_map must be a dict or a str keyword"
+                ));
             }
         }
         self.internal
