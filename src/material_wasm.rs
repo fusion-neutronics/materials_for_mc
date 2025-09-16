@@ -93,7 +93,7 @@ impl WasmMaterial {
     }
 
     #[wasm_bindgen]
-    pub fn calculate_macroscopic_xs_neutron(
+    pub fn calculate_macroscopic_xs(
         &mut self,
         mt_filter: Option<Array>,
         by_nuclide: Option<bool>,
@@ -124,7 +124,7 @@ impl WasmMaterial {
         let by_nuclide = by_nuclide.unwrap_or(false);
         let (energy_grid, xs) = self
             .inner
-            .calculate_macroscopic_xs_neutron(&mt_vec, by_nuclide);
+            .calculate_macroscopic_xs(&mt_vec, by_nuclide);
         let data = MacroscopicXsResult {
             energy_grid,
             cross_sections: xs,
