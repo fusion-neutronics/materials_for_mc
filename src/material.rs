@@ -68,6 +68,13 @@ impl Material {
         }
     }
 
+    /// Clear all cached cross section data
+    fn invalidate_xs_cache(&mut self) {
+        self.macroscopic_xs_neutron.clear();
+        self.macroscopic_xs_neutron_total_by_nuclide = None;
+        self.unified_energy_grid_neutron.clear();
+    }
+
     pub fn add_nuclide(&mut self, nuclide: impl AsRef<str>, fraction: f64) -> Result<(), String> {
         if fraction < 0.0 {
             return Err(String::from("Fraction cannot be negative"));
@@ -75,6 +82,9 @@ impl Material {
 
         self.nuclides
             .insert(String::from(nuclide.as_ref()), fraction);
+        
+        // Clear cached data since composition changed
+        self.invalidate_xs_cache();
         Ok(())
     }
 
@@ -103,6 +113,9 @@ impl Material {
 
         self.density = Some(value);
         self.density_units = String::from(unit.as_ref());
+        
+        // Clear cached data since density affects macroscopic cross sections
+        self.invalidate_xs_cache();
         Ok(())
     }
 
@@ -169,6 +182,8 @@ impl Material {
             self.nuclide_data.insert(nuclide_name, nuclide);
         }
 
+        // Clear cached data since new nuclear data affects cross sections
+        self.invalidate_xs_cache();
         Ok(())
     }
 
@@ -310,6 +325,8 @@ impl Material {
             }
         }
 
+        // Clear cached data since new nuclear data affects cross sections
+        self.invalidate_xs_cache();
         Ok(())
     }
 
@@ -1762,5 +1779,131 @@ mod tests {
             frac_li7 > frac_li6,
             "Li7 should be sampled more often than Li6"
         );
+    }
+
+    #[test]
+    fn test_cache_invalidation_add_nuclide() {
+        crate::nuclide::clear_nuclide_cache();
+
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 0.5).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
+
+        // Load nuclear data
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Pre-populate cache by calculating cross sections
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
+
+        // Adding a nuclide should clear the cache
+        material.add_nuclide("Li7", 0.5).unwrap();
+        assert!(material.macroscopic_xs_neutron.is_empty(), "Cache should be cleared after adding nuclide");
+    }
+
+    #[test]
+    fn test_cache_invalidation_set_density() {
+        crate::nuclide::clear_nuclide_cache();
+
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
+
+        // Load nuclear data
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Pre-populate cache
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
+
+        // Changing density should clear the cache
+        material.set_density("g/cm3", 2.0).unwrap();
+        assert!(material.macroscopic_xs_neutron.is_empty(), "Cache should be cleared after density change");
+    }
+
+    #[test]
+    fn test_cache_invalidation_set_temperature() {
+        crate::nuclide::clear_nuclide_cache();
+
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
+
+        // Load nuclear data
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Pre-populate cache
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
+
+        // Changing temperature should clear the cache
+        material.set_temperature("300");
+        assert!(material.macroscopic_xs_neutron.is_empty(), "Cache should be cleared after temperature change");
+    }
+
+    #[test]
+    fn test_cache_invalidation_read_nuclides() {
+        crate::nuclide::clear_nuclide_cache();
+
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
+
+        // Load nuclear data first time
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Pre-populate cache
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
+
+        // Loading nuclear data again should clear the cache
+        let map = std::collections::HashMap::new();
+        material.read_nuclides_from_json(&map).unwrap();
+        assert!(material.macroscopic_xs_neutron.is_empty(), "Cache should be cleared after loading nuclear data");
+    }
+
+    #[test]
+    fn test_cache_behavior_after_calculation() {
+        crate::nuclide::clear_nuclide_cache();
+
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 1.0).unwrap();
+        material.set_density("g/cm3", 1.0).unwrap();
+        material.set_temperature("294");
+
+        // Load nuclear data
+        let mut nuclide_json_map = std::collections::HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
+
+        // Calculate cross sections multiple times - each call replaces the cache
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        let first_size = material.macroscopic_xs_neutron.len();
+        assert_eq!(first_size, 1, "Cache should contain only MT 1");
+
+        material.calculate_macroscopic_xs_neutron(&vec![1, 2], false);
+        let second_size = material.macroscopic_xs_neutron.len();
+        assert_eq!(second_size, 2, "Cache should contain MT 1 and 2");
+
+        // Verify that calling with just MT 1 replaces cache with only MT 1
+        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        assert_eq!(material.macroscopic_xs_neutron.len(), 1, "Cache should contain only MT 1 again");
+        
+        // Verify that calling with all MTs gives us all MTs in cache
+        material.calculate_macroscopic_xs_neutron(&vec![1, 2], false);
+        assert_eq!(material.macroscopic_xs_neutron.len(), 2, "Cache should contain MT 1 and 2 again");
     }
 } // close mod tests
