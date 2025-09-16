@@ -26,6 +26,7 @@ pub fn get_cache_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 fn get_keyword_url_mapping() -> HashMap<&'static str, &'static str> {
     let mut map = HashMap::new();
     map.insert("tendl-21", "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_tendl_2021/refs/heads/main/tendl_2021/");
+    map.insert("fendl-3.2c", "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_fendl_3.2c/refs/heads/main/fendl3.2c_data/");
     // Add more keyword mappings here as needed
     map
 }
