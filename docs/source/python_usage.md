@@ -19,6 +19,42 @@ Nuclides can be made and their basic properties accessed like this
 nuclide = m4mc.Nuclide('Li6')
 ```
 
+## Working with Nuclear Data
+
+To access cross section data, you first need to configure the nuclear data sources:
+
+```python
+import materials_for_mc as m4mc
+
+# Set a global nuclear data library
+m4mc.Config.set_cross_sections("fendl-3.2c")
+
+# Create a nuclide - data will be auto-loaded when needed
+nuclide = m4mc.Nuclide('Li6')
+
+# Get microscopic cross sections for MT=1 (total) at 294K
+cross_sections, energy_grid = nuclide.microscopic_cross_section(1, '294')
+
+print(f"Got {len(cross_sections)} cross section data points")
+print(f"First few values: {cross_sections[:5]}")
+```
+
+You can also configure individual nuclides with specific data sources:
+
+```python
+# Configure specific files for individual nuclides
+m4mc.Config.set_cross_sections({
+    "Li6": "path/to/Li6.json",
+    "Li7": "path/to/Li7.json"
+})
+
+# Or mix keywords and specific files
+m4mc.Config.set_cross_sections({
+    "Li6": "fendl-3.2c",
+    "Be9": "local/Be9.json"
+})
+```
+
 # Elements
 
 Elements can be made and their basic properties accessed like this

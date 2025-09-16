@@ -238,7 +238,7 @@ impl Nuclide {
         // Try to load using the nuclide name and config
         let path_or_url = {
             let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            cfg.cross_sections.get(nuclide_name).cloned()
+            cfg.get_cross_section(nuclide_name)
         };
         
         if let Some(path_or_url) = path_or_url {
@@ -270,7 +270,7 @@ impl Nuclide {
     fn auto_load_additional_temperature(&mut self, nuclide_name: &str, temperature: &str) -> Result<(), Box<dyn std::error::Error>> {
         let path_or_url = {
             let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            cfg.cross_sections.get(nuclide_name).cloned()
+            cfg.get_cross_section(nuclide_name)
         };
         
         if let Some(path_or_url) = path_or_url {
