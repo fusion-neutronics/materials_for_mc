@@ -24,9 +24,9 @@ fn main() {
     mat.set_density("g/cm3", 19.1).unwrap();
     mat.volume(Some(100.0)).unwrap();
     // mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
-    mat.calculate_macroscopic_xs_neutron(&vec![3], false);
+    mat.calculate_macroscopic_xs(&vec![3], false);
     // mat.calculate_microscopic_xs_neutron(None);
-    // mat.calculate_macroscopic_xs_neutron(None);
+    // mat.calculate_macroscopic_xs(None);
 
     // Create a second material and add element Li (lithium) with natural abundances
     let mut lithium_mat = Material::new();
@@ -35,11 +35,11 @@ fn main() {
     lithium_mat.set_density("g/cm3", 0.534).unwrap(); // Lithium density
     lithium_mat.volume(Some(50.0)).unwrap();
     // lithium_mat.calculate_microscopic_xs_neutron(Some(&vec!["2".to_string()]));
-    // lithium_mat.calculate_macroscopic_xs_neutron(Some(&vec!["2".to_string()]));
+    // lithium_mat.calculate_macroscopic_xs(Some(&vec!["2".to_string()]));
     // lithium_mat.calculate_microscopic_xs_neutron(None);
     // Print available MT numbers for each nuclide at temperature "294"
 
-    lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], true);
+    lithium_mat.calculate_macroscopic_xs(&vec![1], true);
 
 
     let mut rng = StdRng::seed_from_u64(123456);
@@ -72,7 +72,7 @@ fn main() {
         energies.push((log_min + f * (log_max - log_min)).exp());
     }
     // Ensure total xs grid is built once (MT=1)
-    lithium_mat.calculate_macroscopic_xs_neutron(&vec![1], false);
+    lithium_mat.calculate_macroscopic_xs(&vec![1], false);
     let start = Instant::now();
     let mut total_queries: u64 = 0;
     let mut accum_mfp = 0.0_f64; // accumulate to prevent optimization

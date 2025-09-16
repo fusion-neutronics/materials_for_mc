@@ -260,7 +260,7 @@ impl PyMaterial {
     /// Returns:
     ///     Tuple[List[float], Dict[int, List[float]]]: (energy grid, MT -> Σ array)
     #[pyo3(signature = (mt_filter = None, by_nuclide = false))]
-    fn calculate_macroscopic_xs_neutron(
+    fn calculate_macroscopic_xs(
         &mut self,
         mt_filter: Option<Vec<i32>>,
         by_nuclide: bool,
@@ -272,7 +272,7 @@ impl PyMaterial {
         };
         let (energy_grid, xs_dict_i32) = self
             .internal
-            .calculate_macroscopic_xs_neutron(mt_vec, by_nuclide);
+            .calculate_macroscopic_xs(mt_vec, by_nuclide);
         (energy_grid, xs_dict_i32)
     }
 

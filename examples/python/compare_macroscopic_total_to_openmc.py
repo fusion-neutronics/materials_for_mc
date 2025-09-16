@@ -17,7 +17,7 @@ mat1.add_nuclide('Li6',1)
 mat1.set_density('g/cm3',20.)
 mat1.temperature = "294"
 mat1.read_nuclides_from_json({'Li6':'tests/Li6.json'})
-mat1.calculate_macroscopic_xs_neutron(mt_filter=[1])
+mat1.calculate_macroscopic_xs(mt_filter=[1])
 my_macro = mat1.macroscopic_xs_neutron[1]
 my_energies = mat1.unified_energy_grid_neutron()
 

@@ -28,7 +28,7 @@ use std::sync::Arc;
 /// 2. Populate composition (nuclides or elements) and set density.
 /// 3. Optionally set temperature (clears caches if changed).
 /// 4. Call cross section building methods (e.g.
-///    [`Material::calculate_macroscopic_xs_neutron`]) or sampling utilities.
+///    [`Material::calculate_macroscopic_xs`]) or sampling utilities.
 #[derive(Debug, Clone)]
 pub struct Material {
     /// Composition of the material as a map of nuclide names to their atomic fractions
@@ -439,7 +439,7 @@ impl Material {
     /// 3. Summing over all nuclides
     /// If mt_filter is Some, only those MTs will be included (by string match).
     /// If by_nuclide is true, populates the struct field with per-nuclide macroscopic total xs (MT=1) on the unified grid.
-    pub fn calculate_macroscopic_xs_neutron(
+    pub fn calculate_macroscopic_xs(
         &mut self,
         mt_filter: &Vec<i32>,
         by_nuclide: bool,
@@ -559,7 +559,7 @@ impl Material {
         // Ensure we have a total cross section
         if !self.macroscopic_xs_neutron.contains_key(&1) {
             let mt_filter = vec![1];
-            self.calculate_macroscopic_xs_neutron(&mt_filter, false);
+            self.calculate_macroscopic_xs(&mt_filter, false);
         }
         // If we still don't have a total cross section, return None
         if !self.macroscopic_xs_neutron.contains_key(&1) {
@@ -752,7 +752,7 @@ impl Material {
         energy: f64,
         rng: &mut R,
     ) -> String {
-        let by_nuclide = self.macroscopic_xs_neutron_total_by_nuclide.as_ref().expect("macroscopic_xs_neutron_total_by_nuclide is None: call calculate_macroscopic_xs_neutron with by_nuclide=true first");
+        let by_nuclide = self.macroscopic_xs_neutron_total_by_nuclide.as_ref().expect("macroscopic_xs_neutron_total_by_nuclide is None: call calculate_macroscopic_xs with by_nuclide=true first");
         let mut xs_by_nuclide = Vec::new();
         let mut total = 0.0;
         let mut debug_info = String::new();
@@ -839,7 +839,7 @@ mod tests {
             .expect("Failed to read nuclide JSON");
         // Call with by_nuclide = true
         let mt_filter = vec![1];
-        let (_grid, _macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, true);
+        let (_grid, _macro_xs) = material.calculate_macroscopic_xs(&mt_filter, true);
         // Check that macroscopic_xs_neutron_total_by_nuclide is Some and contains both nuclides
         let by_nuclide = material
             .macroscopic_xs_neutron_total_by_nuclide
@@ -879,7 +879,7 @@ mod tests {
             .read_nuclides_from_json(&nuclide_json_map)
             .expect("Failed to read nuclide JSON");
         let mt_filter = vec![3];
-        let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
+        let (_grid, macro_xs) = material.calculate_macroscopic_xs(&mt_filter, false);
         assert!(
             !macro_xs.contains_key(&1),
             "MT=1 should NOT be present when only MT=3 is requested"
@@ -898,7 +898,7 @@ mod tests {
             .read_nuclides_from_json(&nuclide_json_map)
             .expect("Failed to read nuclide JSON");
         let mt_filter = vec![24];
-        let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
+        let (_grid, macro_xs) = material.calculate_macroscopic_xs(&mt_filter, false);
         assert!(
             !macro_xs.contains_key(&1),
             "MT=1 should NOT be present when only MT=24 is requested"
@@ -917,7 +917,7 @@ mod tests {
             .expect("Failed to read nuclide JSON");
         // Request only MT=3 (now present in JSON)
         let mt_filter = vec![3];
-        let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
+        let (_grid, macro_xs) = material.calculate_macroscopic_xs(&mt_filter, false);
         assert!(
             macro_xs.contains_key(&3),
             "MT=3 should be present in macro_xs for Li6"
@@ -1568,7 +1568,7 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_macroscopic_xs_neutron_mt_filter() {
+    fn test_calculate_macroscopic_xs_mt_filter() {
         use std::collections::HashMap;
         let mut material = Material::new();
         material.add_element("Li", 1.0).unwrap();
@@ -1584,7 +1584,7 @@ mod tests {
             69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 101, 102, 103, 104, 105, 203,
             204, 205, 206, 207, 301, 444,
         ];
-        let (_grid, macro_xs) = material.calculate_macroscopic_xs_neutron(&mt_filter, false);
+        let (_grid, macro_xs) = material.calculate_macroscopic_xs(&mt_filter, false);
         for mt in &mt_filter {
             match macro_xs.get(mt) {
                 Some(xs) => assert_eq!(xs.len(), material.unified_energy_grid_neutron.len()),
@@ -1609,11 +1609,11 @@ mod tests {
         // Should panic when calculating macroscopic cross sections with no density
         let result = std::panic::catch_unwind(move || {
             let mut material = material;
-            material.calculate_macroscopic_xs_neutron(&vec![1], false);
+            material.calculate_macroscopic_xs(&vec![1], false);
         });
         assert!(
             result.is_err(),
-            "Should panic if density is not set for calculate_macroscopic_xs_neutron"
+            "Should panic if density is not set for calculate_macroscopic_xs"
         );
 
         // Re-create material for the next test
@@ -1687,7 +1687,7 @@ mod tests {
         mat.set_temperature("294");
 
         // Check that the total cross section is present and nonzero at 14 MeV
-        mat.calculate_macroscopic_xs_neutron(&vec![1], false);
+        mat.calculate_macroscopic_xs(&vec![1], false);
 
         // Sample 1000 distances
         let mut sum = 0.0;
@@ -1730,7 +1730,7 @@ mod tests {
 
         // Calculate total xs to ensure everything is set up
         // For this test, calculate per-nuclide macroscopic total xs as well
-        material.calculate_macroscopic_xs_neutron(&vec![1], true);
+        material.calculate_macroscopic_xs(&vec![1], true);
 
         // Check that macroscopic_xs_neutron_total_by_nuclide is present and not empty
         let by_nuclide = material.macroscopic_xs_neutron_total_by_nuclide.as_ref();
@@ -1797,7 +1797,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Pre-populate cache by calculating cross sections
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
 
         // Adding a nuclide should clear the cache
@@ -1820,7 +1820,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Pre-populate cache
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
 
         // Changing density should clear the cache
@@ -1843,7 +1843,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Pre-populate cache
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
 
         // Changing temperature should clear the cache
@@ -1866,7 +1866,7 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Pre-populate cache
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
 
         // Loading nuclear data again should clear the cache
@@ -1890,20 +1890,20 @@ mod tests {
         material.read_nuclides_from_json(&nuclide_json_map).unwrap();
 
         // Calculate cross sections multiple times - each call replaces the cache
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         let first_size = material.macroscopic_xs_neutron.len();
         assert_eq!(first_size, 1, "Cache should contain only MT 1");
 
-        material.calculate_macroscopic_xs_neutron(&vec![1, 2], false);
+        material.calculate_macroscopic_xs(&vec![1, 2], false);
         let second_size = material.macroscopic_xs_neutron.len();
         assert_eq!(second_size, 2, "Cache should contain MT 1 and 2");
 
         // Verify that calling with just MT 1 replaces cache with only MT 1
-        material.calculate_macroscopic_xs_neutron(&vec![1], false);
+        material.calculate_macroscopic_xs(&vec![1], false);
         assert_eq!(material.macroscopic_xs_neutron.len(), 1, "Cache should contain only MT 1 again");
         
         // Verify that calling with all MTs gives us all MTs in cache
-        material.calculate_macroscopic_xs_neutron(&vec![1, 2], false);
+        material.calculate_macroscopic_xs(&vec![1, 2], false);
         assert_eq!(material.macroscopic_xs_neutron.len(), 2, "Cache should contain MT 1 and 2 again");
     }
 } // close mod tests
