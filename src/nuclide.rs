@@ -1639,4 +1639,28 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("no nuclide name available"), "Error should mention missing name");
     }
+
+    #[test]
+    fn test_fendl_3_2c_keyword() {
+        // Test that the fendl-3.2c keyword is recognized and can be used
+        use crate::url_cache::is_keyword;
+        
+        // Check that the keyword is recognized
+        assert!(is_keyword("fendl-3.2c"), "fendl-3.2c should be a recognized keyword");
+        
+        #[cfg(feature = "download")]
+        {
+            use crate::url_cache::expand_keyword_to_url;
+            
+            // Check that keyword expansion works correctly
+            let expanded = expand_keyword_to_url("fendl-3.2c", "Li6");
+            assert!(expanded.is_some(), "fendl-3.2c keyword should expand to URL");
+            
+            let url = expanded.unwrap();
+            assert!(url.contains("https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_fendl_3.2c"), 
+                    "Expanded URL should contain correct base URL");
+            assert!(url.ends_with("Li6.json"), "Expanded URL should end with nuclide name and .json");
+            assert_eq!(url, "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_fendl_3.2c/refs/heads/main/fendl3.2c_data/Li6.json");
+        }
+    }
 }
