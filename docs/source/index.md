@@ -15,5 +15,6 @@ installation
 python usage
 python_api
 rust_api
+webassembly
 developer_info
 ```
