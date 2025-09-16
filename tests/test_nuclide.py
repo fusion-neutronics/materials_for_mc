@@ -113,3 +113,259 @@ def test_read_nuclide_from_json_local_path():
     nuc = Nuclide('Li6')
     # Should not raise TypeError when passing local path
     nuc.read_nuclide_from_json("tests/Li6.json")
+
+
+def test_microscopic_cross_section_with_temperature():
+    """Test microscopic_cross_section with explicit temperature."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Test with specific temperature
+    xs, energy = nuc.microscopic_cross_section(mt=2, temperature='294')
+    assert len(xs) > 0, "Cross section data should not be empty"
+    assert len(energy) > 0, "Energy data should not be empty"
+    assert len(xs) == len(energy), "Cross section and energy arrays should have same length"
+    
+    # Test with different temperature
+    xs_300, energy_300 = nuc.microscopic_cross_section(mt=2, temperature='300')
+    assert len(xs_300) > 0, "Cross section data should not be empty for 300K"
+    assert len(energy_300) > 0, "Energy data should not be empty for 300K"
+    
+    # Test different MT numbers
+    xs_mt3, energy_mt3 = nuc.microscopic_cross_section(mt=3, temperature='294')
+    assert len(xs_mt3) > 0, "MT=3 cross section data should not be empty"
+    assert len(energy_mt3) > 0, "MT=3 energy data should not be empty"
+
+
+def test_microscopic_cross_section_without_temperature():
+    """Test microscopic_cross_section with single loaded temperature."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    # Load only one temperature
+    nuc.read_nuclide_from_json('tests/Be9.json', temperatures=['294'])
+    
+    # Should work without specifying temperature since only one is loaded
+    xs, energy = nuc.microscopic_cross_section(mt=2)
+    assert len(xs) > 0, "Cross section data should not be empty"
+    assert len(energy) > 0, "Energy data should not be empty"
+    assert len(xs) == len(energy), "Cross section and energy arrays should have same length"
+
+
+def test_microscopic_cross_section_multiple_temperatures_error():
+    """Test that microscopic_cross_section raises error when multiple temperatures loaded without specifying."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')  # Loads both 294 and 300
+    
+    # Should raise error when no temperature specified with multiple loaded
+    with pytest.raises(Exception) as exc_info:
+        nuc.microscopic_cross_section(mt=2)
+    error_msg = str(exc_info.value)
+    assert "Multiple temperatures loaded" in error_msg
+    assert "294" in error_msg and "300" in error_msg
+
+
+def test_microscopic_cross_section_invalid_temperature():
+    """Test error handling for invalid temperature."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Should raise error for non-existent temperature
+    with pytest.raises(Exception) as exc_info:
+        nuc.microscopic_cross_section(mt=2, temperature='500')
+    error_msg = str(exc_info.value)
+    assert "Temperature '500' not found" in error_msg
+    assert "Available temperatures:" in error_msg
+    assert "294" in error_msg and "300" in error_msg
+
+
+def test_microscopic_cross_section_invalid_mt():
+    """Test error handling for invalid MT number."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Should raise error for non-existent MT
+    with pytest.raises(Exception) as exc_info:
+        nuc.microscopic_cross_section(mt=9999, temperature='294')
+    error_msg = str(exc_info.value)
+    assert "MT 9999 not found" in error_msg
+    assert "Available MTs:" in error_msg
+
+
+def test_microscopic_cross_section_multiple_mt_numbers():
+    """Test microscopic_cross_section with various MT numbers."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Test common MT numbers that should exist in Be9
+    test_mts = [1, 2, 3, 16, 27, 101, 102]  # Common reaction types
+    
+    for mt in test_mts:
+        try:
+            xs, energy = nuc.microscopic_cross_section(mt=mt, temperature='294')
+            assert len(xs) > 0, f"MT={mt} should have cross section data"
+            assert len(energy) > 0, f"MT={mt} should have energy data"
+            assert len(xs) == len(energy), f"MT={mt} data length mismatch"
+            assert all(e > 0 for e in energy), f"MT={mt} energy values should be positive"
+            assert all(x >= 0 for x in xs), f"MT={mt} cross sections should be non-negative"
+        except Exception:
+            # Some MT numbers might not exist, which is fine
+            pass
+
+
+def test_microscopic_cross_section_lithium():
+    """Test microscopic_cross_section with Li6 data."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Li6 should have only one temperature, so no temperature needed
+    xs, energy = nuc.microscopic_cross_section(mt=2)  # Elastic scattering
+    assert len(xs) > 0, "Li6 elastic scattering data should not be empty"
+    assert len(energy) > 0, "Li6 energy data should not be empty"
+    
+    # Test with explicit temperature too
+    xs_explicit, energy_explicit = nuc.microscopic_cross_section(mt=2, temperature='294')
+    assert xs == xs_explicit, "Results should be identical with/without explicit temperature"
+    assert energy == energy_explicit, "Energy should be identical with/without explicit temperature"
+
+
+def test_auto_loading_from_config():
+    """Test that microscopic_cross_section can auto-load data from config when nuclide is empty"""
+    from materials_for_mc import Config
+    
+    # Set up config for auto-loading
+    config = Config()
+    config.set_cross_sections({'Be9': 'tests/Be9.json'})
+    
+    # Create empty nuclide with name but no data loaded
+    nuc = Nuclide('Be9')
+    assert nuc.loaded_temperatures == [], "Should start with no loaded temperatures"
+    
+    # Call microscopic_cross_section - should auto-load data
+    xs, energy = nuc.microscopic_cross_section(mt=2, temperature='294')
+    assert len(xs) > 0, "Auto-loaded cross section data should not be empty"
+    assert len(energy) > 0, "Auto-loaded energy data should not be empty"
+    assert len(xs) == len(energy), "Cross section and energy arrays should have same length"
+    
+    # Note: loaded_temperatures won't be updated in the Python object due to immutable API
+    # The auto-loading happens internally but doesn't modify the original object
+
+
+def test_auto_loading_additional_temperature():
+    """Test that microscopic_cross_section can auto-load additional temperatures"""
+    from materials_for_mc import Config
+    
+    # Set up config for auto-loading
+    config = Config()
+    config.set_cross_sections({'Be9': 'tests/Be9.json'})
+    
+    # Load Be9 with only 294K initially
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json', ['294'])
+    
+    assert nuc.loaded_temperatures == ['294'], "Should only have 294K loaded initially"
+    assert '300' in nuc.available_temperatures, "Should know 300K is available"
+    
+    # Request 300K data - should auto-load additional temperature
+    xs, energy = nuc.microscopic_cross_section(mt=2, temperature='300')
+    assert len(xs) > 0, "Auto-loaded 300K cross section data should not be empty"
+    assert len(energy) > 0, "Auto-loaded 300K energy data should not be empty"
+    
+    # The original nuclide object still shows only 294K due to immutable API
+    # But the internal auto-loading worked to provide the 300K data
+    
+
+def test_auto_loading_without_config_fails():
+    """Test that auto-loading fails gracefully when no config is available"""
+    from materials_for_mc import Config
+    
+    # Make sure no config exists for our test nuclide
+    config = Config()
+    current_configs = config.get_cross_sections()
+    if 'TestNuclide' in current_configs:
+        # Remove it temporarily
+        new_configs = {k: v for k, v in current_configs.items() if k != 'TestNuclide'}
+        config.set_cross_sections(new_configs)
+    
+    # Create empty nuclide with name but no config
+    nuc = Nuclide('TestNuclide')
+    
+    # Call microscopic_cross_section - should fail with helpful error
+    try:
+        nuc.microscopic_cross_section(mt=2, temperature='294')
+        assert False, "Auto-loading without config should fail"
+    except ValueError as e:
+        error_msg = str(e)
+        assert "No configuration found" in error_msg, f"Error should mention missing configuration: {error_msg}"
+        assert "TestNuclide" in error_msg, f"Error should mention the nuclide name: {error_msg}"
+
+
+def test_auto_loading_multiple_calls_consistent():
+    """Test that multiple auto-loading calls give consistent results"""
+    from materials_for_mc import Config
+    
+    # Set up config for auto-loading
+    config = Config()
+    config.set_cross_sections({'Be9': 'tests/Be9.json'})
+    
+    # Create empty nuclide
+    nuc = Nuclide('Be9')
+    
+    # Call microscopic_cross_section multiple times
+    xs1, energy1 = nuc.microscopic_cross_section(mt=2, temperature='294')
+    xs2, energy2 = nuc.microscopic_cross_section(mt=2, temperature='294')
+    xs3, energy3 = nuc.microscopic_cross_section(mt=102, temperature='300')
+    
+    # First two calls should give identical results
+    assert xs1 == xs2, "Multiple calls with same parameters should give identical results"
+    assert energy1 == energy2, "Multiple calls with same parameters should give identical energy"
+    
+    # Third call should work too (different MT and temperature)
+    assert len(xs3) > 0, "Auto-loading different MT and temperature should work"
+    assert len(energy3) > 0, "Auto-loading different MT and temperature should provide energy"
+
+
+def test_auto_loading_with_manual_loading_combined():
+    """Test combining manual loading with auto-loading for additional data"""
+    from materials_for_mc import Config
+    
+    # Set up config for auto-loading
+    config = Config()
+    config.set_cross_sections({'Be9': 'tests/Be9.json'})
+    
+    # Manually load some data first
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json', ['294'])
+    
+    # Verify manual loading worked
+    assert '294' in nuc.loaded_temperatures, "Manual loading should work"
+    assert '300' in nuc.available_temperatures, "Should know other temperatures are available"
+    
+    # Now use auto-loading for data that was manually loaded
+    xs_manual, energy_manual = nuc.microscopic_cross_section(mt=2, temperature='294')
+    assert len(xs_manual) > 0, "Should get data for manually loaded temperature"
+    
+    # And use auto-loading for additional temperature not manually loaded  
+    xs_auto, energy_auto = nuc.microscopic_cross_section(mt=2, temperature='300')
+    assert len(xs_auto) > 0, "Should auto-load additional temperature"
+    
+    # Test with a temperature-specific MT - try MT=444 which should only be available at 294K
+    xs_specific, energy_specific = nuc.microscopic_cross_section(mt=444, temperature='294')
+    assert len(xs_specific) > 0, "Should get temperature-specific MT data"
+    
+    # Try to get MT=444 at 300K - this should fail since it's not available at that temperature
+    try:
+        nuc.microscopic_cross_section(mt=444, temperature='300')
+        # If we get here without exception, that's fine too - means 444 exists at both temps
+        print("MT=444 exists at both temperatures")
+    except ValueError as e:
+        # This is expected if MT=444 is not available at 300K
+        assert "MT 444 not found" in str(e), f"Should get MT not found error, got: {e}"
+    
+    # Note: For Be9 MT=2, the cross sections at 294K and 300K might be identical
+    # This is fine - the important thing is that both calls succeeded

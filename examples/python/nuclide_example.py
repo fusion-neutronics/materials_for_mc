@@ -12,4 +12,8 @@ m4mc.Config.set_cross_sections({
 nuc1 = m4mc.Nuclide('Li6')
 print(nuc1)
 
-nuc1.read_nuclide_from_json("tendl-21")
+# nuc1.read_nuclide_from_json()
+
+
+micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3, temperature='294')
+micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3)

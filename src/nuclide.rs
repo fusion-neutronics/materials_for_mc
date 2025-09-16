@@ -189,6 +189,180 @@ impl Nuclide {
             Some(mts_vec)
         }
     }
+
+    /// Get microscopic cross section data for a specific MT number and temperature.
+    /// Returns a tuple of (cross_section_values, energy_grid).
+    /// If temperature is None, uses the single loaded temperature if only one exists.
+    /// Automatically loads data if not already loaded, using the nuclide name and config.
+    pub fn microscopic_cross_section(
+        &mut self,
+        mt: i32,
+        temperature: Option<&str>,
+    ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
+        // Check if we need to load data automatically
+        if self.loaded_temperatures.is_empty() {
+            // No data loaded yet - try to load it automatically
+            if let Some(name) = self.name.clone() {
+                self.auto_load_from_config(&name, temperature)?;
+            } else {
+                return Err("No data loaded and no nuclide name available for automatic loading".into());
+            }
+        }
+
+        // Check if we need to load additional temperature
+        if let Some(temp) = temperature {
+            let temp_normalized = format!("{}K", temp);
+            let temp_without_k = if temp.ends_with('K') { &temp[..temp.len()-1] } else { temp };
+            
+            // Check if the requested temperature is available but not loaded
+            let needs_temp_load = !self.loaded_temperatures.contains(&temp.to_string()) 
+                && !self.loaded_temperatures.contains(&temp_normalized)
+                && !self.loaded_temperatures.contains(&temp_without_k.to_string())
+                && (self.available_temperatures.contains(&temp.to_string()) 
+                    || self.available_temperatures.contains(&temp_normalized)
+                    || self.available_temperatures.contains(&temp_without_k.to_string()));
+            
+            if needs_temp_load {
+                if let Some(name) = self.name.clone() {
+                    self.auto_load_additional_temperature(&name, temp)?;
+                }
+            }
+        }
+
+        // Now proceed with the original logic
+        self.get_microscopic_cross_section_data(mt, temperature)
+    }
+
+    /// Helper method to automatically load data from config
+    fn auto_load_from_config(&mut self, nuclide_name: &str, temperature: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        // Try to load using the nuclide name and config
+        let path_or_url = {
+            let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            cfg.cross_sections.get(nuclide_name).cloned()
+        };
+        
+        if let Some(path_or_url) = path_or_url {
+            // Determine which temperatures to load
+            let temps_to_load = if let Some(temp) = temperature {
+                let mut temps = std::collections::HashSet::new();
+                temps.insert(temp.to_string());
+                Some(temps)
+            } else {
+                None // Load all temperatures
+            };
+            
+            // Load the data
+            let loaded_nuclide = if crate::url_cache::is_keyword(&path_or_url) {
+                load_nuclide_for_python(Some(&path_or_url), Some(nuclide_name), temps_to_load.as_ref())?
+            } else {
+                load_nuclide_for_python(Some(&path_or_url), None, temps_to_load.as_ref())?
+            };
+            
+            // Update self with the loaded data
+            *self = loaded_nuclide;
+            Ok(())
+        } else {
+            Err(format!("No configuration found for nuclide '{}'. Use Config.set_cross_sections() to configure data sources.", nuclide_name).into())
+        }
+    }
+
+    /// Helper method to load additional temperature
+    fn auto_load_additional_temperature(&mut self, nuclide_name: &str, temperature: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let path_or_url = {
+            let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            cfg.cross_sections.get(nuclide_name).cloned()
+        };
+        
+        if let Some(path_or_url) = path_or_url {
+            // Create union of current loaded temperatures plus the new one
+            let mut temps_to_load = std::collections::HashSet::new();
+            for temp in &self.loaded_temperatures {
+                temps_to_load.insert(temp.clone());
+            }
+            temps_to_load.insert(temperature.to_string());
+            
+            // Reload with the expanded temperature set
+            let loaded_nuclide = if crate::url_cache::is_keyword(&path_or_url) {
+                load_nuclide_for_python(Some(&path_or_url), Some(nuclide_name), Some(&temps_to_load))?
+            } else {
+                load_nuclide_for_python(Some(&path_or_url), None, Some(&temps_to_load))?
+            };
+            
+            // Update self with the reloaded data
+            *self = loaded_nuclide;
+            Ok(())
+        } else {
+            Err(format!("No configuration found for nuclide '{}' to load additional temperature", nuclide_name).into())
+        }
+    }
+
+    /// Core method that extracts the cross section data (unchanged logic)
+    fn get_microscopic_cross_section_data(
+        &self,
+        mt: i32,
+        temperature: Option<&str>,
+    ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
+        // Determine which temperature to use
+        let temp_key = if let Some(temp) = temperature {
+            // Try the provided temperature as-is, then with 'K' suffix
+            if self.reactions.contains_key(temp) {
+                temp
+            } else if self.reactions.contains_key(&format!("{}K", temp)) {
+                &format!("{}K", temp)
+            } else {
+                return Err(format!(
+                    "Temperature '{}' not found in loaded data. Available temperatures: [{}]", 
+                    temp, 
+                    self.loaded_temperatures.join(", ")
+                ).into());
+            }
+        } else {
+            // No temperature provided - use single loaded temperature if available
+            if self.loaded_temperatures.len() == 1 {
+                &self.loaded_temperatures[0]
+            } else if self.loaded_temperatures.is_empty() {
+                return Err("No temperatures loaded in nuclide data".into());
+            } else {
+                return Err(format!(
+                    "Multiple temperatures loaded [{}], must specify which one to use",
+                    self.loaded_temperatures.join(", ")
+                ).into());
+            }
+        };
+
+        // Get the reaction data for this temperature and MT
+        let temp_reactions = self.reactions.get(temp_key)
+            .ok_or_else(|| format!(
+                "Temperature '{}' not found in reactions. Available temperatures: [{}]", 
+                temp_key, 
+                self.loaded_temperatures.join(", ")
+            ))?;
+        
+        let reaction = temp_reactions.get(&mt)
+            .ok_or_else(|| {
+                // Get available MTs for this temperature
+                let available_mts: Vec<String> = temp_reactions.keys()
+                    .map(|mt| mt.to_string())
+                    .collect();
+                format!(
+                    "MT {} not found for temperature '{}'. Available MTs: [{}]", 
+                    mt, 
+                    temp_key, 
+                    available_mts.join(", ")
+                )
+            })?;
+
+        // Return the cross section and energy data
+        if reaction.cross_section.is_empty() {
+            return Err(format!("No cross section data available for MT {} at temperature '{}'", mt, temp_key).into());
+        }
+
+        if reaction.energy.is_empty() {
+            return Err(format!("No energy grid available for MT {} at temperature '{}'", mt, temp_key).into());
+        }
+
+        Ok((reaction.cross_section.clone(), reaction.energy.clone()))
+    }
 }
 
 // Internal: parse a nuclide from a JSON value with optional temperature filter.
@@ -427,9 +601,8 @@ fn parse_nuclide_from_json_value(
             .into());
         }
 
-        let mut temps: Vec<String> = reaction_temps.into_iter().collect();
-        temps.sort();
-        nuclide.available_temperatures = temps;
+        // Don't override available_temperatures here - it should preserve all temps from JSON
+        // available_temperatures was already set earlier from the full JSON parsing
     } else if !nuclide.reactions.is_empty() {
         // Reactions present but no energy map created (legacy / missing). Treat as error per requirement.
         let temps: Vec<String> = nuclide.reactions.keys().cloned().collect();
@@ -1143,5 +1316,327 @@ mod tests {
             energy_grid.len(),
             temp
         );
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_with_temperature() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test with specific temperature
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_ok(), "Should successfully get MT=2 data for 294K");
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Cross section data should not be empty");
+        assert!(!energy.is_empty(), "Energy data should not be empty");
+        assert_eq!(xs.len(), energy.len(), "Cross section and energy arrays should have same length");
+        
+        // Test with different temperature
+        let result_300 = nuclide.microscopic_cross_section(2, Some("300"));
+        assert!(result_300.is_ok(), "Should successfully get MT=2 data for 300K");
+        
+        let (xs_300, energy_300) = result_300.unwrap();
+        assert!(!xs_300.is_empty(), "Cross section data should not be empty for 300K");
+        assert!(!energy_300.is_empty(), "Energy data should not be empty for 300K");
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_single_temperature() {
+        // Load Be9 with only one temperature
+        let temps_filter = std::collections::HashSet::from(["294".to_string()]);
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", Some(&temps_filter))
+            .expect("Failed to load Be9.json with temperature filter");
+
+        // Should work without specifying temperature since only one is loaded
+        let result = nuclide.microscopic_cross_section(2, None);
+        assert!(result.is_ok(), "Should successfully get MT=2 data without temperature");
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Cross section data should not be empty");
+        assert!(!energy.is_empty(), "Energy data should not be empty");
+        assert_eq!(xs.len(), energy.len(), "Cross section and energy arrays should have same length");
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_multiple_temperatures_error() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Should fail when no temperature specified with multiple loaded
+        let result = nuclide.microscopic_cross_section(2, None);
+        assert!(result.is_err(), "Should error when multiple temperatures loaded without specifying");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Multiple temperatures loaded"), 
+               "Error should mention multiple temperatures: {}", error_msg);
+        assert!(error_msg.contains("[294, 300]"), 
+               "Error should list the loaded temperatures: {}", error_msg);
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_invalid_temperature() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Should fail for non-existent temperature
+        let result = nuclide.microscopic_cross_section(2, Some("500"));
+        assert!(result.is_err(), "Should error for invalid temperature");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Temperature '500' not found"), 
+               "Error should mention temperature not found: {}", error_msg);
+        assert!(error_msg.contains("Available temperatures:"), 
+               "Error should list available temperatures: {}", error_msg);
+        assert!(error_msg.contains("294") && error_msg.contains("300"), 
+               "Error should list the actual available temperatures: {}", error_msg);
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_invalid_mt() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Should fail for non-existent MT
+        let result = nuclide.microscopic_cross_section(9999, Some("294"));
+        assert!(result.is_err(), "Should error for invalid MT number");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("MT 9999 not found"), 
+               "Error should mention MT not found: {}", error_msg);
+        assert!(error_msg.contains("Available MTs:"), 
+               "Error should list available MTs: {}", error_msg);
+        // Check that some common MTs are listed
+        assert!(error_msg.contains("1") && error_msg.contains("2"), 
+               "Error should list some actual available MTs: {}", error_msg);
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_multiple_mt_numbers() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test common MT numbers that should exist in Be9
+        let test_mts = [1, 2, 3, 16, 27, 101, 102];
+        
+        for mt in test_mts {
+            let result = nuclide.microscopic_cross_section(mt, Some("294"));
+            if result.is_ok() {
+                let (xs, energy) = result.unwrap();
+                assert!(!xs.is_empty(), "MT={} should have cross section data", mt);
+                assert!(!energy.is_empty(), "MT={} should have energy data", mt);
+                assert_eq!(xs.len(), energy.len(), "MT={} data length mismatch", mt);
+                
+                // Validate data quality
+                for &e in &energy {
+                    assert!(e > 0.0, "MT={} energy values should be positive", mt);
+                }
+                for &x in &xs {
+                    assert!(x >= 0.0, "MT={} cross sections should be non-negative", mt);
+                }
+            }
+            // Some MT numbers might not exist, which is fine
+        }
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_lithium() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Li6.json", None)
+            .expect("Failed to load Li6.json");
+
+        // Li6 should have only one temperature, so no temperature needed
+        let result = nuclide.microscopic_cross_section(2, None);
+        assert!(result.is_ok(), "Should successfully get Li6 elastic scattering data");
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Li6 elastic scattering data should not be empty");
+        assert!(!energy.is_empty(), "Li6 energy data should not be empty");
+        
+        // Test with explicit temperature too
+        let result_explicit = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result_explicit.is_ok(), "Should work with explicit temperature");
+        
+        let (xs_explicit, energy_explicit) = result_explicit.unwrap();
+        assert_eq!(xs, xs_explicit, "Results should be identical with/without explicit temperature");
+        assert_eq!(energy, energy_explicit, "Energy should be identical with/without explicit temperature");
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_temperature_with_k_suffix() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test that temperature matching works with 'K' suffix
+        let result_without_k = nuclide.microscopic_cross_section(2, Some("294"));
+        let result_with_k = nuclide.microscopic_cross_section(2, Some("294K"));
+        
+        // Both should work (though one might fail if the data uses different format)
+        if result_without_k.is_ok() && result_with_k.is_ok() {
+            let (xs1, energy1) = result_without_k.unwrap();
+            let (xs2, energy2) = result_with_k.unwrap();
+            assert_eq!(xs1, xs2, "Temperature with/without K suffix should give same result");
+            assert_eq!(energy1, energy2, "Energy with/without K suffix should give same result");
+        } else {
+            // At least one should work
+            assert!(result_without_k.is_ok() || result_with_k.is_ok(), 
+                   "At least one temperature format should work");
+        }
+    }
+
+    #[test]
+    fn test_auto_loading_from_config() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Set up config for auto-loading
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Be9", Some("tests/Be9.json"));
+        }
+
+        // Create empty nuclide with name but no data loaded
+        let mut nuclide = super::Nuclide {
+            name: Some("Be9".to_string()),
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Verify no data is loaded initially
+        assert!(nuclide.loaded_temperatures.is_empty(), "Should start with no loaded temperatures");
+        assert!(nuclide.reactions.is_empty(), "Should start with no reactions");
+
+        // Call microscopic_cross_section - should auto-load data
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_ok(), "Auto-loading should succeed: {:?}", result.err());
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Auto-loaded cross section data should not be empty");
+        assert!(!energy.is_empty(), "Auto-loaded energy data should not be empty");
+        
+        // Verify data was actually loaded into the nuclide
+        assert!(!nuclide.loaded_temperatures.is_empty(), "Should have loaded temperatures after auto-load");
+        assert!(!nuclide.reactions.is_empty(), "Should have reactions after auto-load");
+        assert!(nuclide.available_temperatures.contains(&"294".to_string()), "Should know 294 is available");
+        assert!(nuclide.available_temperatures.contains(&"300".to_string()), "Should know 300 is available");
+
+        // Clean up
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("Be9");
+        }
+    }
+
+    #[test]
+    fn test_auto_loading_additional_temperature() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Set up config for auto-loading
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.set_cross_section("Be9", Some("tests/Be9.json"));
+        }
+
+        // Load Be9 with only 294K initially
+        let temps_filter = std::collections::HashSet::from(["294".to_string()]);
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", Some(&temps_filter))
+            .expect("Failed to load Be9.json with temperature filter");
+        
+        // Verify only 294K is loaded initially
+        assert_eq!(nuclide.loaded_temperatures, vec!["294".to_string()], "Should only have 294K loaded");
+        assert!(nuclide.available_temperatures.contains(&"300".to_string()), "Should know 300K is available");
+        
+        // Request 300K data - should auto-load additional temperature
+        let result = nuclide.microscopic_cross_section(2, Some("300"));
+        assert!(result.is_ok(), "Auto-loading additional temperature should succeed: {:?}", result.err());
+        
+        let (xs, energy) = result.unwrap();
+        assert!(!xs.is_empty(), "Auto-loaded 300K cross section data should not be empty");
+        assert!(!energy.is_empty(), "Auto-loaded 300K energy data should not be empty");
+        
+        // Verify both temperatures are now loaded
+        assert!(nuclide.loaded_temperatures.contains(&"294".to_string()), "Should still have 294K");
+        assert!(nuclide.loaded_temperatures.contains(&"300".to_string()), "Should now have 300K");
+
+        // Clean up
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("Be9");
+        }
+    }
+
+    #[test]
+    fn test_auto_loading_without_config_fails() {
+        // Clear cache to ensure clean test
+        super::clear_nuclide_cache();
+        
+        // Make sure no config exists for our test nuclide
+        {
+            let mut cfg = crate::config::CONFIG.lock().unwrap();
+            cfg.cross_sections.remove("TestNuclide");
+        }
+
+        // Create empty nuclide with name but no config
+        let mut nuclide = super::Nuclide {
+            name: Some("TestNuclide".to_string()),
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Call microscopic_cross_section - should fail with helpful error
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_err(), "Auto-loading without config should fail");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("No configuration found"), "Error should mention missing configuration");
+        assert!(error_msg.contains("TestNuclide"), "Error should mention the nuclide name");
+        assert!(error_msg.contains("Config.set_cross_sections"), "Error should suggest how to fix it");
+    }
+
+    #[test]
+    fn test_auto_loading_no_name_fails() {
+        // Create empty nuclide without name
+        let mut nuclide = super::Nuclide {
+            name: None,
+            element: None,
+            atomic_symbol: None,
+            atomic_number: None,
+            neutron_number: None,
+            mass_number: None,
+            library: None,
+            energy: None,
+            reactions: std::collections::HashMap::new(),
+            fissionable: false,
+            available_temperatures: Vec::new(),
+            loaded_temperatures: Vec::new(),
+            data_path: None,
+        };
+
+        // Call microscopic_cross_section - should fail because no name for auto-loading
+        let result = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result.is_err(), "Auto-loading without nuclide name should fail");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("no nuclide name available"), "Error should mention missing name");
     }
 }
