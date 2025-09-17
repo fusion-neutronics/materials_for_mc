@@ -434,7 +434,10 @@ fn parse_nuclide_from_json_value(
     if let Some(temps_array) = json_value.get("temperatures").and_then(|v| v.as_array()) {
         for temp_value in temps_array {
             if let Some(temp_str) = temp_value.as_str() {
-                all_temperatures.insert(temp_str.to_string());
+                // Filter out 0K temperature data - no Doppler broadening at absolute zero
+                if temp_str != "0" {
+                    all_temperatures.insert(temp_str.to_string());
+                }
             }
         }
     }
@@ -442,14 +445,20 @@ fn parse_nuclide_from_json_value(
     // Step 2: Also check the reactions object for temperatures
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
         for temp in reactions_obj.keys() {
-            all_temperatures.insert(temp.clone());
+            // Filter out 0K temperature data - no Doppler broadening at absolute zero
+            if temp != "0" {
+                all_temperatures.insert(temp.clone());
+            }
         }
     }
 
     // Step 3: Also check energy object for temperatures
     if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
         for temp in energy_obj.keys() {
-            all_temperatures.insert(temp.clone());
+            // Filter out 0K temperature data - no Doppler broadening at absolute zero
+            if temp != "0" {
+                all_temperatures.insert(temp.clone());
+            }
         }
     }
 
@@ -461,6 +470,11 @@ fn parse_nuclide_from_json_value(
     // Check if we have the format with "reactions" field
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
         for (temp, mt_reactions) in reactions_obj {
+            // Filter out 0K temperature data - no Doppler broadening at absolute zero
+            if temp == "0" {
+                continue;
+            }
+
             // Skip temperatures not in the filter if a filter is provided and non-empty
             if let Some(filter) = temps_filter {
                 if !filter.is_empty() && !filter.contains(temp) {
@@ -550,6 +564,11 @@ fn parse_nuclide_from_json_value(
         let mut energy_map = HashMap::new();
 
         for (temp, energy_arr) in energy_obj {
+            // Filter out 0K temperature data - no Doppler broadening at absolute zero
+            if temp == "0" {
+                continue;
+            }
+
             // Skip temperatures not in the filter if a filter is provided and non-empty
             if let Some(filter) = temps_filter {
                 if !filter.is_empty() && !filter.contains(temp) {
