@@ -238,7 +238,7 @@ impl Nuclide {
         // Try to load using the nuclide name and config
         let path_or_url = {
             let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            cfg.cross_sections.get(nuclide_name).cloned()
+            cfg.get_cross_section(nuclide_name)
         };
         
         if let Some(path_or_url) = path_or_url {
@@ -270,7 +270,7 @@ impl Nuclide {
     fn auto_load_additional_temperature(&mut self, nuclide_name: &str, temperature: &str) -> Result<(), Box<dyn std::error::Error>> {
         let path_or_url = {
             let cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            cfg.cross_sections.get(nuclide_name).cloned()
+            cfg.get_cross_section(nuclide_name)
         };
         
         if let Some(path_or_url) = path_or_url {
@@ -429,12 +429,20 @@ fn parse_nuclide_from_json_value(
     // First, collect ALL available temperatures from multiple locations in the JSON
     let mut all_temperatures = std::collections::HashSet::new();
 
+    // IMPORTANT: We currently do not support Doppler broadening and therefore ignore
+    // all temperature "0" (0 Kelvin) data present in JSON files. At absolute zero,
+    // nuclear cross sections would require special handling that we don't implement.
+    // This filtering occurs throughout the temperature processing below.
+
     // Step 1: Check the dedicated "temperatures" array (this is the source of truth)
     // The "temperatures" array in the JSON is the authoritative source of all available temperatures
     if let Some(temps_array) = json_value.get("temperatures").and_then(|v| v.as_array()) {
         for temp_value in temps_array {
             if let Some(temp_str) = temp_value.as_str() {
-                all_temperatures.insert(temp_str.to_string());
+                // Filter out 0K temperature data - we don't currently support Doppler broadening
+                if temp_str != "0" {
+                    all_temperatures.insert(temp_str.to_string());
+                }
             }
         }
     }
@@ -442,14 +450,20 @@ fn parse_nuclide_from_json_value(
     // Step 2: Also check the reactions object for temperatures
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
         for temp in reactions_obj.keys() {
-            all_temperatures.insert(temp.clone());
+            // Filter out 0K temperature data - we don't currently support Doppler broadening
+            if temp != "0" {
+                all_temperatures.insert(temp.clone());
+            }
         }
     }
 
     // Step 3: Also check energy object for temperatures
     if let Some(energy_obj) = json_value.get("energy").and_then(|v| v.as_object()) {
         for temp in energy_obj.keys() {
-            all_temperatures.insert(temp.clone());
+            // Filter out 0K temperature data - we don't currently support Doppler broadening
+            if temp != "0" {
+                all_temperatures.insert(temp.clone());
+            }
         }
     }
 
@@ -461,6 +475,11 @@ fn parse_nuclide_from_json_value(
     // Check if we have the format with "reactions" field
     if let Some(reactions_obj) = json_value.get("reactions").and_then(|v| v.as_object()) {
         for (temp, mt_reactions) in reactions_obj {
+            // Filter out 0K temperature data - we don't currently support Doppler broadening
+            if temp == "0" {
+                continue;
+            }
+
             // Skip temperatures not in the filter if a filter is provided and non-empty
             if let Some(filter) = temps_filter {
                 if !filter.is_empty() && !filter.contains(temp) {
@@ -550,6 +569,11 @@ fn parse_nuclide_from_json_value(
         let mut energy_map = HashMap::new();
 
         for (temp, energy_arr) in energy_obj {
+            // Filter out 0K temperature data - we don't currently support Doppler broadening
+            if temp == "0" {
+                continue;
+            }
+
             // Skip temperatures not in the filter if a filter is provided and non-empty
             if let Some(filter) = temps_filter {
                 if !filter.is_empty() && !filter.contains(temp) {
