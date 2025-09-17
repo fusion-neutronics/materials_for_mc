@@ -6,6 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
+
+
 #[cfg(feature = "pyo3")]
 /// Nuclide data container exposed to Python.
 ///
@@ -301,10 +303,11 @@ impl PyNuclide {
         None
     }
 
-    /// Get microscopic cross section data for a specific MT number and temperature.
+    /// Get microscopic cross section data for a specific reaction and temperature.
     ///
     /// Args:
-    ///     mt (int): ENDF/MT number for the reaction channel.
+    ///     reaction (Union[int, str]): Either an ENDF/MT number (int) or reaction name (str) 
+    ///         like "(n,gamma)", "(n,elastic)", "fission", etc.
     ///     temperature (Optional[str]): Temperature to use. If None, uses the single
     ///         loaded temperature if only one is available.
     ///
@@ -312,17 +315,27 @@ impl PyNuclide {
     ///     Tuple[List[float], List[float]]: A tuple of (cross_section_values, energy_grid).
     ///
     /// Raises:
-    ///     Exception: If temperature not found, MT not found, multiple temperatures loaded
+    ///     Exception: If temperature not found, reaction not found, multiple temperatures loaded
     ///         without specifying one, or no data available.
     pub fn microscopic_cross_section(
         &self,
-        mt: i32,
+        reaction: &PyAny,
         temperature: Option<&str>,
     ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-        // Convert to Nuclide and call the Rust function
         let mut nuclide: Nuclide = self.clone().into();
         
-        match nuclide.microscopic_cross_section(mt, temperature) {
+        // Handle both integer and string inputs
+        let result = if let Ok(mt_num) = reaction.extract::<i32>() {
+            nuclide.microscopic_cross_section(mt_num, temperature)
+        } else if let Ok(reaction_name) = reaction.extract::<String>() {
+            nuclide.microscopic_cross_section(reaction_name, temperature)
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "reaction must be either an integer (MT number) or string (reaction name)"
+            ));
+        };
+        
+        match result {
             Ok((cross_section, energy)) => Ok((cross_section, energy)),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())),
         }

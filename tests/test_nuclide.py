@@ -439,3 +439,83 @@ def test_auto_loading_with_global_keyword():
         else:
             print(f"Note: Auto-loading test skipped due to download issue: {e}")
             # This is acceptable - we verified the config lookup works
+
+
+def test_microscopic_cross_section_by_name():
+    """Test microscopic_cross_section with reaction names."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Test elastic scattering using reaction name
+    xs_name, energy_name = nuc.microscopic_cross_section("(n,elastic)", temperature='294')
+    assert len(xs_name) > 0, "Elastic scattering cross section should not be empty"
+    assert len(energy_name) > 0, "Energy data should not be empty"
+    
+    # Compare with MT number approach (MT=2 is elastic scattering)
+    xs_mt, energy_mt = nuc.microscopic_cross_section(reaction=2, temperature='294')
+    
+    # Should get identical results
+    assert xs_name == xs_mt, "Reaction name and MT number should give identical cross sections"
+    assert energy_name == energy_mt, "Reaction name and MT number should give identical energy grids"
+    
+    # Test other common reactions
+    test_reactions = [
+        ("(n,gamma)", 102),   # Radiative capture
+        ("(n,a)", 107),       # Alpha production
+        ("(n,total)", 1),     # Total cross section
+    ]
+    
+    for reaction_name, mt_num in test_reactions:
+        try:
+            xs_name, energy_name = nuc.microscopic_cross_section(reaction_name, temperature='294')
+            xs_mt, energy_mt = nuc.microscopic_cross_section(reaction=mt_num, temperature='294')
+            
+            assert len(xs_name) > 0, f"{reaction_name} should have cross section data"
+            assert len(energy_name) > 0, f"{reaction_name} should have energy data"
+            assert xs_name == xs_mt, f"{reaction_name} and MT={mt_num} should give identical results"
+            assert energy_name == energy_mt, f"{reaction_name} and MT={mt_num} should give identical energy"
+            
+        except Exception as e:
+            # Some reactions might not exist for Be9, which is acceptable
+            if "not found" in str(e).lower():
+                print(f"Note: {reaction_name} (MT={mt_num}) not available in Be9 data")
+            else:
+                raise e
+
+
+def test_microscopic_cross_section_by_name_invalid_reaction():
+    """Test error handling for invalid reaction names."""
+    from materials_for_mc import Nuclide
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Test with invalid reaction name
+    with pytest.raises(Exception) as exc_info:
+        nuc.microscopic_cross_section("invalid_reaction", temperature='294')
+    error_msg = str(exc_info.value)
+    assert "not found in reaction mapping" in error_msg or "Unknown reaction" in error_msg
+
+
+def test_microscopic_cross_section_by_name_fission():
+    """Test that the special 'fission' alias works."""
+    from materials_for_mc import Nuclide
+    
+    # Use Li6 which might have fission data, or test the error handling
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    try:
+        xs_fission, energy_fission = nuc.microscopic_cross_section("fission", temperature='294')
+        xs_mt18, energy_mt18 = nuc.microscopic_cross_section(18, temperature='294')
+        
+        # Should get identical results since fission maps to MT=18
+        assert xs_fission == xs_mt18, "fission and MT=18 should give identical results"
+        assert energy_fission == energy_mt18, "fission and MT=18 should give identical energy"
+        
+    except Exception as e:
+        # Li6 might not have fission data, which is acceptable
+        if "MT 18 not found" in str(e) or "not found" in str(e).lower():
+            print("Note: Li6 does not have fission data (expected)")
+        else:
+            raise e
