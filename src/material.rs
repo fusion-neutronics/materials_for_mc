@@ -542,6 +542,43 @@ impl Material {
         (energy_grid, macro_xs)
     }
 
+    /// Calculate macroscopic neutron cross sections with flexible reaction parameter.
+    ///
+    /// This method calculates the macroscopic cross section by accepting either
+    /// integer MT numbers or string reaction names (like "(n,gamma)", "fission").
+    ///
+    /// # Arguments
+    /// * `reaction` - Either an integer MT number or a string reaction name
+    ///
+    /// # Returns
+    /// * A tuple of (energy_grid, cross_section_values)
+    pub fn macroscopic_cross_section<R>(&mut self, reaction: R) -> (Vec<f64>, Vec<f64>)
+    where
+        R: Into<crate::nuclide::ReactionIdentifier>,
+    {
+        // Convert reaction identifier to MT number
+        let reaction_id: crate::nuclide::ReactionIdentifier = reaction.into();
+        let mt = match reaction_id {
+            crate::nuclide::ReactionIdentifier::Mt(mt_num) => mt_num,
+            crate::nuclide::ReactionIdentifier::Name(name) => {
+                crate::data::REACTION_MT.get(name.as_str())
+                    .copied()
+                    .unwrap_or_else(|| panic!("Unknown reaction name '{}'", name))
+            }
+        };
+
+        // Calculate macroscopic cross sections for this MT
+        let mt_filter = vec![mt];
+        let (energy_grid, xs_map) = self.calculate_macroscopic_xs(&mt_filter, false);
+        
+        // Extract the cross section for the requested MT
+        let xs_values = xs_map.get(&mt)
+            .unwrap_or_else(|| panic!("No cross section data found for MT {}", mt))
+            .clone();
+
+        (energy_grid, xs_values)
+    }
+
     /// Calculate the neutron mean free path at a given energy
     ///
     /// This method calculates the mean free path of a neutron at a specific energy
@@ -1377,6 +1414,48 @@ mod tests {
             "Material lithium MT list does not match expected. Got {:?}",
             mts
         );
+    }
+
+    #[test]
+    fn test_macroscopic_cross_section_flexible_reactions() {
+        use std::collections::HashMap;
+        let mut material = Material::new();
+        material.add_nuclide("Li6", 0.5).unwrap();
+        material.add_nuclide("Li7", 0.5).unwrap();
+        material.set_density("g/cm3", 2.0).unwrap();
+        
+        let mut nuclide_json_map = HashMap::new();
+        nuclide_json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        nuclide_json_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        material
+            .read_nuclides_from_json(&nuclide_json_map)
+            .expect("Failed to read nuclide JSON");
+
+        // Test with integer MT number
+        let (energy1, xs1) = material.macroscopic_cross_section(1);
+        assert!(!energy1.is_empty(), "Energy grid should not be empty");
+        assert!(!xs1.is_empty(), "Cross section should not be empty");
+        assert_eq!(energy1.len(), xs1.len(), "Energy and cross section arrays should have same length");
+
+        // Test with string reaction name - same reaction
+        let (energy2, xs2) = material.macroscopic_cross_section("(n,total)".to_string());
+        assert_eq!(energy1.len(), energy2.len(), "Energy grids should be same length");
+        assert_eq!(xs1.len(), xs2.len(), "Cross sections should be same length");
+        
+        // Values should be identical (or very close due to floating point)
+        for (i, (&val1, &val2)) in xs1.iter().zip(xs2.iter()).enumerate() {
+            assert!(
+                (val1 - val2).abs() < 1e-10,
+                "Cross section values should be identical at index {}: {} vs {}",
+                i, val1, val2
+            );
+        }
+
+        // Test with gamma capture reaction
+        let (energy3, xs3) = material.macroscopic_cross_section("(n,gamma)");
+        assert!(!energy3.is_empty(), "Energy grid should not be empty for (n,gamma)");
+        assert!(!xs3.is_empty(), "Cross section should not be empty for (n,gamma)");
+        assert_eq!(energy3.len(), xs3.len(), "Energy and cross section arrays should have same length for (n,gamma)");
     }
 
     #[test]
