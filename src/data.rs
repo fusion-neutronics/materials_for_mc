@@ -502,6 +502,133 @@ pub static NATURAL_ABUNDANCE: Lazy<HashMap<&'static str, f64>> = Lazy::new(|| {
     m
 });
 
+/// Mapping from element symbol to atomic number (Z).
+///
+/// Keys are chemical element symbols (e.g. "H", "Li", "Fe") and values are their
+/// atomic numbers. Used for providing atomic number information for elements.
+pub static ATOMIC_NUMBERS: Lazy<HashMap<&'static str, u32>> = Lazy::new(|| {
+    let mut numbers = HashMap::new();
+    numbers.insert("H", 1);
+    numbers.insert("He", 2);
+    numbers.insert("Li", 3);
+    numbers.insert("Be", 4);
+    numbers.insert("B", 5);
+    numbers.insert("C", 6);
+    numbers.insert("N", 7);
+    numbers.insert("O", 8);
+    numbers.insert("F", 9);
+    numbers.insert("Ne", 10);
+    numbers.insert("Na", 11);
+    numbers.insert("Mg", 12);
+    numbers.insert("Al", 13);
+    numbers.insert("Si", 14);
+    numbers.insert("P", 15);
+    numbers.insert("S", 16);
+    numbers.insert("Cl", 17);
+    numbers.insert("Ar", 18);
+    numbers.insert("K", 19);
+    numbers.insert("Ca", 20);
+    numbers.insert("Sc", 21);
+    numbers.insert("Ti", 22);
+    numbers.insert("V", 23);
+    numbers.insert("Cr", 24);
+    numbers.insert("Mn", 25);
+    numbers.insert("Fe", 26);
+    numbers.insert("Co", 27);
+    numbers.insert("Ni", 28);
+    numbers.insert("Cu", 29);
+    numbers.insert("Zn", 30);
+    numbers.insert("Ga", 31);
+    numbers.insert("Ge", 32);
+    numbers.insert("As", 33);
+    numbers.insert("Se", 34);
+    numbers.insert("Br", 35);
+    numbers.insert("Kr", 36);
+    numbers.insert("Rb", 37);
+    numbers.insert("Sr", 38);
+    numbers.insert("Y", 39);
+    numbers.insert("Zr", 40);
+    numbers.insert("Nb", 41);
+    numbers.insert("Mo", 42);
+    numbers.insert("Tc", 43);
+    numbers.insert("Ru", 44);
+    numbers.insert("Rh", 45);
+    numbers.insert("Pd", 46);
+    numbers.insert("Ag", 47);
+    numbers.insert("Cd", 48);
+    numbers.insert("In", 49);
+    numbers.insert("Sn", 50);
+    numbers.insert("Sb", 51);
+    numbers.insert("Te", 52);
+    numbers.insert("I", 53);
+    numbers.insert("Xe", 54);
+    numbers.insert("Cs", 55);
+    numbers.insert("Ba", 56);
+    numbers.insert("La", 57);
+    numbers.insert("Ce", 58);
+    numbers.insert("Pr", 59);
+    numbers.insert("Nd", 60);
+    numbers.insert("Pm", 61);
+    numbers.insert("Sm", 62);
+    numbers.insert("Eu", 63);
+    numbers.insert("Gd", 64);
+    numbers.insert("Tb", 65);
+    numbers.insert("Dy", 66);
+    numbers.insert("Ho", 67);
+    numbers.insert("Er", 68);
+    numbers.insert("Tm", 69);
+    numbers.insert("Yb", 70);
+    numbers.insert("Lu", 71);
+    numbers.insert("Hf", 72);
+    numbers.insert("Ta", 73);
+    numbers.insert("W", 74);
+    numbers.insert("Re", 75);
+    numbers.insert("Os", 76);
+    numbers.insert("Ir", 77);
+    numbers.insert("Pt", 78);
+    numbers.insert("Au", 79);
+    numbers.insert("Hg", 80);
+    numbers.insert("Tl", 81);
+    numbers.insert("Pb", 82);
+    numbers.insert("Bi", 83);
+    numbers.insert("Po", 84);
+    numbers.insert("At", 85);
+    numbers.insert("Rn", 86);
+    numbers.insert("Fr", 87);
+    numbers.insert("Ra", 88);
+    numbers.insert("Ac", 89);
+    numbers.insert("Th", 90);
+    numbers.insert("Pa", 91);
+    numbers.insert("U", 92);
+    numbers.insert("Np", 93);
+    numbers.insert("Pu", 94);
+    numbers.insert("Am", 95);
+    numbers.insert("Cm", 96);
+    numbers.insert("Bk", 97);
+    numbers.insert("Cf", 98);
+    numbers.insert("Es", 99);
+    numbers.insert("Fm", 100);
+    numbers.insert("Md", 101);
+    numbers.insert("No", 102);
+    numbers.insert("Lr", 103);
+    numbers.insert("Rf", 104);
+    numbers.insert("Db", 105);
+    numbers.insert("Sg", 106);
+    numbers.insert("Bh", 107);
+    numbers.insert("Hs", 108);
+    numbers.insert("Mt", 109);
+    numbers.insert("Ds", 110);
+    numbers.insert("Rg", 111);
+    numbers.insert("Cn", 112);
+    numbers.insert("Nh", 113);
+    numbers.insert("Fl", 114);
+    numbers.insert("Mc", 115);
+    numbers.insert("Lv", 116);
+    numbers.insert("Ts", 117);
+    numbers.insert("Og", 118);
+    numbers
+});
+
 /// Mapping from element symbol to its lowercase English name.
 ///
 /// Provided for convenience when presenting user‑facing descriptions and for
