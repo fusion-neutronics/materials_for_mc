@@ -29,22 +29,31 @@ nuclide = m4mc.Nuclide('Li6')
 The microscopic cross section for a specific reaction can then be found for and MT number with.
 
 ```python
-xs, energy = nuclide.microscopic_cross_section(1)
+xs, energy = nuclide.microscopic_cross_section(reaction="(n,total)")
 ```
 
-## Elements
-
-Elements can be made and their basic properties accessed like this
-
-```python
-element = m4mc.Nuclide('Li')
-```
-
-### Element microscopic cross section 
 
 ## Creating a Material
 
+A material can be made by adding elements or nuclides with their atom fractions.
 
+```python
+material = m4mc.Material()
+material.add_element('Li', 0.5)
+material.add_nuclide('B10', 0.5)
+```
+
+The density must also be set to complete the material.
+
+```python
+material.set_density('g/cm3', 7.1)  # kg/m3 also accepted
+```
+
+The macroscopic cross section for a specific reaction can then be found for and MT number with.
+
+```python
+xs, energy = material.macroscopic_cross_section(reaction="(n,total)")
+```
 
 ## Setting nuclear data
 

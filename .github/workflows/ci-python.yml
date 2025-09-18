@@ -68,6 +68,7 @@ jobs:
           python examples/python/materials_example.py
           python examples/python/nuclide_example.py
           python examples/python/use_in_python.py
+          python docs/test_docs_code.py docs/source/python_usage.md 
           
       - name: Run example scripts (Unix)
         if: runner.os != 'Windows'
@@ -78,6 +79,7 @@ jobs:
           python examples/python/materials_example.py
           python examples/python/nuclide_example.py
           python examples/python/use_in_python.py
+          python docs/test_docs_code.py docs/source/python_usage.md 
 
       - name: Install doc deps (only on ubuntu / py3.11)
         if: runner.os == 'Linux' && matrix.python-version == '3.11'
