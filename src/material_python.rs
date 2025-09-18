@@ -340,6 +340,33 @@ impl PyMaterial {
         };
         Ok(self.internal.sample_interacting_nuclide(energy, &mut rng))
     }
+
+    /// Calculate macroscopic cross section for a specific reaction.
+    ///
+    /// This method accepts either an integer MT number or a string reaction name
+    /// (like "(n,gamma)", "fission", etc.) and returns the macroscopic cross section
+    /// for that reaction.
+    ///
+    /// Args:
+    ///     reaction (Union[int, str]): Either an MT number or reaction name.
+    ///
+    /// Returns:
+    ///     Tuple[List[float], List[float]]: (energy_grid, cross_section_values)
+    #[pyo3(text_signature = "(self, reaction)")]
+    fn macroscopic_cross_section(&mut self, reaction: &pyo3::PyAny) -> PyResult<(Vec<f64>, Vec<f64>)> {
+        // Handle both int and str inputs
+        if let Ok(mt_number) = reaction.extract::<i32>() {
+            // Integer MT number
+            Ok(self.internal.macroscopic_cross_section(mt_number))
+        } else if let Ok(reaction_name) = reaction.extract::<String>() {
+            // String reaction name
+            Ok(self.internal.macroscopic_cross_section(reaction_name))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "reaction must be an integer MT number or a string reaction name"
+            ))
+        }
+    }
 }
 
 // Add these helper methods in a separate impl block

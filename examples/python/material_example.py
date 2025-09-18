@@ -20,5 +20,6 @@ print(mat1)
 # Demonstrate partial override: provide only one mapping (others pulled from Config)
 # mat1.read_nuclides_from_json({"Li7": "tests/Li7.json"})
 
-xs, energy = mat1.calculate_macroscopic_xs()
+xs, energy = mat1.macroscopic_cross_section(reaction='(n,gamma)')
+xs, energy = mat1.macroscopic_cross_section(reaction=1)
 print(xs)

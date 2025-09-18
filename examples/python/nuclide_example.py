@@ -10,10 +10,12 @@ m4mc.Config.set_cross_sections({
 })
 
 nuc1 = m4mc.Nuclide('Li6')
+
 print(nuc1)
 
-# nuc1.read_nuclide_from_json()
+
+# nuc1.read_nuclide_from_json()  # now automatic
 
 
-micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3, temperature='294')
-micro_mt_3 , energy = nuc1.microscopic_cross_section(mt=3)
+micro_n_gamma , energy = nuc1.microscopic_cross_section(reaction='(n,gamma)', temperature='294')
+micro_mt_3 , energy = nuc1.microscopic_cross_section(reaction=3)

@@ -14,6 +14,31 @@ use std::sync::{Arc, Mutex};
 static GLOBAL_NUCLIDE_CACHE: Lazy<Mutex<HashMap<String, Arc<Nuclide>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Enum to represent either an MT number or reaction name for flexible reaction identification
+#[derive(Debug, Clone)]
+pub enum ReactionIdentifier {
+    Mt(i32),
+    Name(String),
+}
+
+impl From<i32> for ReactionIdentifier {
+    fn from(mt: i32) -> Self {
+        ReactionIdentifier::Mt(mt)
+    }
+}
+
+impl From<String> for ReactionIdentifier {
+    fn from(name: String) -> Self {
+        ReactionIdentifier::Name(name)
+    }
+}
+
+impl From<&str> for ReactionIdentifier {
+    fn from(name: &str) -> Self {
+        ReactionIdentifier::Name(name.to_string())
+    }
+}
+
 /// Clear the global nuclide cache (used by tests and Python to ensure deterministic selective temperature behavior)
 #[allow(dead_code)]
 pub fn clear_nuclide_cache() {
@@ -190,15 +215,32 @@ impl Nuclide {
         }
     }
 
-    /// Get microscopic cross section data for a specific MT number and temperature.
+    /// Get microscopic cross section data for a specific reaction and temperature.
     /// Returns a tuple of (cross_section_values, energy_grid).
     /// If temperature is None, uses the single loaded temperature if only one exists.
     /// Automatically loads data if not already loaded, using the nuclide name and config.
-    pub fn microscopic_cross_section(
+    /// 
+    /// # Arguments
+    /// * `reaction` - Either an MT number (i32) or reaction name (String/&str) like "(n,gamma)" or "fission"
+    /// * `temperature` - Optional temperature string
+    pub fn microscopic_cross_section<R>(
         &mut self,
-        mt: i32,
+        reaction: R,
         temperature: Option<&str>,
-    ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
+    ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> 
+    where
+        R: Into<ReactionIdentifier>,
+    {
+        // Convert the reaction parameter to an MT number
+        let mt = match reaction.into() {
+            ReactionIdentifier::Mt(mt_num) => mt_num,
+            ReactionIdentifier::Name(name) => {
+                // Use the REACTION_MT mapping to convert string to MT number
+                crate::data::REACTION_MT.get(name.as_str())
+                    .copied()
+                    .ok_or_else(|| format!("Unknown reaction name '{}'. Available reactions can be found in REACTION_MT mapping.", name))?
+            }
+        };
         // Check if we need to load data automatically
         if self.loaded_temperatures.is_empty() {
             // No data loaded yet - try to load it automatically
@@ -1686,5 +1728,82 @@ mod tests {
             assert!(url.ends_with("Li6.json"), "Expanded URL should end with nuclide name and .json");
             assert_eq!(url, "https://raw.githubusercontent.com/fusion-neutronics/cross_section_data_fendl_3.2c/refs/heads/main/fendl3.2c_data/Li6.json");
         }
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_string_reactions() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test with MT number (existing functionality)
+        let result_mt = nuclide.microscopic_cross_section(2, Some("294"));
+        assert!(result_mt.is_ok(), "Should work with MT number");
+        let (xs_mt, energy_mt) = result_mt.unwrap();
+
+        // Test with reaction name string
+        let result_str = nuclide.microscopic_cross_section("(n,elastic)", Some("294"));
+        assert!(result_str.is_ok(), "Should work with reaction name string");
+        let (xs_str, energy_str) = result_str.unwrap();
+
+        // Results should be identical
+        assert_eq!(xs_mt, xs_str, "Cross section data should be identical for MT 2 and '(n,elastic)'");
+        assert_eq!(energy_mt, energy_str, "Energy data should be identical for MT 2 and '(n,elastic)'");
+
+        // Test other common reaction strings
+        let test_cases = vec![
+            ("(n,gamma)", 102),
+            ("(n,p)", 103),
+            ("(n,a)", 107),
+        ];
+
+        for (reaction_name, expected_mt) in test_cases {
+            let result_str = nuclide.microscopic_cross_section(reaction_name, Some("294"));
+            let result_mt = nuclide.microscopic_cross_section(expected_mt, Some("294"));
+            
+            // If both succeed, they should give identical results
+            if result_str.is_ok() && result_mt.is_ok() {
+                let (xs_str, energy_str) = result_str.unwrap();
+                let (xs_mt, energy_mt) = result_mt.unwrap();
+                assert_eq!(xs_str, xs_mt, "Cross section should match for {} and MT {}", reaction_name, expected_mt);
+                assert_eq!(energy_str, energy_mt, "Energy should match for {} and MT {}", reaction_name, expected_mt);
+            }
+            // If one fails, both should fail (reaction not available in this nuclide)
+            else {
+                assert_eq!(result_str.is_ok(), result_mt.is_ok(), 
+                          "String and MT results should both succeed or both fail for {} vs MT {}", 
+                          reaction_name, expected_mt);
+            }
+        }
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_invalid_reaction_string() {
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test with invalid reaction name
+        let result = nuclide.microscopic_cross_section("(n,invalid)", Some("294"));
+        assert!(result.is_err(), "Should fail for invalid reaction name");
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Unknown reaction name"), "Error should mention unknown reaction name");
+        assert!(error_msg.contains("(n,invalid)"), "Error should include the invalid reaction name");
+        assert!(error_msg.contains("REACTION_MT"), "Error should mention where to find available reactions");
+    }
+
+    #[test]
+    fn test_microscopic_cross_section_fission_alias() {
+        // Note: Be9 is not fissionable, so we'll just test the string recognition
+        // The fission alias should map to MT 18
+        let mut nuclide = super::read_nuclide_from_json("tests/Be9.json", None)
+            .expect("Failed to load Be9.json");
+
+        // Test that "fission" string is recognized (even though Be9 doesn't have fission reactions)
+        let result = nuclide.microscopic_cross_section("fission", Some("294"));
+        
+        // Should fail because Be9 doesn't have MT 18, but the error should be about missing MT, not unknown reaction
+        assert!(result.is_err(), "Should fail because Be9 doesn't have fission reactions");
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("MT 18 not found"), "Error should be about missing MT 18, not unknown reaction name");
     }
 }
