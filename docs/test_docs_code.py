@@ -10,6 +10,17 @@ import sys
 import traceback
 from pathlib import Path
 import pytest
+import os
+
+# Ensure stdout can handle ASCII output on all platforms
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except (AttributeError, OSError):
+        pass  # fallback gracefully
+        
+# Alternative: Set environment variable for better Windows compatibility
+os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 def extract_python_code_blocks(markdown_content):
     """Extract Python code blocks from markdown content."""
@@ -33,10 +44,10 @@ def run_code_blocks(code_blocks, context=None):
         try:
             # Execute the code in the shared context
             exec(code, context)
-            print("✓ Success")
+            print("SUCCESS")
             results.append(True)
         except Exception as e:
-            print(f"✗ Error: {e}")
+            print(f"ERROR: {e}")
             traceback.print_exc()
             results.append(False)
     
@@ -75,12 +86,12 @@ def test_markdown_file():
     print("Summary:")
     successful = sum(results)
     total = len(results)
-    print(f"✓ {successful}/{total} code blocks ran successfully")
+    print(f"PASSED: {successful}/{total} code blocks ran successfully")
     
     if successful == total:
-        print("🎉 All code blocks passed!")
+        print("ALL TESTS PASSED!")
     else:
-        print("❌ Some code blocks failed")
+        print("SOME TESTS FAILED")
         # Fail the test if any code blocks failed
         assert False, f"Only {successful}/{total} code blocks passed"
 
@@ -113,13 +124,13 @@ if __name__ == "__main__":
         print("Summary:")
         successful = sum(results)
         total = len(results)
-        print(f"✓ {successful}/{total} code blocks ran successfully")
+        print(f"PASSED: {successful}/{total} code blocks ran successfully")
         
         if successful == total:
-            print("🎉 All code blocks passed!")
+            print("ALL TESTS PASSED!")
             sys.exit(0)
         else:
-            print("❌ Some code blocks failed")
+            print("SOME TESTS FAILED")
             sys.exit(1)
     else:
         print("Usage: python test_docs_code.py <markdown_file>")
