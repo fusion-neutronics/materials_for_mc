@@ -1,0 +1,73 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build_docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Create environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install virtualenv
+          python -m virtualenv venv
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          source venv/bin/activate
+          python -m pip install pytest maturin numpy
+          maturin develop --features pyo3
+
+      - name: Test documentation code blocks
+        shell: bash
+        run: |
+          source venv/bin/activate
+          python docs/test_docs_code.py docs/source/python_usage.md
+
+      - name: Install documentation dependencies
+        shell: bash
+        run: |
+          source venv/bin/activate
+          python -m pip install -r docs/requirements.txt
+
+      - name: Build documentation
+        shell: bash
+        run: |
+          source venv/bin/activate
+          sphinx-build -b html docs/source docs/build/html
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: docs/build/html
+
+      - name: Deploy docs to GitHub Pages
+        if: github.event_name == 'release'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/build/html
+          # with next release of actions-gh-pages
+          # issue to allow force_orphan will be fixed
+          # https://github.com/peaceiris/actions-gh-pages/issues/455
+          # force_orphan: true
+          keep_files: true
