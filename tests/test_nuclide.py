@@ -801,3 +801,95 @@ def test_sample_reaction_return_type():
         assert reaction is None, "Return should be None or dict"
     
     print("Return type test completed")
+
+
+def test_nuclide_different_data_sources():
+    """Test that loading the same nuclide from different sources gives different results."""
+    
+    # Load Li7 from different sources
+    li7_tendl = Nuclide("Li7")
+    li7_tendl.read_nuclide_from_json("tendl-21")
+    
+    li7_fendl = Nuclide("Li7")
+    li7_fendl.read_nuclide_from_json("fendl-3.2c")
+    
+    # Get cross sections from both
+    xs_tendl, energy_tendl = li7_tendl.microscopic_cross_section("(n,gamma)")
+    xs_fendl, energy_fendl = li7_fendl.microscopic_cross_section("(n,gamma)")
+    
+    # Should have different data
+    data_different = (len(xs_tendl) != len(xs_fendl) or 
+                     any(abs(a - b) > 1e-10 for a, b in zip(xs_tendl, xs_fendl)))
+    
+    assert data_different, "TENDL and FENDL data should be different"
+    print(f"TENDL Li7: {len(xs_tendl)} points, FENDL Li7: {len(xs_fendl)} points")
+
+
+def test_nuclide_file_vs_keyword_sources():
+    """Test that file paths and keywords can coexist."""
+    
+    # Load Li6 from local file
+    li6_file = Nuclide("Li6")
+    li6_file.read_nuclide_from_json("tests/Li6.json")
+    
+    # Load Li7 from keyword
+    li7_keyword = Nuclide("Li7")
+    li7_keyword.read_nuclide_from_json("tendl-21")
+    
+    assert li6_file.name == "Li6"
+    assert li7_keyword.name == "Li7"
+    
+    # Verify we can load cross sections from both
+    xs_file, _ = li6_file.microscopic_cross_section("(n,gamma)")
+    xs_keyword, _ = li7_keyword.microscopic_cross_section("(n,gamma)")
+    
+    assert len(xs_file) > 0 and len(xs_keyword) > 0, "Both should have cross section data"
+
+
+def test_nuclide_cache_respects_data_source_boundaries():
+    """Test that the cache properly separates different data sources."""
+    
+    # Load Li7 from TENDL first time
+    li7_tendl_1 = Nuclide("Li7")
+    li7_tendl_1.read_nuclide_from_json("tendl-21")
+    
+    # Load Li7 from FENDL
+    li7_fendl = Nuclide("Li7")
+    li7_fendl.read_nuclide_from_json("fendl-3.2c")
+    
+    # Load Li7 from TENDL again (should use cache)
+    li7_tendl_2 = Nuclide("Li7")
+    li7_tendl_2.read_nuclide_from_json("tendl-21")
+    
+    # Get cross sections
+    xs_tendl_1, _ = li7_tendl_1.microscopic_cross_section("(n,gamma)")
+    xs_fendl, _ = li7_fendl.microscopic_cross_section("(n,gamma)")
+    xs_tendl_2, _ = li7_tendl_2.microscopic_cross_section("(n,gamma)")
+    
+    # TENDL loads should be identical (cache working)
+    assert xs_tendl_1 == xs_tendl_2, "TENDL loads should be identical (cache working)"
+    
+    # TENDL vs FENDL should be different (different data sources)
+    tendl_vs_fendl_different = (len(xs_tendl_1) != len(xs_fendl) or 
+                               any(abs(a - b) > 1e-10 for a, b in zip(xs_tendl_1, xs_fendl)))
+    assert tendl_vs_fendl_different, "TENDL and FENDL should have different data"
+
+
+def test_nuclide_path_normalization():
+    """Test that different path formats for same file give same results."""
+    import os
+    
+    # Load Li6 with relative path
+    li6_rel = Nuclide("Li6")
+    li6_rel.read_nuclide_from_json("tests/Li6.json")
+    
+    # Load Li6 with absolute path
+    li6_abs = Nuclide("Li6")
+    abs_path = os.path.abspath("tests/Li6.json")
+    li6_abs.read_nuclide_from_json(abs_path)
+    
+    # Should give identical results (same file)
+    xs_rel, _ = li6_rel.microscopic_cross_section("(n,gamma)")
+    xs_abs, _ = li6_abs.microscopic_cross_section("(n,gamma)")
+    
+    assert xs_rel == xs_abs, "Relative and absolute paths to same file should give identical results"

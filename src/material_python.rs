@@ -351,7 +351,7 @@ impl PyMaterial {
     ///     reaction (Union[int, str]): Either an MT number or reaction name.
     ///
     /// Returns:
-    ///     Tuple[List[float], List[float]]: (energy_grid, cross_section_values)
+    ///     Tuple[List[float], List[float]]: (cross_section_values, energy_grid)
     #[pyo3(text_signature = "(self, reaction)")]
     fn macroscopic_cross_section(&mut self, reaction: &pyo3::PyAny) -> PyResult<(Vec<f64>, Vec<f64>)> {
         // Handle both int and str inputs
