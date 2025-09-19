@@ -109,7 +109,7 @@ if importlib.util.find_spec('pydata_sphinx_theme') is not None:
 else:
     html_theme = 'classic'
 
-html_title = 'materials_for_mc API'
+html_title = 'Materials for MC'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

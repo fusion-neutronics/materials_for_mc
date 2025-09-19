@@ -1,6 +1,6 @@
-# Materials For MC Documentation
+# Materials for MC Documentation
 
-Materials For MC is a package for accessing nuclear cross section data
+Materials for MC is a package for accessing nuclear cross section data
 
 It provides tools for defining elements, nuclides, and materials then accessing cross sections and energy grids, 
 
