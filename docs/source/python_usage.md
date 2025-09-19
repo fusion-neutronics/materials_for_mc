@@ -85,31 +85,31 @@ If the file is found then it will be used and if not the JSON file will be downl
 
 ### Config with JSON paths
 
-It is also possible to download JSON files from nuclear data repos [fendl-3.2](https://github.com/fusion-neutronics/cross_section_data_fendl_3.2c) and [tendl-21](https://github.com/fusion-neutronics/cross_section_data_tendl_21).Once the JSON files are saved locally then the path to these files can be used to configure the nuclear data.
+It is also possible to download JSON files from nuclear data repos [fendl-3.2](https://github.com/fusion-neutronics/cross_section_data_fendl_3.2c) and [tendl-21](https://github.com/fusion-neutronics/cross_section_data_tendl_21).Once the JSON files are saved locally then the path to these files can be used to configure the nuclear data. Replace the ```tests``` dir to the path to the downloaded JSON files.
 
 ```python
 m4mc.Config.set_cross_sections({
-    "Be9": "path-to-downloaded-repo/Be9.json",
-    "Fe54": "path-to-downloaded-repo/Fe54.json",
-    "Fe56": "path-to-downloaded-repo/Fe56.json",
-    "Fe57": "path-to-downloaded-repo/Fe57.json",
-    "Fe58": "path-to-downloaded-repo/Fe58.json",
-    "Li6": "path-to-downloaded-repo/Li6.json",
-    "Li7": "path-to-downloaded-repo/Li7.json",
+    "Be9": "tests/Be9.json",
+    "Fe54": "tests/Fe54.json",
+    "Fe56": "tests/Fe56.json",
+    "Fe57": "tests/Fe57.json",
+    "Fe58": "tests/Fe58.json",
+    "Li6": "tests/Li6.json",
+    "Li7": "tests/Li7.json",
 })
 ```
 
 ### Config with JSON paths and specific libraries
 
-It is also possible to mix different sources when configuring the nuclear data sources. In this example we use tendl-21 for some nuclides, file paths for others and fendl-3.2c for others.
+It is also possible to mix different sources when configuring the nuclear data sources. In this example we use tendl-21 for some nuclides, file paths for others and fendl-3.2c for others. Replace the ```tests``` dir to the path to the downloaded JSON files.
 
 ```python
 m4mc.Config.set_cross_sections({
     "Be9": "tendl-21",
     "Fe54": "tendl-21",
-    "Fe56": "path-to-downloaded-repo/Fe56.json",
-    "Fe57": "path-to-downloaded-repo/Fe57.json",
-    "Fe58": "path-to-downloaded-repo/Fe58.json",
+    "Fe56": "tests/Fe56.json",
+    "Fe57": "tests/Fe57.json",
+    "Fe58": "tests/Fe58.json",
     "Li6": "fendl-3.2c/Li6.json",
     "Li7": "fendl-3.2c/Li7.json",
 })
