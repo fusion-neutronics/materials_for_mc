@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Python Usage &#8212; materials_for_mc API</title>
+    <title>Python Usage &#8212; Materials for MC</title>
   
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">materials_for_mc API</p>
+    <p class="title logo__title">Materials for MC</p>
   
 </a></div>
     
@@ -155,7 +155,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="webassembly.html">
-    WebAssembly Support
+    WebAssembly
   </a>
 </li>
 
@@ -295,7 +295,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="webassembly.html">
-    WebAssembly Support
+    WebAssembly
   </a>
 </li>
 
@@ -433,9 +433,8 @@ This is the simplest option other config options are covered later.</p>
 </pre></div>
 </div>
 </section>
-</section>
 <section id="create-a-nuclides">
-<h2>Create a nuclides<a class="headerlink" href="#create-a-nuclides" title="Link to this heading">#</a></h2>
+<h3>Create a nuclides<a class="headerlink" href="#create-a-nuclides" title="Link to this heading">#</a></h3>
 <p>Nuclides can be made and their basic properties accessed like this</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">nuclide</span> <span class="o">=</span> <span class="n">m4mc</span><span class="o">.</span><span class="n">Nuclide</span><span class="p">(</span><span class="s1">&#39;Li6&#39;</span><span class="p">)</span>
 </pre></div>
@@ -446,7 +445,7 @@ This is the simplest option other config options are covered later.</p>
 </div>
 </section>
 <section id="creating-a-material">
-<h2>Creating a Material<a class="headerlink" href="#creating-a-material" title="Link to this heading">#</a></h2>
+<h3>Creating a Material<a class="headerlink" href="#creating-a-material" title="Link to this heading">#</a></h3>
 <p>A material can be made by adding elements or nuclides with their atom fractions.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">material</span> <span class="o">=</span> <span class="n">m4mc</span><span class="o">.</span><span class="n">Material</span><span class="p">()</span>
 <span class="n">material</span><span class="o">.</span><span class="n">add_element</span><span class="p">(</span><span class="s1">&#39;Li&#39;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
@@ -461,6 +460,7 @@ This is the simplest option other config options are covered later.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">xs</span><span class="p">,</span> <span class="n">energy</span> <span class="o">=</span> <span class="n">material</span><span class="o">.</span><span class="n">macroscopic_cross_section</span><span class="p">(</span><span class="n">reaction</span><span class="o">=</span><span class="s2">&quot;(n,total)&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
 </section>
 <section id="setting-nuclear-data">
 <h2>Setting nuclear data<a class="headerlink" href="#setting-nuclear-data" title="Link to this heading">#</a></h2>
@@ -639,10 +639,10 @@ The interacting nuclide can be sampled for a given neutron energy using <code cl
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-start-guide">Quick start guide</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#import">Import</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#config-the-nuclear-data">Config the nuclear data</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#create-a-nuclides">Create a nuclides</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#creating-a-material">Creating a Material</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-a-nuclides">Create a nuclides</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#creating-a-material">Creating a Material</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setting-nuclear-data">Setting nuclear data</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#config-specific-libraries">Config specific libraries</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#config-with-json-paths">Config with JSON paths</a></li>

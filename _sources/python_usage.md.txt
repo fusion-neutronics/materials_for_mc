@@ -28,7 +28,7 @@ This is the simplest option other config options are covered later.
 m4mc.Config.set_cross_sections("fendl-3.2c")  # tendl-21 is another option
 ```
 
-## Create a nuclides
+### Create a nuclides
 
 Nuclides can be made and their basic properties accessed like this
 
@@ -42,7 +42,7 @@ The microscopic cross section for a specific reaction can then be found for and 
 xs, energy = nuclide.microscopic_cross_section(reaction="(n,gamma)")
 ```
 
-## Creating a Material
+### Creating a Material
 
 A material can be made by adding elements or nuclides with their atom fractions.
 
@@ -63,10 +63,6 @@ The macroscopic cross section for a specific reaction can then be found for and 
 ```python
 xs, energy = material.macroscopic_cross_section(reaction="(n,total)")
 ```
-
-
-
-
 
 ## Setting nuclear data
 
