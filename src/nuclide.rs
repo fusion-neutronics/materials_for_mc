@@ -869,20 +869,16 @@ pub fn get_or_load_nuclide(
         )
     })?;
     
-    // Create cache key that includes both nuclide name and data source
-    // For file paths, normalize to canonical form for better cache efficiency
-    let normalized_source = if crate::url_cache::is_keyword(&path_or_url) || crate::url_cache::is_url(&path_or_url) {
-        // Keywords and URLs are used as-is
-        path_or_url.clone()
-    } else {
-        // File paths are normalized to canonical form
-        match std::fs::canonicalize(&path_or_url) {
-            Ok(canonical) => canonical.to_string_lossy().to_string(),
-            Err(_) => {
-                // If canonicalization fails (e.g., file doesn't exist yet), use original path
-                // This can happen during URL downloads where the path doesn't exist until resolved
-                path_or_url.clone()
-            }
+    // Resolve URL/keyword to actual path first to create consistent cache keys
+    let resolved_path = crate::url_cache::resolve_path_or_url(&path_or_url, nuclide_name)?;
+    
+    // Create cache key using the resolved path for consistency
+    // This ensures "tendl-21" and the actual downloaded path use the same cache entry
+    let normalized_source = match std::fs::canonicalize(&resolved_path) {
+        Ok(canonical) => canonical.to_string_lossy().to_string(),
+        Err(_) => {
+            // If canonicalization fails, use the resolved path as-is
+            resolved_path.to_string_lossy().to_string()
         }
     };
     let cache_key = format!("{}@{}", nuclide_name, normalized_source);
@@ -915,11 +911,7 @@ pub fn get_or_load_nuclide(
         }
     }
     // Load directly with temperature filtering
-    // If the mapping is missing but nuclide_name is a keyword, set config mapping
-    // (path_or_url already determined above for cache key)
-
-    // Resolve URL or local path - download and cache if it's a URL
-    let resolved_path = crate::url_cache::resolve_path_or_url(&path_or_url, nuclide_name)?;
+    // (resolved_path already determined above for cache key)
 
     // Load the JSON file once
     let file = File::open(&resolved_path)?;
@@ -1732,6 +1724,43 @@ mod tests {
         assert!(error_msg.contains("No configuration found"), "Error should mention missing configuration");
         assert!(error_msg.contains("TestNuclide"), "Error should mention the nuclide name");
         assert!(error_msg.contains("Config.set_cross_sections"), "Error should suggest how to fix it");
+    }
+
+    #[test]
+    fn test_cache_optimization_keyword_vs_path() {
+        // Test that accessing the same file via keyword vs direct path uses same cache entry
+        use std::collections::HashMap;
+        
+        super::clear_nuclide_cache();
+
+        // Load Li6 from local file first
+        let mut li6_map = HashMap::new();
+        li6_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        let _first = super::get_or_load_nuclide("Li6", &li6_map, None)
+            .expect("Initial file load failed");
+
+        // Now try to load the same file by its absolute path
+        let absolute_path = std::fs::canonicalize("tests/Li6.json").unwrap();
+        let mut abs_map = HashMap::new();
+        abs_map.insert("Li6".to_string(), absolute_path.to_string_lossy().to_string());
+        let _second = super::get_or_load_nuclide("Li6", &abs_map, None)
+            .expect("Absolute path load failed");
+
+        // Verify both entries use the same cache key (should only be one entry)
+        {
+            let cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner()
+            };
+            
+            // Should only have one cache entry since both resolve to the same file
+            let li6_entries: Vec<_> = cache.keys()
+                .filter(|k| k.starts_with("Li6@") && k.contains("Li6.json"))
+                .collect();
+            
+            assert_eq!(li6_entries.len(), 1, 
+                "Expected exactly 1 cache entry for Li6, found: {:?}", li6_entries);
+        }
     }
 
     #[test]
