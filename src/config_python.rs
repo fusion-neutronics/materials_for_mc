@@ -80,4 +80,15 @@ impl PyConfig {
         });
         config.get_cross_section(nuclide)
     }
+
+    /// Clear all cross section mappings and default
+    #[classmethod]
+    #[pyo3(text_signature = "(cls)")]
+    fn clear(_cls: &PyType) -> PyResult<()> {
+        let mut config = CONFIG.lock().unwrap_or_else(|poisoned| {
+            poisoned.into_inner()
+        });
+        config.clear();
+        Ok(())
+    }
 }

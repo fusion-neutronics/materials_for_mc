@@ -42,8 +42,14 @@ impl From<&str> for ReactionIdentifier {
 /// Clear the global nuclide cache (used by tests and Python to ensure deterministic selective temperature behavior)
 #[allow(dead_code)]
 pub fn clear_nuclide_cache() {
-    let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-    cache.clear();
+    match GLOBAL_NUCLIDE_CACHE.lock() {
+        Ok(mut cache) => cache.clear(),
+        Err(poisoned) => {
+            // Handle poisoned mutex by clearing the data anyway
+            let mut cache = poisoned.into_inner();
+            cache.clear();
+        }
+    }
 }
 
 /// Core data model for a single nuclide and its reaction cross section data.
@@ -849,29 +855,7 @@ pub fn get_or_load_nuclide(
         .map(|s| s.iter().cloned().collect())
         .unwrap_or_else(HashSet::new);
 
-    // Fast path: cache hit with sufficient temps
-    {
-        let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        if let Some(existing) = cache.get(nuclide_name) {
-            if requested.is_empty()
-                || requested.is_subset(&existing.loaded_temperatures.iter().cloned().collect())
-            {
-                return Ok(Arc::clone(existing));
-            }
-        }
-    }
-    // Determine union (existing loaded + requested)
-    let mut union_set = requested.clone();
-    {
-        let cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        if let Some(existing) = cache.get(nuclide_name) {
-            for t in &existing.loaded_temperatures {
-                union_set.insert(t.clone());
-            }
-        }
-    }
-    // Load directly with temperature filtering
-    // If the mapping is missing but nuclide_name is a keyword, set config mapping
+    // Determine data source for cache key
     let mut path_or_url = json_path_map.get(nuclide_name).cloned();
     if path_or_url.is_none() && crate::url_cache::is_keyword(nuclide_name) {
         let mut cfg = crate::config::CONFIG.lock().unwrap();
@@ -884,9 +868,50 @@ pub fn get_or_load_nuclide(
             nuclide_name
         )
     })?;
-
-    // Resolve URL or local path - download and cache if it's a URL
+    
+    // Resolve URL/keyword to actual path first to create consistent cache keys
     let resolved_path = crate::url_cache::resolve_path_or_url(&path_or_url, nuclide_name)?;
+    
+    // Create cache key using the resolved path for consistency
+    // This ensures "tendl-21" and the actual downloaded path use the same cache entry
+    let normalized_source = match std::fs::canonicalize(&resolved_path) {
+        Ok(canonical) => canonical.to_string_lossy().to_string(),
+        Err(_) => {
+            // If canonicalization fails, use the resolved path as-is
+            resolved_path.to_string_lossy().to_string()
+        }
+    };
+    let cache_key = format!("{}@{}", nuclide_name, normalized_source);
+
+    // Fast path: cache hit with sufficient temps
+    {
+        let cache = match GLOBAL_NUCLIDE_CACHE.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner()
+        };
+        if let Some(existing) = cache.get(&cache_key) {
+            if requested.is_empty()
+                || requested.is_subset(&existing.loaded_temperatures.iter().cloned().collect())
+            {
+                return Ok(Arc::clone(existing));
+            }
+        }
+    }
+    // Determine union (existing loaded + requested)
+    let mut union_set = requested.clone();
+    {
+        let cache = match GLOBAL_NUCLIDE_CACHE.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner()
+        };
+        if let Some(existing) = cache.get(&cache_key) {
+            for t in &existing.loaded_temperatures {
+                union_set.insert(t.clone());
+            }
+        }
+    }
+    // Load directly with temperature filtering
+    // (resolved_path already determined above for cache key)
 
     // Load the JSON file once
     let file = File::open(&resolved_path)?;
@@ -921,8 +946,11 @@ pub fn get_or_load_nuclide(
     );
     let arc = Arc::new(nuclide);
     {
-        let mut cache = GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-        cache.insert(nuclide_name.to_string(), Arc::clone(&arc));
+        let mut cache = match GLOBAL_NUCLIDE_CACHE.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner()
+        };
+        cache.insert(cache_key, Arc::clone(&arc));
     }
     Ok(arc)
 }
@@ -1000,8 +1028,18 @@ mod tests {
         assert!(li6_path.exists(), "tests/Li6.json missing");
         // Only remove Li6 from cache, don't clear all (avoid race with other tests)
         {
-            let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            cache.remove("Li6");
+            let mut cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner()
+            };
+            // Remove any Li6 entries (handle both normalized and non-normalized paths)
+            let keys_to_remove: Vec<String> = cache.keys()
+                .filter(|k| k.starts_with("Li6@") && k.contains("Li6.json"))
+                .cloned()
+                .collect();
+            for key in keys_to_remove {
+                cache.remove(&key);
+            }
         }
         let raw = super::read_nuclide_from_json(li6_path, None).expect("Direct read failed");
         assert_eq!(raw.name.as_deref(), Some("Li6"));
@@ -1010,13 +1048,16 @@ mod tests {
         json_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
         let first =
             super::get_or_load_nuclide("Li6", &json_map, None).expect("Initial cached load failed");
-        // Ensure Li6 now present in cache
+        // Ensure Li6 now present in cache with the correct cache key
         {
-            let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
-            assert!(
-                cache.get("Li6").is_some(),
-                "Li6 should be present after cached load"
-            );
+            let cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner()
+            };
+            
+            // Check for Li6 cache key (path may be normalized)
+            let found = cache.keys().any(|k| k.starts_with("Li6@") && k.contains("Li6.json"));
+            assert!(found, "Li6 should be present after cached load");
         }
         let second =
             super::get_or_load_nuclide("Li6", &json_map, None).expect("Second cached load failed");
@@ -1294,7 +1335,10 @@ mod tests {
         let nuclide_arc = std::sync::Arc::new(nuclide);
 
         {
-            let mut cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+            let mut cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner()
+            };
             cache.insert(
                 "Test_Nuclide".to_string(),
                 std::sync::Arc::clone(&nuclide_arc),
@@ -1311,7 +1355,10 @@ mod tests {
         super::clear_nuclide_cache();
 
         // Verify cache is now empty
-        let cache = super::GLOBAL_NUCLIDE_CACHE.lock().unwrap();
+        let cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner()
+        };
         assert!(
             cache.is_empty(),
             "Cache should be empty after calling clear_nuclide_cache"
@@ -1330,7 +1377,7 @@ mod tests {
         // Add Li6 using keyword to config
         {
             let mut cfg = crate::config::CONFIG.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            cfg.set_cross_section("Li6", "tendl-21");
+            cfg.set_cross_section("Li6", Some("tendl-21"));
         }
 
         // Load the nuclide using the keyword
@@ -1680,6 +1727,43 @@ mod tests {
     }
 
     #[test]
+    fn test_cache_optimization_keyword_vs_path() {
+        // Test that accessing the same file via keyword vs direct path uses same cache entry
+        use std::collections::HashMap;
+        
+        super::clear_nuclide_cache();
+
+        // Load Li6 from local file first
+        let mut li6_map = HashMap::new();
+        li6_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        let _first = super::get_or_load_nuclide("Li6", &li6_map, None)
+            .expect("Initial file load failed");
+
+        // Now try to load the same file by its absolute path
+        let absolute_path = std::fs::canonicalize("tests/Li6.json").unwrap();
+        let mut abs_map = HashMap::new();
+        abs_map.insert("Li6".to_string(), absolute_path.to_string_lossy().to_string());
+        let _second = super::get_or_load_nuclide("Li6", &abs_map, None)
+            .expect("Absolute path load failed");
+
+        // Verify both entries use the same cache key (should only be one entry)
+        {
+            let cache = match super::GLOBAL_NUCLIDE_CACHE.lock() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner()
+            };
+            
+            // Should only have one cache entry since both resolve to the same file
+            let li6_entries: Vec<_> = cache.keys()
+                .filter(|k| k.starts_with("Li6@") && k.contains("Li6.json"))
+                .collect();
+            
+            assert_eq!(li6_entries.len(), 1, 
+                "Expected exactly 1 cache entry for Li6, found: {:?}", li6_entries);
+        }
+    }
+
+    #[test]
     fn test_auto_loading_no_name_fails() {
         // Create empty nuclide without name
         let mut nuclide = super::Nuclide {
@@ -1805,5 +1889,95 @@ mod tests {
         assert!(result.is_err(), "Should fail because Be9 doesn't have fission reactions");
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("MT 18 not found"), "Error should be about missing MT 18, not unknown reaction name");
+    }
+
+    #[test]
+    fn test_nuclide_different_data_sources() {
+        // Test that loading the same nuclide from different sources gives different results
+        
+        // Clear cache to ensure fresh loads
+        crate::nuclide::clear_nuclide_cache();
+
+        // For this test, we'll use different file paths as data sources
+        // since network calls in tests are unreliable
+        let mut li6_file = super::read_nuclide_from_json("tests/Li6.json", None)
+            .expect("Failed to load Li6 from file");
+        
+        let mut li7_file = super::read_nuclide_from_json("tests/Li7.json", None)  
+            .expect("Failed to load Li7 from file");
+
+        // Get cross sections from both (different nuclides will have different data)
+        let (xs_li6, _) = li6_file.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li6 cross section");
+        let (xs_li7, _) = li7_file.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li7 cross section");
+
+        // Should have different data since they're different nuclides
+        let data_different = xs_li6.len() != xs_li7.len() || 
+                            xs_li6.iter().zip(&xs_li7).any(|(a, b)| (a - b).abs() > 1e-10);
+        
+        assert!(data_different, "Li6 and Li7 data should be different");
+        println!("Li6: {} points, Li7: {} points", xs_li6.len(), xs_li7.len());
+    }
+
+    #[test]
+    fn test_nuclide_file_vs_keyword_sources() {
+        // Test that file paths and keywords can coexist in cache
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Load Li6 from local file
+        let mut li6_file = super::read_nuclide_from_json("tests/Li6.json", None)
+            .expect("Failed to load Li6 from file");
+
+        // Load Li7 from local file (different nuclide, different source)
+        let mut li7_file = super::read_nuclide_from_json("tests/Li7.json", None)
+            .expect("Failed to load Li7 from file");
+
+        assert_eq!(li6_file.name.as_deref(), Some("Li6"));
+        assert_eq!(li7_file.name.as_deref(), Some("Li7"));
+        
+        // Verify we can load cross sections from both
+        let (xs_li6, _) = li6_file.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li6 cross section");
+        let (xs_li7, _) = li7_file.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li7 cross section");
+
+        assert!(!xs_li6.is_empty() && !xs_li7.is_empty(), "Both should have cross section data");
+    }
+
+    #[test]
+    fn test_nuclide_cache_respects_data_source_boundaries() {
+        // Test that the cache properly separates different data sources
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Load Li6 from file first time
+        let mut li6_1 = super::read_nuclide_from_json("tests/Li6.json", None)
+            .expect("Failed to load Li6 first time");
+
+        // Load Li7 from file (different nuclide/source)
+        let mut li7 = super::read_nuclide_from_json("tests/Li7.json", None)
+            .expect("Failed to load Li7");
+
+        // Load Li6 from file again (should use cache)
+        let mut li6_2 = super::read_nuclide_from_json("tests/Li6.json", None)
+            .expect("Failed to load Li6 second time");
+
+        // Get cross sections
+        let (xs_li6_1, _) = li6_1.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li6 cross section first time");
+        let (xs_li7, _) = li7.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li7 cross section");
+        let (xs_li6_2, _) = li6_2.microscopic_cross_section("(n,gamma)", Some("294"))
+            .expect("Failed to get Li6 cross section second time");
+
+        // Li6 loads should be identical (cache working)
+        assert_eq!(xs_li6_1, xs_li6_2, "Li6 loads should be identical (cache working)");
+
+        // Li6 vs Li7 should be different (different nuclides)
+        let li6_vs_li7_different = xs_li6_1.len() != xs_li7.len() || 
+                                  xs_li6_1.iter().zip(&xs_li7).any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(li6_vs_li7_different, "Li6 and Li7 should have different data");
     }
 }

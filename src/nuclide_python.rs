@@ -172,15 +172,18 @@ impl PyNuclide {
     /// Load nuclear data from a JSON file.
     ///
     /// You can either provide a JSON file path explicitly via `path` or rely on
-    /// the `name` given at construction if your application resolves it.
+    /// the `name` given at construction and the global configuration to resolve it.
+    /// Providing an explicit `path` will override any global configuration.
     ///
     /// When `temperatures` is provided only those temperatures are loaded while
     /// `available_temperatures` always lists every temperature present in the
     /// file. The subset actually loaded is stored in `loaded_temperatures`.
     ///
     /// Args:
-    ///     path (Optional[str]): Optional path to the nuclide JSON file. If omitted the
-    ///         constructor `name` must have been set and is used as the path / key.
+    ///     path (Optional[str]): Optional path to the nuclide JSON file, keyword 
+    ///         (e.g. "tendl-21", "fendl-3.2c"), or filesystem path. If provided,
+    ///         this overrides any global configuration for this nuclide. If omitted,
+    ///         the constructor `name` is used to look up the path from global config.
     ///     temperatures (Optional[List[str]]): Temperature strings (e.g. ["293K"]).
     ///         If given only these temperatures are loaded.
     ///
@@ -188,8 +191,27 @@ impl PyNuclide {
     ///     None
     ///
     /// Raises:
-    ///     ValueError: If neither `path` nor `name` is available, or if the
-    ///         JSON cannot be read / parsed.
+    ///     ValueError: If neither `path` nor `name` is available, if the nuclide
+    ///         name is not found in global configuration (when path not provided),
+    ///         or if the JSON cannot be read / parsed.
+    ///
+    /// Example:
+    ///     Compare the same nuclide from different data sources:
+    ///     
+    ///     >>> # Set global default
+    ///     >>> m4mc.Config.set_cross_sections("tendl-21")
+    ///     >>> 
+    ///     >>> # Load from global config (will use TENDL)
+    ///     >>> li6_tendl = m4mc.Nuclide("Li6")
+    ///     >>> li6_tendl.read_nuclide_from_json()
+    ///     >>> 
+    ///     >>> # Override to use FENDL for comparison
+    ///     >>> li6_fendl = m4mc.Nuclide("Li6")
+    ///     >>> li6_fendl.read_nuclide_from_json("fendl-3.2c")
+    ///     >>> 
+    ///     >>> # Use custom local file
+    ///     >>> li6_custom = m4mc.Nuclide("Li6")
+    ///     >>> li6_custom.read_nuclide_from_json("path/to/custom_Li6.json")
     #[pyo3(signature = (path=None, temperatures=None), text_signature = "(self, path=None, temperatures=None)")]
     pub fn read_nuclide_from_json(
         &mut self,

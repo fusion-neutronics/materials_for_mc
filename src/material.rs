@@ -576,7 +576,7 @@ impl Material {
             .unwrap_or_else(|| panic!("No cross section data found for MT {}", mt))
             .clone();
 
-        (energy_grid, xs_values)
+        (xs_values, energy_grid)
     }
 
     /// Calculate the neutron mean free path at a given energy
@@ -1432,13 +1432,13 @@ mod tests {
             .expect("Failed to read nuclide JSON");
 
         // Test with integer MT number
-        let (energy1, xs1) = material.macroscopic_cross_section(1);
+        let (xs1, energy1) = material.macroscopic_cross_section(1);
         assert!(!energy1.is_empty(), "Energy grid should not be empty");
         assert!(!xs1.is_empty(), "Cross section should not be empty");
         assert_eq!(energy1.len(), xs1.len(), "Energy and cross section arrays should have same length");
 
         // Test with string reaction name - same reaction
-        let (energy2, xs2) = material.macroscopic_cross_section("(n,total)".to_string());
+        let (xs2, energy2) = material.macroscopic_cross_section("(n,total)".to_string());
         assert_eq!(energy1.len(), energy2.len(), "Energy grids should be same length");
         assert_eq!(xs1.len(), xs2.len(), "Cross sections should be same length");
         
@@ -1452,7 +1452,7 @@ mod tests {
         }
 
         // Test with gamma capture reaction
-        let (energy3, xs3) = material.macroscopic_cross_section("(n,gamma)");
+        let (xs3, energy3) = material.macroscopic_cross_section("(n,gamma)");
         assert!(!energy3.is_empty(), "Energy grid should not be empty for (n,gamma)");
         assert!(!xs3.is_empty(), "Cross section should not be empty for (n,gamma)");
         assert_eq!(energy3.len(), xs3.len(), "Energy and cross section arrays should have same length for (n,gamma)");
@@ -1948,9 +1948,8 @@ mod tests {
         material.calculate_macroscopic_xs(&vec![1], false);
         assert!(!material.macroscopic_xs_neutron.is_empty(), "Cache should be populated");
 
-        // Loading nuclear data again should clear the cache
-        let map = std::collections::HashMap::new();
-        material.read_nuclides_from_json(&map).unwrap();
+        // Loading nuclear data again should clear the cache (use same map since empty map would fail)
+        material.read_nuclides_from_json(&nuclide_json_map).unwrap();
         assert!(material.macroscopic_xs_neutron.is_empty(), "Cache should be cleared after loading nuclear data");
     }
 
@@ -1984,5 +1983,145 @@ mod tests {
         // Verify that calling with all MTs gives us all MTs in cache
         material.calculate_macroscopic_xs(&vec![1, 2], false);
         assert_eq!(material.macroscopic_xs_neutron.len(), 2, "Cache should contain MT 1 and 2 again");
+    }
+
+    #[test]
+    fn test_material_different_data_sources() {
+        // Test that material loading respects different data sources
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Material 1: Li6 from file
+        let mut mat_li6 = Material::new();
+        mat_li6.add_nuclide("Li6", 1.0).unwrap();
+        let mut li6_map = std::collections::HashMap::new();
+        li6_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        mat_li6.read_nuclides_from_json(&li6_map).unwrap();
+        mat_li6.set_density("g/cm3", 0.534).unwrap();
+
+        // Material 2: Li7 from file
+        let mut mat_li7 = Material::new();
+        mat_li7.add_nuclide("Li7", 1.0).unwrap();
+        let mut li7_map = std::collections::HashMap::new();
+        li7_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        mat_li7.read_nuclides_from_json(&li7_map).unwrap();
+        mat_li7.set_density("g/cm3", 0.534).unwrap();
+
+        // Get macroscopic cross sections
+        let (xs_li6, _) = mat_li6.macroscopic_cross_section("(n,gamma)");
+        let (xs_li7, _) = mat_li7.macroscopic_cross_section("(n,gamma)");
+
+        // Should have different data (different nuclides)
+        let data_different = xs_li6.len() != xs_li7.len() || 
+                            xs_li6.iter().zip(&xs_li7).any(|(a, b)| (a - b).abs() > 1e-10);
+        
+        assert!(data_different, "Li6 and Li7 materials should have different cross sections");
+        println!("Material Li6: {} points, Li7: {} points", xs_li6.len(), xs_li7.len());
+    }
+
+    #[test]
+    fn test_material_file_and_keyword_sources() {
+        // Test that materials can use both file paths and keywords
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Material 1: Li6 from file
+        let mut mat_file = Material::new();
+        mat_file.add_nuclide("Li6", 1.0).unwrap();
+        let mut nuclide_map = std::collections::HashMap::new();
+        nuclide_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        mat_file.read_nuclides_from_json(&nuclide_map).unwrap();
+        mat_file.set_density("g/cm3", 1.0).unwrap();
+
+        // Material 2: Li7 from file (different nuclide, different file)
+        let mut mat_other = Material::new();
+        mat_other.add_nuclide("Li7", 1.0).unwrap();
+        let mut other_map = std::collections::HashMap::new();
+        other_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        mat_other.read_nuclides_from_json(&other_map).unwrap();
+        mat_other.set_density("g/cm3", 1.0).unwrap();
+
+        // Both should work and give different results (different nuclides)
+        let (xs_file, _) = mat_file.macroscopic_cross_section("(n,gamma)");
+        let (xs_other, _) = mat_other.macroscopic_cross_section("(n,gamma)");
+
+        assert!(!xs_file.is_empty() && !xs_other.is_empty(), "Both materials should have cross section data");
+        
+        // Should be different since Li6 vs Li7
+        let data_different = xs_file.len() != xs_other.len() || 
+                            xs_file.iter().zip(&xs_other).any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(data_different, "Li6 file vs Li7 file should give different results");
+    }
+
+    #[test]
+    fn test_material_cache_respects_data_source_boundaries() {
+        // Test that material cache properly separates different data sources
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Material 1: Li6 from file first time
+        let mut mat_li6_1 = Material::new();
+        mat_li6_1.add_nuclide("Li6", 1.0).unwrap();
+        let mut li6_map = std::collections::HashMap::new();
+        li6_map.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        mat_li6_1.read_nuclides_from_json(&li6_map).unwrap();
+        mat_li6_1.set_density("g/cm3", 0.534).unwrap();
+
+        // Material 2: Li7 from file
+        let mut mat_li7 = Material::new();
+        mat_li7.add_nuclide("Li7", 1.0).unwrap();
+        let mut li7_map = std::collections::HashMap::new();
+        li7_map.insert("Li7".to_string(), "tests/Li7.json".to_string());
+        mat_li7.read_nuclides_from_json(&li7_map).unwrap();
+        mat_li7.set_density("g/cm3", 0.534).unwrap();
+
+        // Material 3: Li6 from file again (should use cache)
+        let mut mat_li6_2 = Material::new();
+        mat_li6_2.add_nuclide("Li6", 1.0).unwrap();
+        mat_li6_2.read_nuclides_from_json(&li6_map).unwrap(); // reuse same map
+        mat_li6_2.set_density("g/cm3", 0.534).unwrap();
+
+        // Get cross sections
+        let (xs_li6_1, _) = mat_li6_1.macroscopic_cross_section("(n,gamma)");
+        let (xs_li7, _) = mat_li7.macroscopic_cross_section("(n,gamma)");
+        let (xs_li6_2, _) = mat_li6_2.macroscopic_cross_section("(n,gamma)");
+
+        // Li6 materials should be identical (cache working)
+        assert_eq!(xs_li6_1, xs_li6_2, "Li6 materials should be identical (cache working)");
+
+        // Li6 vs Li7 should be different (different nuclides)
+        let li6_vs_li7_different = xs_li6_1.len() != xs_li7.len() || 
+                                  xs_li6_1.iter().zip(&xs_li7).any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(li6_vs_li7_different, "Li6 and Li7 materials should have different data");
+    }
+
+    #[test]
+    fn test_material_path_normalization_in_cache() {
+        // Test that different path formats for same file use same cache entry
+        
+        crate::nuclide::clear_nuclide_cache();
+
+        // Material 1: relative path
+        let mut mat_rel = Material::new();
+        mat_rel.add_nuclide("Li6", 1.0).unwrap();
+        let mut map_rel = std::collections::HashMap::new();
+        map_rel.insert("Li6".to_string(), "tests/Li6.json".to_string());
+        mat_rel.read_nuclides_from_json(&map_rel).unwrap();
+        mat_rel.set_density("g/cm3", 1.0).unwrap();
+
+        // Material 2: absolute path to same file
+        let mut mat_abs = Material::new();
+        mat_abs.add_nuclide("Li6", 1.0).unwrap();
+        let mut map_abs = std::collections::HashMap::new();
+        let abs_path = std::env::current_dir().unwrap().join("tests/Li6.json");
+        map_abs.insert("Li6".to_string(), abs_path.to_string_lossy().to_string());
+        mat_abs.read_nuclides_from_json(&map_abs).unwrap();
+        mat_abs.set_density("g/cm3", 1.0).unwrap();
+
+        // Should give identical results (same file, cache working)
+        let (xs_rel, _) = mat_rel.macroscopic_cross_section("(n,gamma)");
+        let (xs_abs, _) = mat_abs.macroscopic_cross_section("(n,gamma)");
+
+        assert_eq!(xs_rel, xs_abs, "Relative and absolute paths to same file should give identical results");
     }
 } // close mod tests

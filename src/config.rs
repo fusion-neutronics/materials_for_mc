@@ -65,6 +65,12 @@ impl Config {
     {
         input.apply(self);
     }
+
+    /// Clear all cross section mappings and default
+    pub fn clear(&mut self) {
+        self.cross_sections.clear();
+        self.default_cross_section = None;
+    }
 }
 
 /// Trait to allow flexible input types for set_cross_sections

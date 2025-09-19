@@ -307,7 +307,7 @@ def test_sample_interacting_nuclide_li6_li7():
 
     # Load nuclide data from JSON
     nuclide_json_map = {
-        "Li6": "tests/Li6.json",
+        "Li6": "tests/Li6.json",'(n,total)'
         "Li7": "tests/Li7.json",
     }
     material.read_nuclides_from_json(nuclide_json_map)
@@ -374,3 +374,116 @@ def test_read_nuclides_from_json_dict():
     mat.volume = 1.0
     # Should not raise TypeError - provide both Li6 and Li7 since element expansion creates both
     mat.read_nuclides_from_json({"Li6": "tendl-21", "Li7": "tendl-21"})
+
+
+def test_material_different_data_sources():
+    """Test that material loading respects different data sources."""
+    
+    # Material 1: Li7 from TENDL
+    mat_tendl = Material()
+    mat_tendl.add_nuclide("Li7", 1.0)
+    mat_tendl.read_nuclides_from_json("tendl-21")
+    mat_tendl.set_density("g/cm3", 0.534)
+    
+    # Material 2: Li7 from FENDL
+    mat_fendl = Material()
+    mat_fendl.add_nuclide("Li7", 1.0)
+    mat_fendl.read_nuclides_from_json("fendl-3.2c")
+    mat_fendl.set_density("g/cm3", 0.534)
+    
+    # Get macroscopic cross sections
+    xs_tendl, _ = mat_tendl.macroscopic_cross_section("(n,gamma)")
+    xs_fendl, _ = mat_fendl.macroscopic_cross_section("(n,gamma)")
+    
+    # Should have different data
+    data_different = (len(xs_tendl) != len(xs_fendl) or 
+                     any(abs(a - b) > 1e-10 for a, b in zip(xs_tendl, xs_fendl)))
+    
+    assert data_different, "TENDL and FENDL materials should have different cross sections"
+    print(f"Material TENDL: {len(xs_tendl)} points, FENDL: {len(xs_fendl)} points")
+
+
+def test_material_file_and_keyword_sources():
+    """Test that materials can use both file paths and keywords."""
+    
+    # Material 1: Li6 from file
+    mat_file = Material()
+    mat_file.add_nuclide("Li6", 1.0)
+    mat_file.read_nuclides_from_json({"Li6": "tests/Li6.json"})
+    mat_file.set_density("g/cm3", 1.0)
+    
+    # Material 2: Li7 from keyword
+    mat_keyword = Material()
+    mat_keyword.add_nuclide("Li7", 1.0)
+    mat_keyword.read_nuclides_from_json("tendl-21")
+    mat_keyword.set_density("g/cm3", 1.0)
+    
+    # Both should work and give different results (different nuclides)
+    xs_file, _ = mat_file.macroscopic_cross_section("(n,gamma)")
+    xs_keyword, _ = mat_keyword.macroscopic_cross_section("(n,gamma)")
+    
+    assert len(xs_file) > 0 and len(xs_keyword) > 0, "Both materials should have cross section data"
+    
+    # Should be different since Li6 vs Li7
+    data_different = (len(xs_file) != len(xs_keyword) or 
+                     any(abs(a - b) > 1e-10 for a, b in zip(xs_file, xs_keyword)))
+    assert data_different, "Li6 file vs Li7 keyword should give different results"
+
+
+def test_material_cache_respects_data_source_boundaries():
+    """Test that material cache properly separates different data sources."""
+    
+    # Material 1: Li7 from TENDL
+    mat_tendl_1 = Material()
+    mat_tendl_1.add_nuclide("Li7", 1.0)
+    mat_tendl_1.read_nuclides_from_json("tendl-21")
+    mat_tendl_1.set_density("g/cm3", 0.534)
+    
+    # Material 2: Li7 from FENDL
+    mat_fendl = Material()
+    mat_fendl.add_nuclide("Li7", 1.0)
+    mat_fendl.read_nuclides_from_json("fendl-3.2c")
+    mat_fendl.set_density("g/cm3", 0.534)
+    
+    # Material 3: Li7 from TENDL again (should use cache)
+    mat_tendl_2 = Material()
+    mat_tendl_2.add_nuclide("Li7", 1.0)
+    mat_tendl_2.read_nuclides_from_json("tendl-21")
+    mat_tendl_2.set_density("g/cm3", 0.534)
+    
+    # Get cross sections
+    xs_tendl_1, _ = mat_tendl_1.macroscopic_cross_section("(n,gamma)")
+    xs_fendl, _ = mat_fendl.macroscopic_cross_section("(n,gamma)")
+    xs_tendl_2, _ = mat_tendl_2.macroscopic_cross_section("(n,gamma)")
+    
+    # TENDL materials should be identical (cache working)
+    assert xs_tendl_1 == xs_tendl_2, "TENDL materials should be identical (cache working)"
+    
+    # TENDL vs FENDL should be different (different data sources)
+    tendl_vs_fendl_different = (len(xs_tendl_1) != len(xs_fendl) or 
+                               any(abs(a - b) > 1e-10 for a, b in zip(xs_tendl_1, xs_fendl)))
+    assert tendl_vs_fendl_different, "TENDL and FENDL materials should have different data"
+
+
+def test_material_path_normalization_in_cache():
+    """Test that different path formats for same file use same cache entry."""
+    import os
+    
+    # Material 1: relative path
+    mat_rel = Material()
+    mat_rel.add_nuclide("Li6", 1.0)
+    mat_rel.read_nuclides_from_json({"Li6": "tests/Li6.json"})
+    mat_rel.set_density("g/cm3", 1.0)
+    
+    # Material 2: absolute path to same file
+    mat_abs = Material()
+    mat_abs.add_nuclide("Li6", 1.0)
+    abs_path = os.path.abspath("tests/Li6.json")
+    mat_abs.read_nuclides_from_json({"Li6": abs_path})
+    mat_abs.set_density("g/cm3", 1.0)
+    
+    # Should give identical results (same file, cache working)
+    xs_rel, _ = mat_rel.macroscopic_cross_section("(n,gamma)")
+    xs_abs, _ = mat_abs.macroscopic_cross_section("(n,gamma)")
+    
+    assert xs_rel == xs_abs, "Relative and absolute paths to same file should give identical results"
