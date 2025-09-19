@@ -165,9 +165,9 @@ However the Python API provides access to all the Monte Carlo Transport properti
 
 ### Mean free path
 
-The mean free path of a neutron with a specified energy in a material can be found using ```mean_free_path_neutron()```.
+The mean free path of a neutron with a specified energy in a material can be found using ```Material.mean_free_path_neutron()```.
 
-```
+```python
 import materials_for_mc as m4mc
 mat1 = m4mc.Material()
 mat1.add_nuclide('Li6',1)
@@ -179,6 +179,9 @@ m4mc_mean_free_path_at_14mev = mat1.mean_free_path_neutron(14e6)
 ```
 
 ### Sample distance to collision
+
+The distance to the collision can be sampled for a given neutron energy using ``` Material.distance to the collision()```.
+This is used by Monte Carlo codes to determine if an interaction occurs within the material.
 
 
 The distance to a collision within a material can be sampled
@@ -193,7 +196,12 @@ mat.temperature = "294"
 sampled_distance = mat.sample_distance_to_collision(energy=14e6, seed=1234)
 
 ```
+
 ### Sample interacting nuclide
+
+If the sampled distance is less than the mean free path then an interaction happens.
+Monte Carlo codes typically then sample the interacting nuclide.
+The interacting nuclide can be sampled for a given neutron energy using ```material. sample_interacting_nuclide()```
 
 ```python
 import materials_for_mc as m4mc
@@ -213,3 +221,10 @@ interacting_nuclide = material.sample_interacting_nuclide(energy=2.5e6, seed=456
 
 ### Sample interacting reaction
 
+
+```python
+import materials_for_mc as m4mc
+nuc = m4mc.Nuclide('Li6')
+nuc.read_nuclide_from_json('tests/Li6.json')
+reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+```
