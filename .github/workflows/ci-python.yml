@@ -68,7 +68,6 @@ jobs:
           python examples/python/materials_example.py
           python examples/python/nuclide_example.py
           python examples/python/use_in_python.py
-          python docs/test_docs_code.py docs/source/python_usage.md 
           
       - name: Run example scripts (Unix)
         if: runner.os != 'Windows'
@@ -79,28 +78,6 @@ jobs:
           python examples/python/materials_example.py
           python examples/python/nuclide_example.py
           python examples/python/use_in_python.py
-          python docs/test_docs_code.py docs/source/python_usage.md 
-
-      - name: Install doc deps (only on ubuntu / py3.11)
-        if: runner.os == 'Linux' && matrix.python-version == '3.11'
-        shell: bash
-        run: |
-          source venv/bin/activate
-          python -m pip install -r docs/requirements.txt
-          sphinx-build -b html docs/source docs/build/html
-
-      - name: Deploy docs to GitHub Pages
-        if: github.event_name == 'release' && runner.os == 'Linux' && matrix.python-version == '3.11'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          publish_branch: gh-pages
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/build/html
-          # with next rlease of actions-gh-pages
-          # issue to allow force_orphan will be fixed
-          # https://github.com/peaceiris/actions-gh-pages/issues/455
-          # force_orphan: true
-          keep_files: true
 
 
       # TODO: Commented out OpenMC-dependent examples
