@@ -340,6 +340,77 @@ impl PyNuclide {
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())),
         }
     }
+
+    /// Sample a reaction based on cross sections at a given energy and temperature.
+    ///
+    /// This method randomly selects a nuclear reaction channel based on the relative 
+    /// cross sections at the specified neutron energy. It uses Monte Carlo sampling
+    /// to select between absorption, elastic scattering, fission (if fissionable), 
+    /// and non-elastic reactions according to their probabilities.
+    ///
+    /// Args:
+    ///     energy (float): Neutron energy in eV.
+    ///     temperature (str): Temperature to use for reaction data (e.g. "294", "300K").
+    ///     seed (Optional[int]): Random seed for reproducible sampling. If None, 
+    ///         uses system random state.
+    ///
+    /// Returns:
+    ///     Optional[Dict[str, Any]]: Dictionary containing the sampled reaction data:
+    ///         - mt_number (int): ENDF/MT number of the sampled reaction
+    ///         - cross_section (List[float]): Cross section values in barns
+    ///         - threshold_idx (int): Index where reaction becomes active
+    ///         - interpolation (List[int]): Interpolation flags
+    ///         - energy (List[float]): Reaction energy grid
+    ///     Returns None if no reaction could be sampled (e.g., zero total cross section).
+    ///
+    /// Raises:
+    ///     ValueError: If temperature not found or no reaction data available.
+    ///
+    /// Example:
+    ///     >>> nuclide = Nuclide("Li6")
+    ///     >>> nuclide.read_nuclide_from_json()
+    ///     >>> reaction = nuclide.sample_reaction(1e-3, "294", seed=42)
+    ///     >>> if reaction:
+    ///     ...     print(f"Sampled MT {reaction['mt_number']}")
+    #[pyo3(signature = (energy, temperature, seed=None), text_signature = "(self, energy, temperature, seed=None)")]
+    pub fn sample_reaction(
+        &self,
+        energy: f64,
+        temperature: &str,
+        seed: Option<u64>,
+    ) -> PyResult<Option<PyObject>> {
+        use rand::{Rng, SeedableRng};
+        use rand::rngs::StdRng;
+        use pyo3::types::PyDict;
+        use pyo3::Python;
+
+        let nuclide: Nuclide = self.clone().into();
+        
+        // Create random number generator with optional seed
+        let mut rng = if let Some(seed_val) = seed {
+            StdRng::seed_from_u64(seed_val)
+        } else {
+            StdRng::from_entropy()
+        };
+
+        // Sample the reaction
+        let sampled_reaction = nuclide.sample_reaction(energy, temperature, &mut rng);
+
+        if let Some(reaction) = sampled_reaction {
+            // Convert the reaction to a Python dictionary
+            Python::with_gil(|py| {
+                let reaction_dict = PyDict::new(py);
+                reaction_dict.set_item("mt_number", reaction.mt_number)?;
+                reaction_dict.set_item("cross_section", &reaction.cross_section)?;
+                reaction_dict.set_item("threshold_idx", reaction.threshold_idx)?;
+                reaction_dict.set_item("interpolation", &reaction.interpolation)?;
+                reaction_dict.set_item("energy", &reaction.energy)?;
+                Ok(Some(reaction_dict.into()))
+            })
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(feature = "pyo3")]
