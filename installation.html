@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Materials For MC Documentation &#8212; materials_for_mc API</title>
+    <title>Installation &#8212; materials_for_mc API</title>
   
   
   
@@ -42,10 +42,11 @@
     <script src="_static/documentation_options.js?v=01f34227"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'installation';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Installation" href="installation.html" />
+    <link rel="next" title="Python Usage" href="python_usage.html" />
+    <link rel="prev" title="Materials For MC Documentation" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -103,7 +104,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -124,8 +125,8 @@
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="installation.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
     Installation
   </a>
 </li>
@@ -248,10 +249,8 @@
       
       
       
-        
-      
       <dialog id="pst-primary-sidebar-modal"></dialog>
-      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
         
 
   
@@ -266,8 +265,8 @@
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="installation.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
     Installation
   </a>
 </li>
@@ -345,6 +344,15 @@
     
   </div>
   
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
   
   <div class="sidebar-primary-items__end sidebar-primary__section">
       <div class="sidebar-primary-item">
@@ -365,7 +373,31 @@
           <div class="bd-content">
             <div class="bd-article-container">
               
-              <div class="bd-header-article d-print-none"></div>
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Installation</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
               
               
               
@@ -373,22 +405,28 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section class="tex2jax_ignore mathjax_ignore" id="materials-for-mc-documentation">
-<h1>Materials For MC Documentation<a class="headerlink" href="#materials-for-mc-documentation" title="Link to this heading">#</a></h1>
-<p>Materials For MC is a package for accessing nuclear cross section data</p>
-<p>It provides tools for defining elements, nuclides, and materials then accessing cross sections and energy grids,</p>
-<p>The package also provides functions intended for use in Monte Carlo particle transport simulations such as mean free path, sampling nuclide, sampling reaction and interpolating the cross section value at a given energy.</p>
-<p>It provides ease of access through a Python API for users and performant access for Monte Carlo codes via a Rust API</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="python_usage.html">Python Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="rust_api.html">Rust API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="webassembly.html">WebAssembly Support</a></li>
-<li class="toctree-l1"><a class="reference internal" href="developer_info.html">Developer Info</a></li>
-</ul>
+  <section class="tex2jax_ignore mathjax_ignore" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h1>
+<p>materials_for_mc can be installed and used on Linux, Windows, and macOS.</p>
+<section id="python-installation">
+<h2>Python Installation<a class="headerlink" href="#python-installation" title="Link to this heading">#</a></h2>
+<p>materials_for_mc is available on <a class="reference external" href="https://pypi.org/project/materials-for-mc">PyPI</a>. To install, run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>materials-for-mc
+</pre></div>
 </div>
+</section>
+<section id="rust-installation">
+<h2>Rust Installation<a class="headerlink" href="#rust-installation" title="Link to this heading">#</a></h2>
+<p>materials_for_mc is published as a <a class="reference external" href="https://crates.io/crates/materials_for_mc">Rust crate</a>. To add it to your project, include the following in your <code class="docutils literal notranslate"><span class="pre">Cargo.toml</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[dependencies]</span>
+<span class="n">materials_for_mc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span>
+</pre></div>
+</div>
+<p>Then run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cargo<span class="w"> </span>build
+</pre></div>
+</div>
+</section>
 </section>
 
 
@@ -407,10 +445,23 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#python-installation">Python Installation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#rust-installation">Rust Installation</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="_sources/index.md.txt"
+      <li><a href="_sources/installation.md.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

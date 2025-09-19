@@ -46,7 +46,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Rust API" href="rust_api.html" />
-    <link rel="prev" title="Documentation" href="index.html" />
+    <link rel="prev" title="Python Usage" href="python_usage.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -125,6 +125,20 @@
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="python_usage.html">
+    Python Usage
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
     Python API
@@ -140,11 +154,28 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="developer_info.html">
+  <a class="nav-link nav-internal" href="webassembly.html">
+    WebAssembly Support
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="developer_info.html">
     Developer Info
   </a>
 </li>
 
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -234,6 +265,20 @@
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="python_usage.html">
+    Python Usage
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
     Python API
@@ -244,6 +289,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="rust_api.html">
     Rust API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="webassembly.html">
+    WebAssembly Support
   </a>
 </li>
 
@@ -493,12 +545,12 @@ or None if no energy data loaded.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Nuclide.get_reaction_energy_grid">
 <span class="sig-name descname"><span class="pre">get_reaction_energy_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.get_reaction_energy_grid" title="Link to this definition">#</a></dt>
-<dd><p>Get the reaction-specific energy grid for a given MT at a temperature.</p>
+<dd><p>Get energy grid for a specific temperature and MT number.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>temperature</strong> (<em>str</em>) – Temperature key (e.g. “293K”).</p></li>
-<li><p><strong>mt</strong> (<em>int</em>) – ENDF MT reaction number.</p></li>
+<li><p><strong>temperature</strong> (<em>str</em>) – Temperature to use for reaction data.</p></li>
+<li><p><strong>mt</strong> (<em>int</em>) – ENDF/MT number for the reaction channel.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -548,6 +600,32 @@ or None if no energy data loaded.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>Optional[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.microscopic_cross_section">
+<span class="sig-name descname"><span class="pre">microscopic_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reaction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperature</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.microscopic_cross_section" title="Link to this definition">#</a></dt>
+<dd><p>Get microscopic cross section data for a specific reaction and temperature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reaction</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>str</em><em>]</em>) – Either an ENDF/MT number (int) or reaction name (str)
+like “(n,gamma)”, “(n,elastic)”, “fission”, etc.</p></li>
+<li><p><strong>temperature</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Temperature to use. If None, uses the single
+loaded temperature if only one is available.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple of (cross_section_values, energy_grid).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[List[float], List[float]]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If temperature not found, reaction not found, multiple temperatures loaded
+    without specifying one, or no data available.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -623,15 +701,18 @@ dictionary has these keys:</p>
 <span class="sig-name descname"><span class="pre">read_nuclide_from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperatures</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.read_nuclide_from_json" title="Link to this definition">#</a></dt>
 <dd><p>Load nuclear data from a JSON file.</p>
 <p>You can either provide a JSON file path explicitly via <cite>path</cite> or rely on
-the <cite>name</cite> given at construction if your application resolves it.</p>
+the <cite>name</cite> given at construction and the global configuration to resolve it.
+Providing an explicit <cite>path</cite> will override any global configuration.</p>
 <p>When <cite>temperatures</cite> is provided only those temperatures are loaded while
 <cite>available_temperatures</cite> always lists every temperature present in the
 file. The subset actually loaded is stored in <cite>loaded_temperatures</cite>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>path</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Optional path to the nuclide JSON file. If omitted the
-constructor <cite>name</cite> must have been set and is used as the path / key.</p></li>
+<li><p><strong>path</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Optional path to the nuclide JSON file, keyword
+(e.g. “tendl-21”, “fendl-3.2c”), or filesystem path. If provided,
+this overrides any global configuration for this nuclide. If omitted,
+the constructor <cite>name</cite> is used to look up the path from global config.</p></li>
 <li><p><strong>temperatures</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em>) – Temperature strings (e.g. [“293K”]).
 If given only these temperatures are loaded.</p></li>
 </ul>
@@ -640,10 +721,77 @@ If given only these temperatures are loaded.</p></li>
 <dd class="field-even"><p>None</p>
 </dd>
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>ValueError</strong> – If neither <cite>path</cite> nor <cite>name</cite> is available, or if the
-    JSON cannot be read / parsed.</p>
+<dd class="field-odd"><p><strong>ValueError</strong> – If neither <cite>path</cite> nor <cite>name</cite> is available, if the nuclide
+    name is not found in global configuration (when path not provided),
+    or if the JSON cannot be read / parsed.</p>
 </dd>
 </dl>
+<p class="rubric">Example</p>
+<p>Compare the same nuclide from different data sources:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Set global default</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">m4mc</span><span class="o">.</span><span class="n">Config</span><span class="o">.</span><span class="n">set_cross_sections</span><span class="p">(</span><span class="s2">&quot;tendl-21&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Load from global config (will use TENDL)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_tendl</span> <span class="o">=</span> <span class="n">m4mc</span><span class="o">.</span><span class="n">Nuclide</span><span class="p">(</span><span class="s2">&quot;Li6&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_tendl</span><span class="o">.</span><span class="n">read_nuclide_from_json</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Override to use FENDL for comparison</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_fendl</span> <span class="o">=</span> <span class="n">m4mc</span><span class="o">.</span><span class="n">Nuclide</span><span class="p">(</span><span class="s2">&quot;Li6&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_fendl</span><span class="o">.</span><span class="n">read_nuclide_from_json</span><span class="p">(</span><span class="s2">&quot;fendl-3.2c&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Use custom local file</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_custom</span> <span class="o">=</span> <span class="n">m4mc</span><span class="o">.</span><span class="n">Nuclide</span><span class="p">(</span><span class="s2">&quot;Li6&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">li6_custom</span><span class="o">.</span><span class="n">read_nuclide_from_json</span><span class="p">(</span><span class="s2">&quot;path/to/custom_Li6.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Nuclide.sample_reaction">
+<span class="sig-name descname"><span class="pre">sample_reaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Nuclide.sample_reaction" title="Link to this definition">#</a></dt>
+<dd><p>Sample a reaction based on cross sections at a given energy and temperature.</p>
+<p>This method randomly selects a nuclear reaction channel based on the relative
+cross sections at the specified neutron energy. It uses Monte Carlo sampling
+to select between absorption, elastic scattering, fission (if fissionable),
+and non-elastic reactions according to their probabilities.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy</strong> (<em>float</em>) – Neutron energy in eV.</p></li>
+<li><p><strong>temperature</strong> (<em>str</em>) – Temperature to use for reaction data (e.g. “294”, “300K”).</p></li>
+<li><p><strong>seed</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – Random seed for reproducible sampling. If None,
+uses system random state.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Dictionary containing the sampled reaction data:</dt><dd><ul class="simple">
+<li><p>mt_number (int): ENDF/MT number of the sampled reaction</p></li>
+<li><p>cross_section (List[float]): Cross section values in barns</p></li>
+<li><p>threshold_idx (int): Index where reaction becomes active</p></li>
+<li><p>interpolation (List[int]): Interpolation flags</p></li>
+<li><p>energy (List[float]): Reaction energy grid</p></li>
+</ul>
+</dd>
+</dl>
+<p>Returns None if no reaction could be sampled (e.g., zero total cross section).</p>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional[Dict[str, Any]]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If temperature not found or no reaction data available.</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">nuclide</span> <span class="o">=</span> <span class="n">Nuclide</span><span class="p">(</span><span class="s2">&quot;Li6&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">nuclide</span><span class="o">.</span><span class="n">read_nuclide_from_json</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">reaction</span> <span class="o">=</span> <span class="n">nuclide</span><span class="o">.</span><span class="n">sample_reaction</span><span class="p">(</span><span class="mf">1e-3</span><span class="p">,</span> <span class="s2">&quot;294&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">reaction</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampled MT </span><span class="si">{</span><span class="n">reaction</span><span class="p">[</span><span class="s1">&#39;mt_number&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -793,8 +941,8 @@ associated energy (e.g. Q-value or representative energy in MeV).</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="materials_for_mc.Material.calculate_macroscopic_xs_neutron">
-<span class="sig-name descname"><span class="pre">calculate_macroscopic_xs_neutron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mt_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_nuclide</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.calculate_macroscopic_xs_neutron" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="materials_for_mc.Material.calculate_macroscopic_xs">
+<span class="sig-name descname"><span class="pre">calculate_macroscopic_xs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mt_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_nuclide</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.calculate_macroscopic_xs" title="Link to this definition">#</a></dt>
 <dd><p>Calculate macroscopic neutron cross sections (total or subset of MTs).</p>
 <p>Builds the unified energy grid if not already present.</p>
 <dl class="field-list simple">
@@ -862,6 +1010,26 @@ associated energy (e.g. Q-value or representative energy in MeV).</p>
 <dd><p>Return a list of nuclide names currently present in the material.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Material.macroscopic_cross_section">
+<span class="sig-name descname"><span class="pre">macroscopic_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reaction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.macroscopic_cross_section" title="Link to this definition">#</a></dt>
+<dd><p>Calculate macroscopic cross section for a specific reaction.</p>
+<p>This method accepts either an integer MT number or a string reaction name
+(like “(n,gamma)”, “fission”, etc.) and returns the macroscopic cross section
+for that reaction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>reaction</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>str</em><em>]</em>) – Either an MT number or reaction name.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(cross_section_values, energy_grid)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[List[float], List[float]]</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="materials_for_mc.Material.macroscopic_xs_neutron">
 <span class="sig-name descname"><span class="pre">macroscopic_xs_neutron</span></span><a class="headerlink" href="#materials_for_mc.Material.macroscopic_xs_neutron" title="Link to this definition">#</a></dt>
@@ -917,10 +1085,10 @@ associated energy (e.g. Q-value or representative energy in MeV).</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Material.read_nuclides_from_json">
 <span class="sig-name descname"><span class="pre">read_nuclides_from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nuclide_json_map</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material.read_nuclides_from_json" title="Link to this definition">#</a></dt>
-<dd><p>Bulk load nuclide data from a mapping of nuclide -&gt; JSON path.</p>
+<dd><p>Bulk load nuclide data from a mapping of nuclide -&gt; JSON path or a keyword string.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>nuclide_json_map</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>,</em><em>str</em><em>]</em><em>]</em>) – Mapping of nuclide names to JSON file paths.</p>
+<dd class="field-odd"><p><strong>nuclide_json_map</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>,</em><em>str</em><em>] </em><em>| </em><em>str</em><em>]</em>) – Mapping of nuclide names to JSON file paths or a keyword string.</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>ValueError</strong> – If any JSON file cannot be read / parsed.</p>
@@ -1026,6 +1194,12 @@ RNG seed can be supplied for reproducibility.</p>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Python wrapper for the Config struct</p>
 <dl class="py method">
+<dt class="sig sig-object py" id="materials_for_mc.Config.clear">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">clear</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.clear" title="Link to this definition">#</a></dt>
+<dd><p>Clear all cross section mappings and default</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Config.get_cross_section">
 <em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.get_cross_section" title="Link to this definition">#</a></dt>
 <dd><p>Get a cross section file path for a nuclide</p>
@@ -1039,14 +1213,14 @@ RNG seed can be supplied for reproducibility.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Config.set_cross_section">
-<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nuclide</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.set_cross_section" title="Link to this definition">#</a></dt>
-<dd><p>Set a cross section file path for a nuclide</p>
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_cross_section</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyword_or_nuclide</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.set_cross_section" title="Link to this definition">#</a></dt>
+<dd><p>Set a cross section file path for a nuclide, or set a global default if only a keyword is provided</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Config.set_cross_sections">
 <em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_cross_sections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Config.set_cross_sections" title="Link to this definition">#</a></dt>
-<dd><p>Set the cross sections dictionary</p>
+<dd><p>Set the cross sections dictionary or global keyword</p>
 </dd></dl>
 
 </dd></dl>
@@ -1095,11 +1269,13 @@ RNG seed can be supplied for reproducibility.</p>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.library"><code class="docutils literal notranslate"><span class="pre">Nuclide.library</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.loaded_temperatures"><code class="docutils literal notranslate"><span class="pre">Nuclide.loaded_temperatures</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.mass_number"><code class="docutils literal notranslate"><span class="pre">Nuclide.mass_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.microscopic_cross_section"><code class="docutils literal notranslate"><span class="pre">Nuclide.microscopic_cross_section()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.name"><code class="docutils literal notranslate"><span class="pre">Nuclide.name</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.neutron_number"><code class="docutils literal notranslate"><span class="pre">Nuclide.neutron_number</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.reaction_mts"><code class="docutils literal notranslate"><span class="pre">Nuclide.reaction_mts</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.reactions"><code class="docutils literal notranslate"><span class="pre">Nuclide.reactions</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.read_nuclide_from_json"><code class="docutils literal notranslate"><span class="pre">Nuclide.read_nuclide_from_json()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Nuclide.sample_reaction"><code class="docutils literal notranslate"><span class="pre">Nuclide.sample_reaction()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -1129,12 +1305,13 @@ RNG seed can be supplied for reproducibility.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material"><code class="docutils literal notranslate"><span class="pre">Material</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.add_element"><code class="docutils literal notranslate"><span class="pre">Material.add_element()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.add_nuclide"><code class="docutils literal notranslate"><span class="pre">Material.add_nuclide()</span></code></a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.calculate_macroscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.calculate_macroscopic_xs_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.calculate_macroscopic_xs"><code class="docutils literal notranslate"><span class="pre">Material.calculate_macroscopic_xs()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.calculate_microscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.calculate_microscopic_xs_neutron()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.density"><code class="docutils literal notranslate"><span class="pre">Material.density</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.density_units"><code class="docutils literal notranslate"><span class="pre">Material.density_units</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.get_atoms_per_barn_cm"><code class="docutils literal notranslate"><span class="pre">Material.get_atoms_per_barn_cm()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.get_nuclide_names"><code class="docutils literal notranslate"><span class="pre">Material.get_nuclide_names()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.macroscopic_cross_section"><code class="docutils literal notranslate"><span class="pre">Material.macroscopic_cross_section()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.macroscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.macroscopic_xs_neutron</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.mean_free_path_neutron"><code class="docutils literal notranslate"><span class="pre">Material.mean_free_path_neutron()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.nuclide_ptr_addr"><code class="docutils literal notranslate"><span class="pre">Material.nuclide_ptr_addr()</span></code></a></li>
@@ -1153,6 +1330,7 @@ RNG seed can be supplied for reproducibility.</p>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#config">Config</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.clear"><code class="docutils literal notranslate"><span class="pre">Config.clear()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.get_cross_section"><code class="docutils literal notranslate"><span class="pre">Config.get_cross_section()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.get_cross_sections"><code class="docutils literal notranslate"><span class="pre">Config.get_cross_sections()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Config.set_cross_section"><code class="docutils literal notranslate"><span class="pre">Config.set_cross_section()</span></code></a></li>

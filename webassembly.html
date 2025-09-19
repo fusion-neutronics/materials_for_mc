@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Materials For MC Documentation &#8212; materials_for_mc API</title>
+    <title>WebAssembly Support &#8212; materials_for_mc API</title>
   
   
   
@@ -42,10 +42,11 @@
     <script src="_static/documentation_options.js?v=01f34227"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'webassembly';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Installation" href="installation.html" />
+    <link rel="next" title="Developer Info" href="developer_info.html" />
+    <link rel="prev" title="Rust API" href="rust_api.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -103,7 +104,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -152,8 +153,8 @@
 </li>
 
 
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="webassembly.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
     WebAssembly Support
   </a>
 </li>
@@ -248,10 +249,8 @@
       
       
       
-        
-      
       <dialog id="pst-primary-sidebar-modal"></dialog>
-      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
         
 
   
@@ -294,8 +293,8 @@
 </li>
 
 
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="webassembly.html">
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
     WebAssembly Support
   </a>
 </li>
@@ -345,6 +344,15 @@
     
   </div>
   
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
   
   <div class="sidebar-primary-items__end sidebar-primary__section">
       <div class="sidebar-primary-item">
@@ -365,7 +373,31 @@
           <div class="bd-content">
             <div class="bd-article-container">
               
-              <div class="bd-header-article d-print-none"></div>
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">WebAssembly Support</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
               
               
               
@@ -373,22 +405,89 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section class="tex2jax_ignore mathjax_ignore" id="materials-for-mc-documentation">
-<h1>Materials For MC Documentation<a class="headerlink" href="#materials-for-mc-documentation" title="Link to this heading">#</a></h1>
-<p>Materials For MC is a package for accessing nuclear cross section data</p>
-<p>It provides tools for defining elements, nuclides, and materials then accessing cross sections and energy grids,</p>
-<p>The package also provides functions intended for use in Monte Carlo particle transport simulations such as mean free path, sampling nuclide, sampling reaction and interpolating the cross section value at a given energy.</p>
-<p>It provides ease of access through a Python API for users and performant access for Monte Carlo codes via a Rust API</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="python_usage.html">Python Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="rust_api.html">Rust API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="webassembly.html">WebAssembly Support</a></li>
-<li class="toctree-l1"><a class="reference internal" href="developer_info.html">Developer Info</a></li>
+  <section class="tex2jax_ignore mathjax_ignore" id="webassembly-support">
+<h1>WebAssembly Support<a class="headerlink" href="#webassembly-support" title="Link to this heading">#</a></h1>
+<p>The materials_for_mc library provides WebAssembly (WASM) bindings, allowing the library to run in web browsers and other JavaScript environments. This enables client-side nuclear data processing and visualization without requiring server-side computation.</p>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">#</a></h2>
+<p>The WebAssembly version supports:</p>
+<ul class="simple">
+<li><p>Material creation and manipulation</p></li>
+<li><p>Cross section calculation and visualization</p></li>
+<li><p>Predefined materials</p></li>
+<li><p>Interactive plotting with Plotly</p></li>
+<li><p>All core functionality available in the Rust version</p></li>
 </ul>
+</section>
+<section id="building-webassembly">
+<h2>Building WebAssembly<a class="headerlink" href="#building-webassembly" title="Link to this heading">#</a></h2>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h3>
+<p>First, install the required tools:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>https://rustwasm.github.io/wasm-pack/installer/init.sh<span class="w"> </span>-sSf<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+</pre></div>
 </div>
+</section>
+<section id="building-the-package">
+<h3>Building the Package<a class="headerlink" href="#building-the-package" title="Link to this heading">#</a></h3>
+<p>To quickly build the WebAssembly package:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wasm-pack<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>web<span class="w"> </span>--features<span class="w"> </span>wasm
+</pre></div>
+</div>
+<p>To build the optimized WebAssembly package:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wasm-pack<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>web<span class="w"> </span>--features<span class="w"> </span>wasm<span class="w"> </span>--release
+</pre></div>
+</div>
+<p>This creates a <code class="docutils literal notranslate"><span class="pre">pkg/</span></code> directory containing the generated WebAssembly files and JavaScript bindings.</p>
+<p>Create an index.html that makes use of the WASM file.</p>
+<p>Copy the generated package to the examples directory and serve locally:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cp<span class="w"> </span>-r<span class="w"> </span>pkg<span class="w"> </span>examples/wasm/
+<span class="c1"># Serve the demo pages locally</span>
+python<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span>
+<span class="c1"># Open the demo pages in your browser</span>
+firefox<span class="w"> </span>http://localhost:8000/examples/wasm/index.html
+</pre></div>
+</div>
+</section>
+<section id="running-wasm-tests">
+<h3>Running WASM Tests<a class="headerlink" href="#running-wasm-tests" title="Link to this heading">#</a></h3>
+<p>To test the WebAssembly bindings:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wasm-pack<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--headless<span class="w"> </span>--firefox
+</pre></div>
+</div>
+</section>
+<section id="running-wasm-specific-tests">
+<h3>Running WASM-Specific Tests<a class="headerlink" href="#running-wasm-specific-tests" title="Link to this heading">#</a></h3>
+<p>For tests that require WASM-specific features, enable the optional <code class="docutils literal notranslate"><span class="pre">wasm-test</span></code> feature:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>wasm-test
+wasm-pack<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--headless<span class="w"> </span>--firefox<span class="w"> </span>--features<span class="w"> </span>wasm-test
+</pre></div>
+</div>
+<p>This ensures that WASM-specific tests and dependencies are only included when needed.</p>
+</section>
+</section>
+<section id="javascript-api">
+<h2>JavaScript API<a class="headerlink" href="#javascript-api" title="Link to this heading">#</a></h2>
+<p>The WebAssembly build exposes a JavaScript API that mirrors the Rust API. Example usage:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Material</span><span class="p">,</span><span class="w"> </span><span class="nx">Nuclide</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;./pkg/materials_for_mc.js&#39;</span><span class="p">;</span>
+
+<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">init</span><span class="p">();</span>
+<span class="w">    </span>
+<span class="w">    </span><span class="c1">// Create a material</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">material</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Material</span><span class="p">();</span>
+<span class="w">    </span><span class="nx">material</span><span class="p">.</span><span class="nx">add_element</span><span class="p">(</span><span class="s2">&quot;Li&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="w">    </span><span class="nx">material</span><span class="p">.</span><span class="nx">set_density</span><span class="p">(</span><span class="s2">&quot;g/cm3&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">0.534</span><span class="p">);</span>
+<span class="w">    </span>
+<span class="w">    </span><span class="c1">// Calculate cross sections</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">xs_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">material</span><span class="p">.</span><span class="nx">calculate_macroscopic_xs_neutron</span><span class="p">([</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">],</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Cross section data:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">xs_data</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="nx">main</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
@@ -407,10 +506,30 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#features">Features</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-webassembly">Building WebAssembly</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-the-package">Building the Package</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#running-wasm-tests">Running WASM Tests</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#running-wasm-specific-tests">Running WASM-Specific Tests</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#javascript-api">JavaScript API</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="_sources/index.md.txt"
+      <li><a href="_sources/webassembly.md.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>
