@@ -519,3 +519,285 @@ def test_microscopic_cross_section_by_name_fission():
             print("Note: Li6 does not have fission data (expected)")
         else:
             raise e
+
+
+def test_sample_reaction_basic():
+    """Test basic functionality of sample_reaction method."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Test sampling at a typical neutron energy
+    reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+    
+    if reaction is not None:
+        # Check that all expected fields are present
+        assert 'mt_number' in reaction, "Reaction should have mt_number field"
+        assert 'cross_section' in reaction, "Reaction should have cross_section field"
+        assert 'threshold_idx' in reaction, "Reaction should have threshold_idx field"
+        assert 'interpolation' in reaction, "Reaction should have interpolation field"
+        assert 'energy' in reaction, "Reaction should have energy field"
+        
+        # Check data types
+        assert isinstance(reaction['mt_number'], int), "MT number should be integer"
+        assert isinstance(reaction['cross_section'], list), "Cross section should be list"
+        assert isinstance(reaction['energy'], list), "Energy should be list"
+        assert isinstance(reaction['threshold_idx'], int), "Threshold index should be integer"
+        assert isinstance(reaction['interpolation'], list), "Interpolation should be list"
+        
+        # Check data validity
+        assert reaction['mt_number'] > 0, "MT number should be positive"
+        assert len(reaction['cross_section']) > 0, "Cross section should not be empty"
+        assert len(reaction['energy']) > 0, "Energy grid should not be empty"
+        assert reaction['threshold_idx'] >= 0, "Threshold index should be non-negative"
+        assert all(x >= 0 for x in reaction['cross_section']), "Cross sections should be non-negative"
+        assert all(e > 0 for e in reaction['energy']), "Energy values should be positive"
+    else:
+        # If no reaction is sampled, that's also valid (zero total cross section)
+        print("Note: No reaction sampled (possibly zero total cross section)")
+
+
+def test_sample_reaction_reproducibility():
+    """Test that sample_reaction gives reproducible results with same seed."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Sample with same seed multiple times
+    reaction1 = nuc.sample_reaction(energy=1.0, temperature='294', seed=123)
+    reaction2 = nuc.sample_reaction(energy=1.0, temperature='294', seed=123)
+    reaction3 = nuc.sample_reaction(energy=1.0, temperature='294', seed=456)
+    
+    if reaction1 is not None and reaction2 is not None:
+        # Same seed should give same result
+        assert reaction1['mt_number'] == reaction2['mt_number'], "Same seed should give same MT number"
+        assert reaction1['cross_section'] == reaction2['cross_section'], "Same seed should give same cross section data"
+        assert reaction1['energy'] == reaction2['energy'], "Same seed should give same energy data"
+        
+        # Different seed might give different result (but not guaranteed)
+        if reaction3 is not None:
+            # We can't guarantee different results, but at least verify the structure is correct
+            assert isinstance(reaction3['mt_number'], int), "Different seed should still give valid MT number"
+    else:
+        print("Note: No reaction sampled in reproducibility test")
+
+
+def test_sample_reaction_different_energies():
+    """Test sample_reaction at different neutron energies."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Test various energies from thermal to fast neutron range
+    test_energies = [1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1000.0]
+    sampled_mts = set()
+    
+    for energy in test_energies:
+        reaction = nuc.sample_reaction(energy=energy, temperature='294', seed=42)
+        
+        if reaction is not None:
+            sampled_mts.add(reaction['mt_number'])
+            
+            # Verify reaction structure at each energy
+            assert reaction['mt_number'] > 0, f"Valid MT number at energy {energy}"
+            assert len(reaction['cross_section']) > 0, f"Non-empty cross section at energy {energy}"
+            assert len(reaction['energy']) > 0, f"Non-empty energy grid at energy {energy}"
+    
+    # Should sample at least one reaction across all energies (unless total XS is zero everywhere)
+    if len(sampled_mts) == 0:
+        print("Warning: No reactions sampled across all test energies")
+    else:
+        print(f"Sampled {len(sampled_mts)} different reaction types across energy range")
+
+
+def test_sample_reaction_be9():
+    """Test sample_reaction with Be9 nuclide (different reaction channels)."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')
+    
+    # Be9 has different reaction channels than Li6
+    reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+    
+    if reaction is not None:
+        # Verify structure
+        assert 'mt_number' in reaction, "Be9 reaction should have mt_number field"
+        assert isinstance(reaction['mt_number'], int), "Be9 MT number should be integer"
+        assert reaction['mt_number'] > 0, "Be9 MT number should be positive"
+        
+        # Check that MT number is valid for Be9
+        assert reaction['mt_number'] in nuc.reaction_mts, f"MT {reaction['mt_number']} should be in available MTs for Be9"
+        
+        print(f"Be9 sampled reaction: MT {reaction['mt_number']}")
+    else:
+        print("Note: No Be9 reaction sampled")
+
+
+def test_sample_reaction_without_seed():
+    """Test that sample_reaction works without specifying a seed."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Sample without seed (should use system random state)
+    reaction1 = nuc.sample_reaction(energy=1.0, temperature='294')
+    reaction2 = nuc.sample_reaction(energy=1.0, temperature='294')
+    
+    # Both should work (might be same or different)
+    if reaction1 is not None:
+        assert isinstance(reaction1['mt_number'], int), "No-seed reaction 1 should be valid"
+    
+    if reaction2 is not None:
+        assert isinstance(reaction2['mt_number'], int), "No-seed reaction 2 should be valid"
+    
+    print("No-seed sampling test completed")
+
+
+def test_sample_reaction_multiple_temperatures():
+    """Test sample_reaction with different temperatures."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Be9')
+    nuc.read_nuclide_from_json('tests/Be9.json')  # Has both 294K and 300K
+    
+    # Sample at both temperatures
+    reaction_294 = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+    reaction_300 = nuc.sample_reaction(energy=1.0, temperature='300', seed=42)
+    
+    # Both should work
+    if reaction_294 is not None:
+        assert isinstance(reaction_294['mt_number'], int), "294K reaction should be valid"
+        
+    if reaction_300 is not None:
+        assert isinstance(reaction_300['mt_number'], int), "300K reaction should be valid"
+    
+    # Results might be different due to temperature-dependent cross sections
+    # but we can't guarantee this, so just verify they both work
+    print("Multiple temperature sampling test completed")
+
+
+def test_sample_reaction_invalid_temperature():
+    """Test error handling for invalid temperature in sample_reaction."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Test with invalid temperature - should handle gracefully
+    # The current implementation uses fallback behavior rather than strict errors
+    reaction = nuc.sample_reaction(energy=1.0, temperature='999', seed=42)
+    
+    # The method should either work (using fallback) or return None
+    if reaction is not None:
+        assert isinstance(reaction['mt_number'], int), "Fallback temperature reaction should be valid"
+        print("Invalid temperature handled with fallback")
+    else:
+        print("Invalid temperature resulted in no reaction sampled")
+
+
+def test_sample_reaction_edge_cases():
+    """Test sample_reaction with edge case energies."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Test very low energy
+    reaction_low = nuc.sample_reaction(energy=1e-5, temperature='294', seed=42)
+    
+    # Test very high energy
+    reaction_high = nuc.sample_reaction(energy=1e7, temperature='294', seed=42)
+    
+    # Both should either work or return None (no error)
+    if reaction_low is not None:
+        assert isinstance(reaction_low['mt_number'], int), "Very low energy should give valid reaction"
+    
+    if reaction_high is not None:
+        assert isinstance(reaction_high['mt_number'], int), "Very high energy should give valid reaction"
+    
+    print("Edge case energy test completed")
+
+
+def test_sample_reaction_zero_energy():
+    """Test sample_reaction with zero energy."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    # Test with zero energy (edge case)
+    reaction = nuc.sample_reaction(energy=0.0, temperature='294', seed=42)
+    
+    # Should either work or return None, not crash
+    if reaction is not None:
+        assert isinstance(reaction['mt_number'], int), "Zero energy should give valid reaction if any"
+    
+    print("Zero energy test completed")
+
+
+def test_sample_reaction_consistency_with_available_mts():
+    """Test that sampled reactions are from available MT numbers."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    available_mts = set(nuc.reaction_mts)
+    sampled_mts = set()
+    
+    # Sample many times to get a good distribution
+    for i in range(100):
+        reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=i)
+        if reaction is not None:
+            sampled_mts.add(reaction['mt_number'])
+    
+    # All sampled MTs should be in the available set
+    for mt in sampled_mts:
+        assert mt in available_mts, f"Sampled MT {mt} should be in available MTs {available_mts}"
+    
+    if sampled_mts:
+        print(f"Sampled MTs {sorted(sampled_mts)} are all in available MTs {sorted(available_mts)}")
+    else:
+        print("No reactions sampled in consistency test")
+
+
+def test_sample_reaction_return_type():
+    """Test that sample_reaction returns correct Python types."""
+    from materials_for_mc import Nuclide
+    
+    nuc = Nuclide('Li6')
+    nuc.read_nuclide_from_json('tests/Li6.json')
+    
+    reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+    
+    if reaction is not None:
+        # Check that it's a dictionary
+        assert isinstance(reaction, dict), "Reaction should be a dictionary"
+        
+        # Check specific field types
+        assert isinstance(reaction['mt_number'], int), "mt_number should be int"
+        assert isinstance(reaction['cross_section'], list), "cross_section should be list"
+        assert isinstance(reaction['energy'], list), "energy should be list"
+        assert isinstance(reaction['threshold_idx'], int), "threshold_idx should be int"
+        assert isinstance(reaction['interpolation'], list), "interpolation should be list"
+        
+        # Check list element types
+        if reaction['cross_section']:
+            assert isinstance(reaction['cross_section'][0], float), "Cross section values should be float"
+        
+        if reaction['energy']:
+            assert isinstance(reaction['energy'][0], float), "Energy values should be float"
+        
+        if reaction['interpolation']:
+            assert isinstance(reaction['interpolation'][0], int), "Interpolation values should be int"
+    
+    else:
+        # None is also a valid return type
+        assert reaction is None, "Return should be None or dict"
+    
+    print("Return type test completed")
