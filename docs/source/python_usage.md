@@ -221,6 +221,8 @@ interacting_nuclide = material.sample_interacting_nuclide(energy=2.5e6, seed=456
 
 ### Sample interacting reaction
 
+Once the interacting nuclide is known then the reaction can be sampled using ```Nuclide.sample_reaction()```.
+
 
 ```python
 import materials_for_mc as m4mc
