@@ -1,4 +1,4 @@
-# WebAssembly Support
+# WebAssembly
 
 The materials_for_mc library provides WebAssembly (WASM) bindings, allowing the library to run in web browsers and other JavaScript environments. This enables client-side nuclear data processing and visualization without requiring server-side computation.
 
