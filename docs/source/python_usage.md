@@ -161,7 +161,7 @@ my_energies, xs_dict = material.calculate_macroscopic_xs([3])
 ## Monte Carlo transport features
 
 If building a Monte Carlo code on top of this package then it is recommended to use the Rust API to access the Monte Carlo specific properties as it offers a offers a speed advantage.  
-However the Python API provides access to all the Monte Carlo Transport properties such as mean free path, sampling of interacting nuclide and interacting reaction for completeness.
+However the Python API also provides access to all the Monte Carlo Transport properties such as mean free path, sampling interaction distance, interacting nuclide and interacting reaction.
 
 ### Mean free path
 
@@ -175,7 +175,8 @@ mat1.add_nuclide('Li7',1)
 mat1.set_density('g/cm3',1.)
 mat1.temperature = "294"
 mat1.read_nuclides_from_json({'Li6':'tests/Li6.json', 'Li7':'tests/Li7.json'})
-m4mc_mean_free_path_at_14mev = mat1.mean_free_path_neutron(14e6)
+mean_free_path = mat1.mean_free_path_neutron(14e6)
+print(f'mean free path is {mean_free_path}')
 ```
 
 ### Sample distance to collision
@@ -192,9 +193,9 @@ mat.add_nuclide("Li6", 1.0)
 mat.set_density("g/cm3", 1.)
 mat.read_nuclides_from_json({"Li6": "tests/Li6.json"})
 mat.temperature = "294"
-# mat.calculate_macroscopic_xs()  # Ensure xs are calculated
+mat.calculate_macroscopic_xs()  # Ensure xs are calculated
 sampled_distance = mat.sample_distance_to_collision(energy=14e6, seed=1234)
-
+print(f'sampled interaction distance is {sampled_distance}')
 ```
 
 ### Sample interacting nuclide
@@ -217,16 +218,17 @@ material.read_nuclides_from_json({
 # Calculate per-nuclide macroscopic total xs
 material.calculate_macroscopic_xs(mt_filter=[1], by_nuclide=True)
 interacting_nuclide = material.sample_interacting_nuclide(energy=2.5e6, seed=456)
+print(f'interacting nuclide is {interacting_nuclide}')
 ```
 
 ### Sample interacting reaction
 
 Once the interacting nuclide is known then the reaction can be sampled using ```Nuclide.sample_reaction()```.
 
-
 ```python
 import materials_for_mc as m4mc
 nuc = m4mc.Nuclide('Li6')
 nuc.read_nuclide_from_json('tests/Li6.json')
 reaction = nuc.sample_reaction(energy=1.0, temperature='294', seed=42)
+print(f'interacting reaction is {reaction}')
 ```
