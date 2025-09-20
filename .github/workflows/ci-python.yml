@@ -132,6 +132,9 @@ jobs:
         with:
           manylinux: 2_17
           args: --release --features pyo3 -i python${{ matrix.python-version }} --out wheelhouse
+          before-script-linux: |
+            yum update -y
+            yum install -y openssl-devel
 
       - name: Build wheel (non-Linux)
         if: runner.os != 'Linux'
