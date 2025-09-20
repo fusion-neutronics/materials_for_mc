@@ -33,6 +33,12 @@ jobs:
           python -m pip install virtualenv
           python -m virtualenv venv
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -101,6 +107,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux for wheel build)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
 
       - name: Set up Python ${{ matrix.python-version }} (non-Linux only)
         if: runner.os != 'Linux'
