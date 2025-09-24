@@ -487,3 +487,13 @@ def test_material_path_normalization_in_cache():
     xs_abs, _ = mat_abs.macroscopic_cross_section("(n,gamma)")
     
     assert xs_rel == xs_abs, "Relative and absolute paths to same file should give identical results"
+
+def test_material_name_set_and_get():
+    mat = Material()
+    assert mat.name is None
+    mat.name = "TestPyName"
+    assert mat.name == "TestPyName"
+    mat.name = "OtherName"
+    assert mat.name == "OtherName"
+    mat2 = Material(name="InitialName")
+    assert mat2.name == "InitialName"

@@ -10,6 +10,17 @@ pub struct PyMaterial {
 
 #[pymethods]
 impl PyMaterial {
+    /// Get the name of the material
+    #[getter]
+    fn name(&self) -> Option<String> {
+        self.internal.get_name().map(|s| s.to_string())
+    }
+
+    /// Set the name of the material
+    #[setter]
+    fn set_name(&mut self, name: String) {
+        self.internal.set_name(name);
+    }
     /// Sample a distance to the next neutron collision.
     ///
     /// Uses the macroscopic total cross section (calculating it first if missing)
@@ -22,7 +33,6 @@ impl PyMaterial {
     ///
     /// Returns:
     ///     Optional[float]: Sampled distance in cm, or None if total XS unavailable.
-    #[pyo3(text_signature = "(self, energy, seed=None)")]
     fn sample_distance_to_collision(&self, energy: f64, seed: Option<u64>) -> Option<f64> {
         use rand::rngs::StdRng;
         use rand::SeedableRng;
@@ -32,16 +42,20 @@ impl PyMaterial {
         };
         self.internal.sample_distance_to_collision(energy, &mut rng)
     }
-    /// Create an empty material.
+    /// Create a new material, optionally with a name.
+    ///
+    /// Args:
+    ///     name (Optional[str]): Name for the material.
     ///
     /// Returns:
-    ///     Material: A new material with no density or nuclides set.
+    ///     Material: A new material with optional name.
     #[new]
-    #[pyo3(text_signature = "()")]
-    fn new() -> Self {
-        PyMaterial {
-            internal: Material::new(),
+    fn new(name: Option<String>) -> Self {
+        let mut internal = Material::new();
+        if let Some(n) = name {
+            internal.set_name(n);
         }
+        PyMaterial { internal }
     }
 
     /// Add (or update) a nuclide number fraction.
@@ -52,7 +66,6 @@ impl PyMaterial {
     ///
     /// Raises:
     ///     ValueError: On invalid fraction or name.
-    #[pyo3(text_signature = "(self, nuclide, fraction)")]
     fn add_nuclide(&mut self, nuclide: String, fraction: f64) -> PyResult<()> {
         self.internal
             .add_nuclide(&nuclide, fraction)
@@ -67,7 +80,6 @@ impl PyMaterial {
     ///
     /// Raises:
     ///     ValueError: If unit not supported.
-    #[pyo3(text_signature = "(self, unit, value)")]
     fn set_density(&mut self, unit: String, value: f64) -> PyResult<()> {
         self.internal
             .set_density(&unit, value)
