@@ -907,7 +907,7 @@ associated energy (e.g. Q-value or representative energy in MeV).</p>
 <h2>Material<a class="headerlink" href="#material" title="Link to this heading">#</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="materials_for_mc.Material">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Material</span></span><a class="headerlink" href="#materials_for_mc.Material" title="Link to this definition">#</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">materials_for_mc.</span></span><span class="sig-name descname"><span class="pre">Material</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#materials_for_mc.Material" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="materials_for_mc.Material.add_element">
@@ -1051,6 +1051,12 @@ for that reaction.</p>
 <dd class="field-odd"><p>Optional[float]</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="materials_for_mc.Material.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#materials_for_mc.Material.name" title="Link to this definition">#</a></dt>
+<dd><p>Get the name of the material</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1314,6 +1320,7 @@ RNG seed can be supplied for reproducibility.</p>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.macroscopic_cross_section"><code class="docutils literal notranslate"><span class="pre">Material.macroscopic_cross_section()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.macroscopic_xs_neutron"><code class="docutils literal notranslate"><span class="pre">Material.macroscopic_xs_neutron</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.mean_free_path_neutron"><code class="docutils literal notranslate"><span class="pre">Material.mean_free_path_neutron()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.name"><code class="docutils literal notranslate"><span class="pre">Material.name</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.nuclide_ptr_addr"><code class="docutils literal notranslate"><span class="pre">Material.nuclide_ptr_addr()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.nuclides"><code class="docutils literal notranslate"><span class="pre">Material.nuclides</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#materials_for_mc.Material.reaction_mts"><code class="docutils literal notranslate"><span class="pre">Material.reaction_mts</span></code></a></li>
