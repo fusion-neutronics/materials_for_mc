@@ -1,3 +1,4 @@
+// ...existing code...
 use crate::config::CONFIG;
 use crate::data::ELEMENT_NAMES;
 use crate::nuclide::{get_or_load_nuclide, Nuclide};
@@ -31,6 +32,8 @@ use std::sync::Arc;
 ///    [`Material::calculate_macroscopic_xs`]) or sampling utilities.
 #[derive(Debug, Clone)]
 pub struct Material {
+    /// Optional name of the material
+    pub name: Option<String>,
     /// Composition of the material as a map of nuclide names to their atomic fractions
     pub nuclides: HashMap<String, f64>,
     /// Density of the material in g/cm³
@@ -56,6 +59,7 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         Material {
+            name: None,
             nuclides: HashMap::new(),
             density: None,
             density_units: String::from("g/cm3"),
@@ -66,6 +70,16 @@ impl Material {
             unified_energy_grid_neutron: Vec::new(),
             macroscopic_xs_neutron_total_by_nuclide: None,
         }
+    }
+
+    /// Set the name of the material
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = Some(name.into());
+    }
+
+    /// Get the name of the material
+    pub fn get_name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
     /// Clear all cached cross section data
@@ -826,39 +840,50 @@ impl Material {
         panic!("Failed to sample nuclide: numerical error in sampling loop");
     }
 }
-//... (The rest of the file, including tests, remains unchanged)
-#[cfg(test)]
-#[test]
-fn test_sample_distance_to_collision() {
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-    let mut material = Material::new();
-    // Set up a mock total cross section and energy grid
-    material.unified_energy_grid_neutron = vec![1.0, 10.0, 100.0];
-    material
-        .macroscopic_xs_neutron
-        .insert(1, vec![2.0, 2.0, 2.0]);
-    let mut rng = StdRng::seed_from_u64(42);
-    let energy = 5.0;
-    // Sample 200 times and check the average is close to expected mean
-    let mut samples = Vec::with_capacity(200);
-    for _ in 0..200 {
-        let distance = material.sample_distance_to_collision(energy, &mut rng);
-        assert!(distance.is_some());
-        samples.push(distance.unwrap());
-    }
-    // For sigma_t = 2.0, mean = 1/sigma_t = 0.5
-    let avg: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
-    let expected_mean = 0.5;
-    let tolerance = 0.05; // 10% tolerance
-    assert!(
-        (avg - expected_mean).abs() < tolerance,
-        "Average sampled distance incorrect: got {}, expected {}",
-        avg,
-        expected_mean
-    );
-}
-mod tests {
+
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn test_set_and_get_name() {
+            let mut mat = Material::new();
+            assert_eq!(mat.get_name(), None);
+            mat.set_name("TestMaterial");
+            assert_eq!(mat.get_name(), Some("TestMaterial"));
+            mat.set_name("AnotherName");
+            assert_eq!(mat.get_name(), Some("AnotherName"));
+        }
+        #[test]
+        fn test_sample_distance_to_collision() {
+            use rand::rngs::StdRng;
+            use rand::SeedableRng;
+            let mut material = Material::new();
+            // Set up a mock total cross section and energy grid
+            material.unified_energy_grid_neutron = vec![1.0, 10.0, 100.0];
+            material
+                .macroscopic_xs_neutron
+                .insert(1, vec![2.0, 2.0, 2.0]);
+            let mut rng = StdRng::seed_from_u64(42);
+            let energy = 5.0;
+            // Sample 200 times and check the average is close to expected mean
+            let mut samples = Vec::with_capacity(200);
+            for _ in 0..200 {
+                let distance = material.sample_distance_to_collision(energy, &mut rng);
+                assert!(distance.is_some());
+                samples.push(distance.unwrap());
+            }
+            // For sigma_t = 2.0, mean = 1/sigma_t = 0.5
+            let avg: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
+            let expected_mean = 0.5;
+            let tolerance = 0.05; // 10% tolerance
+            assert!(
+                (avg - expected_mean).abs() < tolerance,
+                "Average sampled distance incorrect: got {}, expected {}",
+                avg,
+                expected_mean
+            );
+        }
     #[allow(unused_imports)]
     use super::Material;
     #[test]
@@ -2125,3 +2150,4 @@ mod tests {
         assert_eq!(xs_rel, xs_abs, "Relative and absolute paths to same file should give identical results");
     }
 } // close mod tests
+
