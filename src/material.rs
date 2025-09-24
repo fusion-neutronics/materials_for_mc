@@ -1,17 +1,4 @@
-#[cfg(test)]
-mod test_name_field {
-    use super::*;
-
-    #[test]
-    fn test_set_and_get_name() {
-        let mut mat = Material::new();
-        assert_eq!(mat.get_name(), None);
-        mat.set_name("TestMaterial");
-        assert_eq!(mat.get_name(), Some("TestMaterial"));
-        mat.set_name("AnotherName");
-        assert_eq!(mat.get_name(), Some("AnotherName"));
-    }
-}
+// ...existing code...
 use crate::config::CONFIG;
 use crate::data::ELEMENT_NAMES;
 use crate::nuclide::{get_or_load_nuclide, Nuclide};
@@ -858,6 +845,15 @@ impl Material {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn test_set_and_get_name() {
+            let mut mat = Material::new();
+            assert_eq!(mat.get_name(), None);
+            mat.set_name("TestMaterial");
+            assert_eq!(mat.get_name(), Some("TestMaterial"));
+            mat.set_name("AnotherName");
+            assert_eq!(mat.get_name(), Some("AnotherName"));
+        }
         #[test]
         fn test_sample_distance_to_collision() {
             use rand::rngs::StdRng;
